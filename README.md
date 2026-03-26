@@ -14,7 +14,7 @@ A strategic hybrid of chess and cardplay where players battle across a rampart b
     ╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░░░░╚═╝╚═╝░░░░░╚═╝░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░
 
 <p>
-  <img src="screenshots/rampart_bg.png" width="600">
+  <img src="screenshots/rampart_bg.png" width="500">
 </p>
 
 ## 🎮 Download & Play (Windows)
