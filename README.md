@@ -27,10 +27,9 @@ No installation required! To play immediately:
 
 Watch full games of Rampart:
 
-[![Rampart Full Gameplay](https://img.youtube.com/vi/TWDltWxu2pY/0.jpg)](https://www.youtube.com/watch?v=TWDltWxu2pY)
-
-[![Rampart Full Gameplay](https://img.youtube.com/vi/TWDltWxu2pY/0.jpg)](https://www.youtube.com/watch?v=Klb_kVEQBv4)
-
+| Full Gameplay (Client) | Full Gameplay (AI) |
+|:---:|:---:|
+| [![Rampart Gameplay 1](https://img.youtube.com/vi/TWDltWxu2pY/0.jpg)](https://www.youtube.com/watch?v=TWDltWxu2pY) | [![Rampart Gameplay 2](https://img.youtube.com/vi/Klb_kVEQBv4/0.jpg)](https://www.youtube.com/watch?v=Klb_kVEQBv4) |
 
 
 *Click the image above to watch the full gameplay video on YouTube*
