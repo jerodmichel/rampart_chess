@@ -51,10 +51,10 @@ Watch full games of Rampart:
 
 ## Screenshots
 
-| Gameplay | Cast Move | Multiplayer |
+| Multiplayer | Cast Move | AI Mode |
 |----------|--------------|-------------|
-| <img src="screenshots/screen2.png" width="300"> | <img src="screenshots/screen1.png" width="300"> | <img src="screenshots/screen3.png" width="300"> |
-| <img src="screenshots/screen4.png" width="300"> | <img src="screenshots/screen5.png" width="300"> | <img src="screenshots/screen6.png" width="300"> |
+| <img src="screenshots/screen2.png" width="300"> | <img src="screenshots/screen1.png" width="300"> | <img src="screenshots/screen4.png" width="300"> |
+| <img src="screenshots/screen3.png" width="300"> | <img src="screenshots/screen5.png" width="300"> | <img src="screenshots/screen6.png" width="300"> |
 
 ## Features
 | Category                 | Highlights                                                                 |
