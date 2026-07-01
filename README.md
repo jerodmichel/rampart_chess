@@ -66,7 +66,7 @@ Watch full games of Rampart:
 | **Tactical Depth** | Lightning animations • Graveyard resurrection mechanics                    |
 
 ## Official Rules
-[![Rulebook PDF](https://img.shields.io/badge/Download-Rulebook-blue)](https://https://www.apecrank.net/2026/07/rampart-official-rulebook.html)  
+[![Rulebook PDF](https://www.apecrank.net/2026/07/rampart-official-rulebook.html)  
 Complete strategy guide including card combinations and special moves.
 
 ---
