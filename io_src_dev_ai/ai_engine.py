@@ -50,6 +50,7 @@ TIME_LIMIT = INFINITY  # seconds per move
 PIECE_VALUES = {
     'raider': 100,
     'knight': 320,
+    'bishop': 330,
     'rook': 500,
     'queen': 900,
     'king': 20000
@@ -124,6 +125,8 @@ class RampartAttackGenerator:
                     attacks |= self.gen.get_knight_moves(from_sq, friendly_mask, bb.NON_RAIDER_VALID_MASK)
                 elif p_type == 'rook':
                     attacks |= self.gen.get_rook_moves(from_sq, occupied, friendly_mask, bb.NON_RAIDER_VALID_MASK)
+                elif p_type == 'bishop':
+                    attacks |= self.gen.get_bishop_moves(from_sq, occupied, friendly_mask, bb.NON_RAIDER_VALID_MASK)
                 elif p_type == 'queen':
                     attacks |= self.gen.get_queen_moves(from_sq, occupied, friendly_mask, bb.NON_RAIDER_VALID_MASK)
                 elif p_type == 'king':
@@ -233,6 +236,8 @@ class BitboardGameState:
                     targets = self.gen.get_knight_moves(from_sq, friendly_mask, bb.NON_RAIDER_VALID_MASK)
                 elif p_type == 'rook':
                     targets = self.gen.get_rook_moves(from_sq, occupied, friendly_mask, bb.NON_RAIDER_VALID_MASK)
+                elif p_type == 'bishop':
+                    targets = self.gen.get_bishop_moves(from_sq, occupied, friendly_mask, bb.NON_RAIDER_VALID_MASK)
                 elif p_type == 'queen':
                     targets = self.gen.get_queen_moves(from_sq, occupied, friendly_mask, bb.NON_RAIDER_VALID_MASK)
                 elif p_type == 'king':

@@ -70,10 +70,10 @@ class RampartBitboard:
         # 10x6 Board = 60 bits used. 
         # square 0 is 1a, Square 59 is 10f.
         self.white_pieces = {
-            'raider': 0, 'knight': 0, 'rook': 0, 'king': 0, 'queen': 0
+            'raider': 0, 'knight': 0, 'rook': 0, 'bishop': 0, 'king': 0, 'queen': 0
         }
         self.black_pieces = {
-            'raider': 0, 'knight': 0, 'rook': 0, 'king': 0, 'queen': 0
+            'raider': 0, 'knight': 0, 'rook': 0, 'bishop': 0, 'king': 0, 'queen': 0
         }
         
         # RESOURCE STATE (anticipating casting)

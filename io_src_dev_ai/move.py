@@ -70,6 +70,7 @@ class Move:
                 'raider': Raider,
                 'knight': Knight,
                 'rook': Rook,
+                'bishop': Bishop,
                 'queen': Queen,
                 'king': King
             }[piece_data['name']]
