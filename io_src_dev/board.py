@@ -943,7 +943,15 @@ class Board:
                     (1, 0), # down
                     (0, -1) # right
                     ])
-        
+
+        elif isinstance(piece, Bishop):
+            straightline_moves([
+                    (-1, 1), # up-right
+                    (-1, -1), # up-left
+                    (1, 1), # down-right
+                    (1, -1), # down-left
+                    ])
+
         elif isinstance(piece, King):
             king_moves()
             
@@ -983,49 +991,51 @@ class Board:
             self.squares[sq[0]][sq[1]] = Square(sq[0], sq[1], None, card)
      
     def _add_pieces(self, color):
-        # row_raider, row_other = (3, 4) if color == 'white' else (2, 1)
-    
+        # back rank, corner to center: bishop, king, knight, rook
+        # raiders sit in front of each back-rank piece
+
         # raiders
-        # self.squares[4][1] = Square(4, 1, Raider('white')) # test
         if color == 'white':
-            for col in [7, 8, 9]:
+            for col in [6, 7, 8, 9]:
                 card = self.squares[col][3].card if (col,3) in CARDSQS else None
                 self.squares[col][3] = Square(col, 3, Raider(color), card)
-                
+
         else:
-            for col in range(3):
+            for col in range(4):
                 card = self.squares[col][2].card if (col,2) in CARDSQS else None
                 self.squares[col][2] = Square(col, 2, Raider(color), card)
-            
-        # knights
-        if color == 'white':
-            self.squares[8][4] = Square(8, 4, Knight(color))
-        else:
-            self.squares[1][1] = Square(1, 1, Knight(color))
-            # test knight
-            # self.squares[5][2] = Square(5, 2, Knight(color))
-        
-        
-        
+
         # rooks
         if color == 'white':
+            self.squares[6][4] = Square(6, 4, Rook(color))
+        else:
+            self.squares[3][1] = Square(3, 1, Rook(color))
+
+        # knights
+        if color == 'white':
             card = self.squares[7][4].card
-            self.squares[7][4] = Square(7, 4, Rook(color), card)
+            self.squares[7][4] = Square(7, 4, Knight(color), card)
         else:
             card = self.squares[2][1].card
-            self.squares[2][1] = Square(2, 1, Rook(color), card)
-        
-        
+            self.squares[2][1] = Square(2, 1, Knight(color), card)
+
         # queen
         # self.squares[row_other][2] = Square(row_other, 2, Queen(color))
-        
+
         # king
         if color == 'white':
+            self.squares[8][4] = Square(8, 4, King(color))
+        else:
+            card = self.squares[1][1].card
+            self.squares[1][1] = Square(1, 1, King(color), card)
+
+        # bishops
+        if color == 'white':
             card = self.squares[9][4].card
-            self.squares[9][4] = Square(9, 4, King(color), card)
+            self.squares[9][4] = Square(9, 4, Bishop(color), card)
         else:
             card = self.squares[0][1].card
-            self.squares[0][1] = Square(0, 1, King(color), card)
+            self.squares[0][1] = Square(0, 1, Bishop(color), card)
             
 
 # ╭━━━┳━━━━┳╮╱╭┳━━━┳━━━╮╭━╮╭━┳━━━┳━━━━┳╮╱╭┳━━━┳━━━┳━━━╮
@@ -1263,8 +1273,8 @@ class Board:
                 sq = self.squares[col][row]
                 if sq.has_piece():
                     # Track kings and pieces that can deliver check
-                    if (isinstance(sq.piece, King) or 
-                        sq.piece.name in ['queen', 'rook']):  # Long-range pieces
+                    if (isinstance(sq.piece, King) or
+                        sq.piece.name in ['queen', 'rook', 'bishop']):  # Long-range pieces
                         critical_pieces.append((col, row, sq.piece.name, sq.piece.color))
         fingerprint['critical_pieces'] = tuple(sorted(critical_pieces))
         
@@ -1275,7 +1285,7 @@ class Board:
                 sq = self.squares[col][row]
                 if sq.has_rival_piece(player_color):
                     # Pieces that can threaten cast move destinations
-                    if sq.piece.name in ['queen', 'rook', 'raider', 'knight']:
+                    if sq.piece.name in ['queen', 'rook', 'raider', 'knight', 'bishop']:
                         enemy_threats.append((col, row, sq.piece.name))
         fingerprint['enemy_threats'] = tuple(sorted(enemy_threats))
         
