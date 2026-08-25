@@ -85,6 +85,28 @@ class RampartMoveGenerator:
         
         return moves & ~friendly_mask & valid_mask
 
+    def get_bishop_moves(self, sq, occupied, friendly_mask, valid_mask):
+        """
+        Calculates sliding moves for a Bishop at 'sq'.
+        Reuses the precomputed Queen diagonal rays (indices 4-7).
+        """
+        moves = 0
+        for i in [4, 5, 6, 7]: # diagonal directions only
+            ray = self.QUEEN_RAYS[sq][i]
+            blockers = ray & occupied
+            if blockers:
+                if i in [0, 3, 5, 7]:
+                    first_blocker_sq = (blockers & -blockers).bit_length() - 1
+                else:
+                    first_blocker_sq = blockers.bit_length() - 1
+
+                line_to_blocker = ray ^ self.QUEEN_RAYS[first_blocker_sq][i]
+                moves |= line_to_blocker
+            else:
+                moves |= ray
+
+        return moves & ~friendly_mask & valid_mask
+
     def _precompute_knights(self):
         """Generates all legal L-moves for every square on a 10x6 grid."""
         offsets = [
@@ -301,12 +323,14 @@ class RampartCastGenerator:
                 e_threats_adj = enemy_pieces['raider'] | enemy_pieces['king'] | \
                     enemy_pieces['queen']
                 e_knights = enemy_pieces['knight']
-                e_sliders = enemy_pieces['rook'] | enemy_pieces['queen']
-                
+                e_orth_sliders = enemy_pieces['rook'] | enemy_pieces['queen']
+                e_diag_sliders = enemy_pieces['bishop'] | enemy_pieces['queen']
+
                 my_protectors_adj = my_pieces['raider'] | my_pieces['king'] | \
                     my_pieces['queen']
                 my_knights = my_pieces['knight']
-                my_sliders = my_pieces['rook'] | my_pieces['queen']
+                my_orth_sliders = my_pieces['rook'] | my_pieces['queen']
+                my_diag_sliders = my_pieces['bishop'] | my_pieces['queen']
                 
                 best_sq = spawn_squares[0]
                 best_score = -float('inf')
@@ -328,7 +352,12 @@ class RampartCastGenerator:
                             if bit & my_protectors_adj: current_score += 50
                             
                     # C. ray casting
-                    for dc, dr in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                    for dc, dr in [(0, 1), (0, -1), (1, 0), (-1, 0),
+                                   (1, 1), (1, -1), (-1, 1), (-1, -1)]:
+                        is_diag = dc != 0 and dr != 0
+                        e_sliders = e_diag_sliders if is_diag else e_orth_sliders
+                        my_sliders = my_diag_sliders if is_diag else my_orth_sliders
+
                         r, c = row + dr, col + dc
                         while 0 <= r < 6 and 0 <= c < 10:
                             idx = r * 10 + c
