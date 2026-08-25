@@ -62,8 +62,18 @@ class Raider(Piece):
     def __init__(self, color):
         super().__init__('raider', color, 1.0)
                 
+class Bishop(Piece):
+
+    def __init__(self, color):
+        super().__init__('bishop', color, 3.0)
+
+    def set_texture(self, size=80):
+        # only the imgs-{size}px set has bishop art; new_kset/new_Lset don't,
+        # so bishop ignores the theme-cycling index and always uses this set
+        self.texture = os.path.join(f'assets/images/imgs-{size}px/{self.color}_{self.name}.png')
+
 class Knight(Piece):
-        
+
     def __init__(self, color):
         super().__init__('knight', color, 3.0)
                     

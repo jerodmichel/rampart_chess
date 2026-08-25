@@ -1253,6 +1253,7 @@ class Game:
             if name == 'raider': piece = Raider(color)
             elif name == 'knight': piece = Knight(color)
             elif name == 'rook': piece = Rook(color)
+            elif name == 'bishop': piece = Bishop(color)
             elif name == 'queen': piece = Queen(color)
             elif name == 'king': piece = King(color)
             
@@ -1379,14 +1380,14 @@ class Game:
                 "MATERIALS & SETUP",
                 "- 1 standard deck of cards (White uses Spades, Black uses Clubs)",
                 "- Chess pieces per player: 8 Raiders (pawns), 1 Rook, 1 Knight,",
-                "  1 Queen, and 1 King.",
+                "  1 Bishop, 1 Queen, and 1 King.",
                 "- Board: Bottom half is Diamonds, top half is Hearts.",
                 "- Houses: Jack, Queen, and King cards on rows 'a' and 'f'.",
                 "",
                 "PIECE MOVEMENT",
                 "- Raiders: Move 1 space any direction, capture diagonally.",
                 "  Cannot cross back over the rampart (the mid-board barrier).",
-                "- Knights/Rooks/Queens/Kings: Move standard to chess.",
+                "- Knights/Rooks/Bishops/Queens/Kings: Move standard to chess.",
                 "",
                 "CASTING & HOUSES",
                 "Casting requires using exactly 3 cards totaling 21.",
