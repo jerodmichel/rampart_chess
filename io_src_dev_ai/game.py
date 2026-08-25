@@ -19,6 +19,7 @@ Created on Mon Nov 11 12:05:17 2024
 import pygame
 import json
 import os
+import re
 
 from const import *
 from board import Board
@@ -1188,6 +1189,7 @@ class Game:
             if name == 'raider': piece = Raider(color)
             elif name == 'knight': piece = Knight(color)
             elif name == 'rook': piece = Rook(color)
+            elif name == 'bishop': piece = Bishop(color)
             elif name == 'queen': piece = Queen(color)
             elif name == 'king': piece = King(color)
             
@@ -1252,11 +1254,9 @@ class Game:
     def sync_last_move_highlight(self, notation):
         """parses notation to highlight last move"""
         if ">" in notation:
-            parts = notation.split('>')
-            dst_str = notation.split('>')[1][:2]
-            t_col = int(dst_str[0]) - 1
-            t_row = 5 - (ord(dst_str[1]) - ord('a'))
-            
+            dst_token = notation.split('>')[1]
+            t_col, t_row = self._parse_square_token(dst_token)
+
             self.board.last_move = Move(Square(0, 0), Square(t_col, t_row))
         
     def show_load_menu(self, screen):
@@ -1298,19 +1298,27 @@ class Game:
             else:
                 self.next_player = 'white'
             
+    # parses a "<col><row-letter>" square token, e.g. "3f" or "10a".
+    # column is 1-10 (COLS=10) so it can be 1 or 2 digits - can't use
+    # fixed-width slicing to split it from the row letter.
+    SQUARE_TOKEN_RE = re.compile(r'^(\d+)([a-g])')
+
+    def _parse_square_token(self, token):
+        match = self.SQUARE_TOKEN_RE.match(token)
+        col = int(match.group(1)) - 1
+        row = 5 - (ord(match.group(2)) - ord('a'))
+        return col, row
+
     # notation parser
     def apply_notation_to_board(self, notation):
         # handle standard moves
         if ">" in notation and "/" not in notation:
             p_char = notation[0]
-            src_str = notation[1:3]
-            dst_str = notation[4:6]
-            
-            f_col = int(src_str[0]) - 1
-            f_row = 5 - (ord(src_str[1]) - ord('a'))
-            t_col = int(dst_str[0]) - 1
-            t_row = 5 - (ord(dst_str[1]) - ord('a'))
-            
+            src_str, dst_str = notation[1:].split(">")
+
+            f_col, f_row = self._parse_square_token(src_str)
+            t_col, t_row = self._parse_square_token(dst_str)
+
             piece = self.board.squares[f_col][f_row].piece
             
             # in case of corrupted file
@@ -1327,8 +1335,7 @@ class Game:
             is_raise = "++" in notation
             # extract target square: the chars after '@'
             target_part = notation.split('@')[1].split('(')[0]
-            t_col = int(target_part[0]) - 1
-            t_row = 5 - (ord(target_part[1]) - ord('a'))
+            t_col, t_row = self._parse_square_token(target_part)
             target_sq = self.board.squares[t_col][t_row]
             
             # determine piece
@@ -1367,8 +1374,7 @@ class Game:
             
             # manually handle queen spawn
             q_target = spawn_part.split('@')[1]
-            q_col = int(q_target[0]) - 1
-            q_row = 5 - (ord(q_target[1]) - ord('a'))
+            q_col, q_row = self._parse_square_token(q_target)
             self.board._raise_queen(q_col, q_row, self.next_player, self.board.\
                 squares[q_col][q_row].card)
                 
@@ -1443,14 +1449,14 @@ class Game:
                 "MATERIALS & SETUP",
                 "- 1 standard deck of cards (White uses Spades, Black uses Clubs)",
                 "- Chess pieces per player: 8 Raiders (pawns), 1 Rook, 1 Knight,",
-                "  1 Queen, and 1 King.",
+                "  1 Bishop, 1 Queen, and 1 King.",
                 "- Board: Bottom half is Diamonds, top half is Hearts.",
                 "- Houses: Jack, Queen, and King cards on rows 'a' and 'f'.",
                 "",
                 "PIECE MOVEMENT",
                 "- Raiders: Move 1 space any direction, capture diagonally.",
                 "  Cannot cross back over the rampart (the mid-board barrier).",
-                "- Knights/Rooks/Queens/Kings: Move standard to chess.",
+                "- Knights/Rooks/Bishops/Queens/Kings: Move standard to chess.",
                 "",
                 "CASTING & HOUSES",
                 "Casting requires using exactly 3 cards totaling 21.",
