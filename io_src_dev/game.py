@@ -20,6 +20,7 @@ import pygame
 import threading
 import os
 import json
+import re
 
 from const import *
 from board import Board
@@ -1098,19 +1099,27 @@ class Game:
             self.apply_notation_to_board(notation)
             self.next_player = 'black' if self.next_player == 'white' else 'white'
     
+    # parses a "<col><row-letter>" square token, e.g. "3f" or "10a".
+    # column is 1-10 (COLS=10) so it can be 1 or 2 digits - can't use
+    # fixed-width slicing to split it from the row letter.
+    SQUARE_TOKEN_RE = re.compile(r'^(\d+)([a-g])')
+
+    def _parse_square_token(self, token):
+        match = self.SQUARE_TOKEN_RE.match(token)
+        col = int(match.group(1)) - 1
+        row = 5 - (ord(match.group(2)) - ord('a'))
+        return col, row
+
     def apply_notation_to_board(self, notation):
         # interpret rampart notation
-        
+
         # normal moves
         if ">" in notation and "/" not in notation:
-            src_str = notation[1:3]
-            dst_str = notation[4:6]
-            
-            f_col = int(src_str[0]) - 1
-            f_row = 5 - (ord(src_str[1]) - ord('a'))
-            t_col = int(dst_str[0]) - 1
-            t_row = 5 - (ord(dst_str[1]) - ord('a'))
-            
+            src_str, dst_str = notation[1:].split(">")
+
+            f_col, f_row = self._parse_square_token(src_str)
+            t_col, t_row = self._parse_square_token(dst_str)
+
             piece = self.board.squares[f_col][f_row].piece
             move = Move(Square(f_col, f_row), Square(t_col, t_row))
             self.board.move(piece, move)
@@ -1119,8 +1128,7 @@ class Game:
         elif "++" in notation or "--" in notation:
             is_raise = "++" in notation
             target_part = notation.split('@')[1].split('(')[0]
-            t_col = int(target_part[0]) - 1
-            t_row = 5 - (ord(target_part[1]) - ord('a'))
+            t_col, t_row = self._parse_square_token(target_part)
             target_sq = self.board.squares[t_col][t_row]
             
             # identify piece and deck
@@ -1157,8 +1165,7 @@ class Game:
             
             # replay queen spawn
             q_target = spawn_part.split("@")[1]
-            q_col = int(q_target[0]) - 1
-            q_row = 5 - (ord(q_target[1]) - ord('a'))
+            q_col, q_row = self._parse_square_token(q_target)
             self.board._raise_queen(q_col, q_row, self.next_player, self.board.squares[q_col][q_row].card)
             
             # force update to color
@@ -1297,12 +1304,10 @@ class Game:
     def sync_last_move_highlight(self, notation):
         target_str = notation.split(">")[-1] if '>' in notation else \
             notation.split('@')[1]
-        dst = target_str[:2]
         try:
-            t_col = int(dst[0]) - 1
-            t_row = 5 - (ord(dst[1]) - ord('a'))
+            t_col, t_row = self._parse_square_token(target_str)
             self.board.last_move = Move(Square(0, 0), Square(t_col, t_row))
-        except (ValueError, IndexError):
+        except (ValueError, IndexError, AttributeError):
             pass
                 
 

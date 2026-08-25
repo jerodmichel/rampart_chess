@@ -26,6 +26,19 @@ import time
 
 import pygame
 
+# Windows-only: declare this process DPI-aware so Windows doesn't
+# scale/blur the pygame window to match the display's DPI scaling setting
+# (125%/150%/etc). Must run before pygame.init() / any window creation.
+if os.name == 'nt':
+    import ctypes
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor v2 (Win 8.1+)
+    except (AttributeError, OSError):
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()  # fallback (Vista+)
+        except (AttributeError, OSError):
+            pass
+
 def log_to_file(message):
     """Simple, reliable logging to a file in the current directory."""
     try:
@@ -100,7 +113,11 @@ class Main:
     def __init__(self):
         os.environ['SDL_VIDEO_CENTERED'] = '1'
         pygame.init()
-        self.screen = pygame.display.set_mode( (WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT) )
+        # SCALED lets SDL fit/scale this window to whatever the actual
+        # display resolution is, instead of assuming every monitor can
+        # show a fixed WIDTH+200 x HEIGHT+40+RAMPART_HEIGHT window
+        self.screen = pygame.display.set_mode(
+            (WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT), pygame.SCALED)
         pygame.display.set_caption('Rampart')
         self.game = Game()
         self.game.play_strike_sound()
@@ -230,68 +247,11 @@ class Main:
                     self.ai_color, self.state_history, debug=False)
 
                 if engine_move:
-                    if engine_move.move_type == 'normal':
-                        # 2. convert 0-59 bitboard indices to Col/Row
-                        # integer // 10 = Row, integer % 10 = Column
-                        from_col = engine_move.from_sq % 10
-                        from_row = engine_move.from_sq // 10
-                        to_col = engine_move.to_sq % 10
-                        to_row = engine_move.to_sq // 10
-                        
-                        # 3. create a clean dict object to pass to execution
-                        move_data = {
-                            'from_col': from_col,
-                            'from_row': from_row,
-                            'to_col': to_col,
-                            'to_row': to_row,
-                            'piece_type': engine_move.piece_type
-                        }
-                        
-                        # 4. execute
-                        self._execute_normal_move(move_data)
-                        pass
-                    
-                    elif engine_move.move_type == 'enter_queen_house':
-                        # 1. execute occupation
-                        # reuse normal move logic but do not switch turns yet
-                        from_col = engine_move.from_sq % 10
-                        from_row = engine_move.from_sq // 10
-                        to_col = engine_move.to_sq % 10
-                        to_row = engine_move.to_sq // 10
-                        
-                        move_data = {
-                            'from_col': from_col, 'from_row': from_row,
-                            'to_col': to_col, 'to_row': to_row,
-                            'piece_type': 'raider'
-                        }
-                        
-                        # execute move
-                        if self._execute_normal_move(move_data, auto_end_turn=False):
-                        
-                            # 2. execute spawn of queen
-                            if engine_move.spawn_sq is not None:
-                                sp_col = engine_move.spawn_sq % 10
-                                sp_row = engine_move.spawn_sq // 10
-                                
-                                # pass 'None' for cards as not needed for initial 
-                                # queen spawn
-                                self.game.board._raise_queen(sp_col, sp_row, \
-                                    engine_move.color, None)
-                                self.game.play_raise_sound()
-                                self.game.lightning.trigger(engine_move.color, \
-                                    persist_frames=10)
-                                    
-                            self._post_move_check_validation()
-                            
-                        
-                    else:
-                        # cast move
-                        self._execute_cast_move(engine_move)
-                    
+                    self._apply_engine_move(engine_move)
                 else:
                     print("[AI] No move returned by engine.")
                     self._fallback_random_move()
-                    
+
             except Exception as e:
                 log_to_file(f"[MAIN] !!! AI MOVE EXCEPTION: {e}")
                 # important: print to console so can see it immediately
@@ -299,8 +259,97 @@ class Main:
                 self._fallback_random_move()
             finally:
                 self.ai_thinking = False
-    
-    
+
+
+    def _apply_engine_move(self, engine_move):
+        """Executes a single EngineMove (normal / enter_queen_house / cast)
+        against the live pygame board. Shared by the main AI move path and
+        the random-move fallback so both go through identical execution
+        logic."""
+        if engine_move.move_type == 'normal':
+            # convert 0-59 bitboard indices to Col/Row
+            # integer // 10 = Row, integer % 10 = Column
+            from_col = engine_move.from_sq % 10
+            from_row = engine_move.from_sq // 10
+            to_col = engine_move.to_sq % 10
+            to_row = engine_move.to_sq // 10
+
+            move_data = {
+                'from_col': from_col,
+                'from_row': from_row,
+                'to_col': to_col,
+                'to_row': to_row,
+                'piece_type': engine_move.piece_type
+            }
+
+            self._execute_normal_move(move_data)
+
+        elif engine_move.move_type == 'enter_queen_house':
+            # execute occupation
+            # reuse normal move logic but do not switch turns yet
+            from_col = engine_move.from_sq % 10
+            from_row = engine_move.from_sq // 10
+            to_col = engine_move.to_sq % 10
+            to_row = engine_move.to_sq // 10
+
+            move_data = {
+                'from_col': from_col, 'from_row': from_row,
+                'to_col': to_col, 'to_row': to_row,
+                'piece_type': 'raider'
+            }
+
+            # execute move
+            if self._execute_normal_move(move_data, auto_end_turn=False):
+
+                # execute spawn of queen
+                if engine_move.spawn_sq is not None:
+                    sp_col = engine_move.spawn_sq % 10
+                    sp_row = engine_move.spawn_sq // 10
+
+                    # pass 'None' for cards as not needed for initial
+                    # queen spawn
+                    self.game.board._raise_queen(sp_col, sp_row, \
+                        engine_move.color, None)
+                    self.game.play_raise_sound()
+                    self.game.lightning.trigger(engine_move.color, \
+                        persist_frames=10)
+
+                self._post_move_check_validation()
+
+        else:
+            # cast move
+            self._execute_cast_move(engine_move)
+
+
+    def _fallback_random_move(self):
+        """Last-resort recovery when the search engine returns no move, or
+        raises partway through a turn: pick a uniformly random legal move
+        for the AI so the game can continue instead of stalling/crashing.
+        (Previously called but never defined - AI errors used to crash out
+        to an unhandled AttributeError instead of recovering.)"""
+        from rampartbitboard import RampartBitboard
+        from ai_engine import BitboardGameState
+        import random
+
+        try:
+            bb = RampartBitboard()
+            bb.sync_from_board(self.game.board)
+            state = BitboardGameState(bb, self.ai_color)
+            moves = state.get_legal_moves()
+
+            if not moves:
+                print("[AI] Fallback: no legal moves available for AI.")
+                log_to_file("[MAIN] Fallback: AI has no legal moves")
+                return
+
+            move = random.choice(moves)
+            log_to_file(f"[MAIN] Fallback: playing random move {move}")
+            self._apply_engine_move(move)
+        except Exception as e:
+            log_to_file(f"[MAIN] !!! FALLBACK MOVE EXCEPTION: {e}")
+            print(f"AI FALLBACK ERROR: {e}")
+
+
     def _execute_normal_move(self, move_data, auto_end_turn=True):
         """Executes a standard board move determined by AI."""
         f_col, f_row = move_data['from_col'], move_data['from_row']

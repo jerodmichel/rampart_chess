@@ -26,6 +26,19 @@ import random
 
 import pygame
 
+# Windows-only: declare this process DPI-aware so Windows doesn't
+# scale/blur the pygame window to match the display's DPI scaling setting
+# (125%/150%/etc). Must run before pygame.init() / any window creation.
+if os.name == 'nt':
+    import ctypes
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor v2 (Win 8.1+)
+    except (AttributeError, OSError):
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()  # fallback (Vista+)
+        except (AttributeError, OSError):
+            pass
+
 # ╭━━━┳╮╱╭┳━━━┳━━┳━━━╮
 # ┃╭━╮┃┃╱┃┣╮╭╮┣┫┣┫╭━╮┃
 # ┃┃╱┃┃┃╱┃┃┃┃┃┃┃┃┃┃╱┃┃
@@ -93,7 +106,11 @@ class Main:
     def __init__(self):
         os.environ['SDL_VIDEO_CENTERED'] = '1'
         pygame.init()
-        self.screen = pygame.display.set_mode( (WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT) )
+        # SCALED lets SDL fit/scale this window to whatever the actual
+        # display resolution is, instead of assuming every monitor can
+        # show a fixed WIDTH+200 x HEIGHT+40+RAMPART_HEIGHT window
+        self.screen = pygame.display.set_mode(
+            (WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT), pygame.SCALED)
         pygame.display.set_caption('Rampart')
         self.game = Game()
         self.game.play_strike_sound()
