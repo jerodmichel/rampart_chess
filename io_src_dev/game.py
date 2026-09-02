@@ -348,6 +348,29 @@ class Game:
 # ┃╰━╯┃┃╱┃┃╰━╯┣╮╭╮╭╯┃┃┃┃┃┃╭━╮┃╱┃┃╱┃╰━━┫┃┃╰┳┫┣┫╭━╮┃╰━╯┃╰━╯┃
 # ╰━━━┻╯╱╰┻━━━╯╰╯╰╯╱╰╯╰╯╰┻╯╱╰╯╱╰╯╱╰━━━┻╯╰━┻━━┻╯╱╰┻━━━┻━━━╯
     
+    def _get_check_halo(self, size=104):
+        # soft red radial-gradient glow, drawn behind an in-check king so it
+        # peeks out around the piece's (transparent-background) silhouette -
+        # built once per size and cached, since a per-pixel gradient isn't
+        # something to redo every frame.
+        halo = getattr(self, '_check_halo_cache', {}).get(size)
+        if halo is not None:
+            return halo
+        halo = pygame.Surface((size, size), pygame.SRCALPHA)
+        cx = cy = size / 2
+        max_r = size / 2
+        max_alpha = 140
+        for y in range(size):
+            for x in range(size):
+                dist = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+                if dist <= max_r:
+                    alpha = max_alpha * (1 - dist / max_r) ** 1.4
+                    halo.set_at((x, y), (220, 30, 30, int(alpha)))
+        if not hasattr(self, '_check_halo_cache'):
+            self._check_halo_cache = {}
+        self._check_halo_cache[size] = halo
+        return halo
+
     def show_pieces(self, surface):
         for col in range(COLS):
             for row in range(ROWS):
@@ -364,6 +387,13 @@ class Game:
                                     (disp_row * RHEIGHT + RHEIGHT // 2 if disp_row < 3 \
                                      else disp_row * RHEIGHT + RHEIGHT // 2 + RAMPART_HEIGHT)
                         piece.texture_rect = img.get_rect(center=img_center)
+
+                        if piece.name == 'king' and \
+                            ((piece.color == 'white' and self.white_cast_prompt == 'in-check') or
+                             (piece.color == 'black' and self.black_cast_prompt == 'in-check')):
+                            halo = self._get_check_halo()
+                            surface.blit(halo, halo.get_rect(center=img_center))
+
                         surface.blit(img, piece.texture_rect)
                     
     def show_dead(self, surface):
@@ -754,6 +784,12 @@ class Game:
             elif self.white_cast_prompt == 'choosegrv':
                 text = font.render('Choose a peice from the cemetery to raise.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.white_cast_prompt == 'no-raise':
+                text = font.render('No eligible square to raise on.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.white_cast_prompt == 'no-strike':
+                text = font.render('No eligible raider to strike.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.white_cast_prompt == 'make21':
                 text = font.render('Choose cards from your deck and from the board that sum to 21.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
@@ -777,7 +813,12 @@ class Game:
                 	surface.blit(text1,(320, 805 + RAMPART_HEIGHT))
                 	text2 = font.render('-- Press "r" key to start new game.',True,(255, 255, 255))
                 	surface.blit(text2,(540, 805 + RAMPART_HEIGHT))
-            
+            elif isinstance(self.white_cast_prompt, list) and self.white_cast_prompt[1] == 'insufficient-material':
+                text1 = font.render('Draw by insufficient material', True, (255, 255, 255))
+                surface.blit(text1, (320, 805 + RAMPART_HEIGHT))
+                text2 = font.render('-- Press "r" key to start new game.', True, (255, 255, 255))
+                surface.blit(text2, (320 + text1.get_width() + 10, 805 + RAMPART_HEIGHT))
+
         if color == 'black' and self.black_cast_prompt:
             if self.black_cast_prompt == 'cast':
                 text = font.render('To begin casting, click on a card in your deck.',True,(255, 255, 255))
@@ -794,8 +835,14 @@ class Game:
             elif self.black_cast_prompt == 'choosegrv':
                 text = font.render('Choose a peice from the cemetery to raise.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.black_cast_prompt == 'no-raise':
+                text = font.render('No eligible square to raise on.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.black_cast_prompt == 'no-strike':
+                text = font.render('No eligible raider to strike.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.black_cast_prompt == 'make21':
-                text = font.render('Choose a peice from the cemetery to raise.',True,(255, 255, 255))
+                text = font.render('Choose cards from your deck and from the board that sum to 21.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.black_cast_prompt == 'choosecast':
                 text = font.render('Click one of the "strike" or "raise" buttons.',True,(255, 255, 255))
@@ -817,15 +864,26 @@ class Game:
                	surface.blit(text1,(320, 805 + RAMPART_HEIGHT))
                	text2 = font.render('-- Press "r" key to start new game.',True,(255, 255, 255))
                	surface.blit(text2,(540, 805 + RAMPART_HEIGHT))
+            elif isinstance(self.black_cast_prompt, list) and self.black_cast_prompt[1] == 'insufficient-material':
+                text1 = font.render('Draw by insufficient material', True, (255, 255, 255))
+                surface.blit(text1, (320, 805 + RAMPART_HEIGHT))
+                text2 = font.render('-- Press "r" key to start new game.', True, (255, 255, 255))
+                surface.blit(text2, (320 + text1.get_width() + 10, 805 + RAMPART_HEIGHT))
 
     def next_turn(self):
         with self.turn_lock:  # thread safety
             if not self.queen_raid_pending:
+                if self.board.is_draw_by_insufficient_material() or \
+                        self.board.is_draw_by_locked_material():
+                    self.board.king_stalemated = True
+                    self.set_insufficient_material_prompt()
+                    return
+
                 if self.next_player == 'white':
                     self.next_player = 'black'
                 else:
                     self.next_player = 'white'
-                    
+
                 self.next_state = 'update1'
                 
     def change_state(self):
@@ -946,13 +1004,23 @@ class Game:
         return (None, None)
         
     def set_mated_prompt(self, color):
+        # guard against overwrite of a draw already detected
+        if isinstance(self.white_cast_prompt, list) and \
+            len(self.white_cast_prompt) > 1 and \
+            self.white_cast_prompt[1] == 'insufficient-material':
+            return
+
         if self.board.king_mated:
             self.white_cast_prompt = [color, 'mated']
             self.black_cast_prompt = [color, 'mated']
         elif self.board.king_stalemated:
             self.white_cast_prompt = [color, 'stale-mated']
             self.black_cast_prompt = [color, 'stale-mated']
-        
+
+    def set_insufficient_material_prompt(self):
+        self.white_cast_prompt = ['both', 'insufficient-material']
+        self.black_cast_prompt = ['both', 'insufficient-material']
+
     def set_in_check_prompt(self, color):
         if color == 'white':
             self.white_cast_prompt = 'in-check'
@@ -988,6 +1056,18 @@ class Game:
             self.white_cast_prompt = 'choosegrv'
         else:
             self.black_cast_prompt = 'choosegrv'
+
+    def set_no_raise_prompt(self, color):
+        if color == 'white':
+            self.white_cast_prompt = 'no-raise'
+        else:
+            self.black_cast_prompt = 'no-raise'
+
+    def set_no_strike_prompt(self, color):
+        if color == 'white':
+            self.white_cast_prompt = 'no-strike'
+        else:
+            self.black_cast_prompt = 'no-strike'
             
     def set_make_21_prompt(self, color):
         if color == 'white':
@@ -1006,6 +1086,13 @@ class Game:
             self.white_cast_prompt = ''
         else:
             self.black_cast_prompt = ''
+
+    def restore_cast_prompt(self, color):
+        # re-show 'cast' if COLOR's piece is still sitting on the enemy jack
+        # house after an overriding prompt (e.g. 'in-check') is cleared -
+        # that condition doesn't go away just because the prompt covering it did.
+        if self.board._enemy_jack_house_occupied(color):
+            self.set_cast_prompt(color)
     
     def set_sq_hover(self, col, row):
         if self.flipped:
@@ -1093,12 +1180,37 @@ class Game:
         # rebuild board for local viewing without affecting firebase
         self.board = Board(self.flipped)
         self.next_player = 'white'
-        
+
         for i in range(index):
             notation = history[i]
             self.apply_notation_to_board(notation)
             self.next_player = 'black' if self.next_player == 'white' else 'white'
-    
+
+        # Board(...) always starts with king_mated/king_stalemated False, so
+        # a reconstruction landing on the real game's final position would
+        # otherwise silently look "in progress" again - re-derive both the
+        # flags and the prompt from the reconstructed position itself, the
+        # same way load_game() does, rather than trusting next_player (which
+        # only reflects the mover, not the mated/stalemated side).
+        self.kill_prompt('white')
+        self.kill_prompt('black')
+
+        current_player = self.board.players[1] if self.next_player == 'white' \
+            else self.board.players[0]
+
+        mated_or_stale_color = None
+        for p in self.board.players:
+            if self.board._king_mated(p):
+                mated_or_stale_color = p.color
+                break
+
+        if mated_or_stale_color:
+            self.set_mated_prompt(mated_or_stale_color)
+        elif self.board.king_in_check(current_player):
+            self.set_in_check_prompt(self.next_player)
+        elif self.next_player == 'white':
+            self.set_cast_prompt('white')
+
     # parses a "<col><row-letter>" square token, e.g. "3f" or "10a".
     # column is 1-10 (COLS=10) so it can be 1 or 2 digits - can't use
     # fixed-width slicing to split it from the row letter.
@@ -1290,9 +1402,20 @@ class Game:
         self.kill_prompt('black')
         current_player = self.board.players[1] if self.next_player == 'white' else \
             self.board.players[0]
-            
-        if self.board._king_mated(current_player):
-            self.set_mated_prompt(self.next_player)
+
+        # Mate/stalemate is checked against BOTH players rather than just
+        # current_player: when a saved game actually ended in mate,
+        # next_player was never advanced to the mated side (the turn-switch
+        # that would do that is skipped once mate is detected), so
+        # next_player still names the winner here, not the side with no moves.
+        mated_or_stale_color = None
+        for p in self.board.players:
+            if self.board._king_mated(p):
+                mated_or_stale_color = p.color
+                break
+
+        if mated_or_stale_color:
+            self.set_mated_prompt(mated_or_stale_color)
         elif self.board.king_in_check(current_player):
             self.set_in_check_prompt(self.next_player)
         elif self.next_player == 'white':
@@ -1342,8 +1465,11 @@ class Game:
          title_surf = font_title.render(title, True, (0, 255, 255))
          screen.blit(title_surf, (WIDTH + 20, 200))
          
-         # draw options with hover effect
-         mouse_pos = pygame.mouse.get_pos()
+         # draw options with hover effect (scaled back to design-resolution
+         # coordinates - see Main._get_mouse_pos() for why)
+         _mx, _my = pygame.mouse.get_pos()
+         ui_scale = getattr(self, 'ui_scale', 1.0)
+         mouse_pos = (int(_mx / ui_scale), int(_my / ui_scale))
          for i, opt in enumerate(options):
              # define hitboxes for options
              opt_rect = pygame.Rect(WIDTH + 20, 240 + (i * 40), 160, 30)
@@ -1375,7 +1501,7 @@ class Game:
         if self.show_rules_overlay:
             title = font_title.render("RAMPART RULES", True, (0, 255, 255))
             lines = [
-                "Official Rulebook: https://osf.io/5w74d/files/a3cfz",
+                "Official Rulebook: https://apecrank.net/rampart_rulebook/",
                 "--------------------------------------------------",
                 "RAMPART: DESCRIPTION",
                 "Rampart is a strategic hybrid of chess and cardplay, where two",

@@ -32,8 +32,12 @@ class Piece:
         self.texture_rect = texture_rect
         
     def set_texture(self, size=80):
+        # new_kset used to be .svg; runtime SVG rasterization varies across
+        # platforms/SDL2_image versions (rendered full-size on Linux but
+        # tiny on Windows), so these are now pre-rendered to fixed-size
+        # PNGs instead of decoded at runtime.
         textures = [f'assets/images/imgs-{size}px/{self.color}_{self.name}.png', \
-                    f'assets/images/new_kset/{self.color}_{self.name}.svg', \
+                    f'assets/images/new_kset/{self.color}_{self.name}.png', \
                         f'assets/images/new_Lset/{self.color}_{self.name}.png']
         self.texture = os.path.join(
                 textures[self.idx3]
@@ -55,7 +59,7 @@ class Piece:
         
     def change_texture(self):
         self.idx3 += 1
-        self.idx3 %= 3
+        self.idx3 %= 2  # new_Lset (idx 2) disabled until it has bishop art
 
 class Raider(Piece):
     

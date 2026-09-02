@@ -91,13 +91,13 @@ class Config:
         
     def _add_emblems(self):
         print("Loading emblem paths...")  # debug
-        alpha_omega = [r'assets/images/alpha_omega.jpg', 'assets/images/alpha_omega.jpg']
+        alpha_omega = [r'assets/images/alpha_omega88.png', 'assets/images/alpha_omega88.png']
         
         alpha_omega2 = [r'assets/images/alpha-omega1.png', 'assets/images/alpha-omega1.png']
         
-        alpha_omega1 = [r'assets/images/alpha-omega2.png', 'assets/images/alpha-omega2.png']
+        alpha_omega1 = [r'assets/images/alpha_omega.png', 'assets/images/alpha_omega.png']
         
-        alpha_omega3 = [r'assets/images/alpha_omega.jpg', 'assets/images/alpha_omega.jpg']
+        alpha_omega3 = [r'assets/images/alpha-omega2.png', 'assets/images/alpha-omega2.png']
         self.emblems = [alpha_omega, alpha_omega2, alpha_omega1, alpha_omega3]
         
     def change_dead_card(self):

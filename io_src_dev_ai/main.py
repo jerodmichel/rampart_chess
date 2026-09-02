@@ -19,10 +19,27 @@ Created on Mon Nov 11 11:49:17 2024
 # from firebase_admin import db
 
 import sys
+
+# On Windows, when stdout/stderr aren't attached to a real console (e.g.
+# launched as a subprocess with piped output, as launcher.py does), Python
+# falls back to the OS's legacy codepage (cp1252) instead of UTF-8 to
+# encode printed text. Several debug prints in this codebase use emoji,
+# which crashes with UnicodeEncodeError under that codepage. Force UTF-8
+# so those prints (and any future ones) never depend on the console's
+# encoding.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, 'reconfigure'):
+        try:
+            _stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
 print(f"DEBUG: Python executable path is: {sys.executable}")
 
 import os
 import time
+import threading
+import datetime
 
 import pygame
 
@@ -113,14 +130,38 @@ class Main:
     def __init__(self):
         os.environ['SDL_VIDEO_CENTERED'] = '1'
         pygame.init()
-        # SCALED lets SDL fit/scale this window to whatever the actual
-        # display resolution is, instead of assuming every monitor can
-        # show a fixed WIDTH+200 x HEIGHT+40+RAMPART_HEIGHT window
-        self.screen = pygame.display.set_mode(
-            (WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT), pygame.SCALED)
+
+        # pygame.SCALED alone doesn't shrink a window below its requested
+        # size - by itself it only ever scales UP to an integer multiple on
+        # a larger display, never down, so on a screen smaller than the
+        # design resolution (WIDTH+200 x HEIGHT+40+RAMPART_HEIGHT, i.e.
+        # 1000x860) the window used to render at full size regardless,
+        # overflowing the screen. Instead, every existing draw call keeps
+        # targeting self.screen - an off-screen Surface at the fixed design
+        # resolution, completely unchanged - and self.display is the real,
+        # on-screen window, sized to actually fit whatever screen this runs
+        # on. _present() scales the former into the latter once per frame.
+        design_w, design_h = WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT
+        try:
+            display_info = pygame.display.Info()
+            screen_w, screen_h = display_info.current_w, display_info.current_h
+        except Exception:
+            screen_w, screen_h = design_w, design_h
+
+        scale = min(1.0, (screen_w * 0.95) / design_w, (screen_h * 0.85) / design_h)
+        display_w = max(1, int(design_w * scale))
+        display_h = max(1, int(design_h * scale))
+
+        self.screen = pygame.Surface((design_w, design_h))
+        self.display = pygame.display.set_mode((display_w, display_h), pygame.SCALED)
+        self.ui_scale = scale
         pygame.display.set_caption('Rampart')
         self.game = Game()
         self.game.play_strike_sound()
+        # game.py's own show_side_menu() reads the real mouse position
+        # directly for a hover effect - give it the same scale factor so
+        # that stays aligned with the design-resolution rects it hit-tests.
+        self.game.ui_scale = self.ui_scale
         
 
 # ░█████╗░██╗  ██╗░░░░░░█████╗░░██████╗░██╗░█████╗░
@@ -132,7 +173,10 @@ class Main:
         
         self.ai_color = 'black'
         self.ai_thinking = False
-        
+        self.ai_thread = None
+        self.ai_move_result = None
+        self.ai_move_error = None
+
         # AI setup
         self.ai_engine = NegamaxEngine()
         self.ai_thinking_time = 3.0
@@ -147,7 +191,74 @@ class Main:
         
         self.state_history = []
         self.move_log = []
-        
+        self._autosaved = False
+
+    def _get_mouse_pos(self):
+        """pygame.mouse.get_pos() reports real on-screen pixels, but every
+        click/hover rect in this file and game.py is defined in the fixed
+        design resolution self.screen draws to - convert back to that
+        space here rather than at every one of the many call sites."""
+        x, y = pygame.mouse.get_pos()
+        return (int(x / self.ui_scale), int(y / self.ui_scale))
+
+    def _present(self):
+        """Scale the fixed-resolution off-screen surface (self.screen, what
+        every draw call in this file and game.py actually targets) into the
+        real, screen-sized window and show it. Call this wherever the code
+        used to call pygame.display.update()/flip() directly."""
+        if self.display.get_size() == self.screen.get_size():
+            self.display.blit(self.screen, (0, 0))
+        else:
+            pygame.transform.smoothscale(self.screen, self.display.get_size(), self.display)
+        pygame.display.update()
+
+    def _autosave_finished_game(self):
+        """Called once per frame; the moment a game ends (checkmate,
+        stalemate, repetition, or insufficient material), silently writes
+        the full move history to saves/ so a finished game is never lost
+        just because the window gets closed without an explicit Save."""
+        if self._autosaved:
+            return
+        if not (self.game.board.king_mated or self.game.board.king_stalemated):
+            return
+
+        self._autosaved = True
+
+        if not self.move_log:
+            return  # nothing played, nothing worth saving
+
+        if not os.path.exists('saves'):
+            os.makedirs('saves', exist_ok=True)
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"saves/autosave_{timestamp}.json"
+
+        self.game.move_log = self.move_log
+        self.game.save_game(filename)
+        print(f"[AUTOSAVE] Game over - saved to {filename}")
+
+    # depth cap and per-move time budget for each difficulty - Hard gets a
+    # much larger time budget because Medium's search was regularly hitting
+    # TIME_LIMIT before finishing a depth-6 pass (see the
+    # "[AI] Time limit reached at Depth 5/6" log lines during real games),
+    # so simply raising max_depth without also raising the time budget
+    # wouldn't let it search any deeper in practice.
+    AI_DIFFICULTY_SETTINGS = {
+        'Easy':   {'max_depth': 4, 'time_limit': 5.0},
+        'Medium': {'max_depth': 6, 'time_limit': 5.0},
+        'Hard':   {'max_depth': 7, 'time_limit': 15.0},
+    }
+    AI_DIFFICULTY_NEXT = {'Easy': 'Medium', 'Medium': 'Hard', 'Hard': 'Easy'}
+
+    def _cycle_ai_difficulty(self):
+        """Advance ai_difficulty Easy -> Medium -> Hard -> Easy, applying
+        the matching search depth and time budget to the engine."""
+        self.game.ai_difficulty = self.AI_DIFFICULTY_NEXT.get(
+            self.game.ai_difficulty, 'Easy')
+        settings = self.AI_DIFFICULTY_SETTINGS[self.game.ai_difficulty]
+        self.ai_engine.max_depth = settings['max_depth']
+        self.ai_engine.time_limit = settings['time_limit']
+
     def _check_repetition_draw(self):
         # temp bitboard
         temp_bb = RampartBitboard()
@@ -184,8 +295,10 @@ class Main:
         # 2. clear AI's old prompts
         if self.ai_color == 'white' and self.game.white_cast_prompt == 'in-check':
             self.game.kill_prompt(self.ai_color)
+            self.game.restore_cast_prompt(self.ai_color)
         elif self.ai_color == 'black' and self.game.black_cast_prompt == 'in-check':
             self.game.kill_prompt(self.ai_color)
+            self.game.restore_cast_prompt(self.ai_color)
             
         # 3. DETECT CHECK BEFORE TURN SWITCH
         if self.game.board.king_in_check(rival_player):
@@ -214,51 +327,79 @@ class Main:
         
         
     def ai_make_move(self):
-        """AI using Negamax (Bitboards) to make moves"""
+        """AI using Negamax (Bitboards) to make moves.
+
+        Kicks the search off on a background thread rather than blocking
+        the main loop, so the render loop keeps running (and the thinking
+        hourglass keeps animating) for however long the search takes.
+        The actual move is applied back on the main thread by
+        _poll_ai_thread() once the thread finishes.
+        """
         # only run if it's AI's turn, game isn't over, and AI isn't already thinking
-        if (self.game.next_player == self.ai_color and 
+        if (self.game.next_player == self.ai_color and
             not self.game.board.king_mated and
             not self.game.board.king_stalemated and
             not self.ai_thinking):
-            
+
             # quick sanity check
             from rampartbitboard import RampartBitboard
             from ai_engine import BitboardGameState
-            
+
             bb = RampartBitboard()
             bb.sync_from_board(self.game.board)
             state = BitboardGameState(bb, self.ai_color)
-            
+
             moves = state.get_legal_moves()
-            
+
             if len(moves) == 0:
                 print("WARNING: Bitboard says AI has no moves!")
                 # check if AI king is in check
                 in_check = state.attack_gen.is_king_in_check(bb, self.ai_color)
                 print(f"AI king in check: {in_check}")
-            
+
             self.ai_thinking = True
-            pygame.display.flip()
-            
-            try:
-                # 1. ask the new AI Engine for the best move
-                # this returns an EngineMove object
-                engine_move = self.ai_engine.get_best_move(self.game.board, \
-                    self.ai_color, self.state_history, debug=False)
+            self.game.hourglass.start()
+            self.ai_move_result = None
+            self.ai_move_error = None
 
-                if engine_move:
-                    self._apply_engine_move(engine_move)
-                else:
-                    print("[AI] No move returned by engine.")
-                    self._fallback_random_move()
+            def _search():
+                try:
+                    self.ai_move_result = self.ai_engine.get_best_move(
+                        self.game.board, self.ai_color, self.state_history, debug=False)
+                except Exception as e:
+                    self.ai_move_error = e
 
-            except Exception as e:
-                log_to_file(f"[MAIN] !!! AI MOVE EXCEPTION: {e}")
-                # important: print to console so can see it immediately
-                print(f"AI ERROR: {e}")
+            self.ai_thread = threading.Thread(target=_search, daemon=True)
+            self.ai_thread.start()
+
+    def _poll_ai_thread(self):
+        """Called once per frame; applies the AI's move on the main thread
+        as soon as the background search thread finishes."""
+        if not self.ai_thinking or self.ai_thread is None or self.ai_thread.is_alive():
+            return
+
+        self.ai_thread = None
+        self.game.hourglass.stop()
+
+        try:
+            if self.ai_move_error is not None:
+                raise self.ai_move_error
+
+            if self.ai_move_result:
+                self._apply_engine_move(self.ai_move_result)
+            else:
+                print("[AI] No move returned by engine.")
                 self._fallback_random_move()
-            finally:
-                self.ai_thinking = False
+
+        except Exception as e:
+            log_to_file(f"[MAIN] !!! AI MOVE EXCEPTION: {e}")
+            # important: print to console so can see it immediately
+            print(f"AI ERROR: {e}")
+            self._fallback_random_move()
+        finally:
+            self.ai_move_result = None
+            self.ai_move_error = None
+            self.ai_thinking = False
 
 
     def _apply_engine_move(self, engine_move):
@@ -313,6 +454,14 @@ class Main:
                     self.game.play_raise_sound()
                     self.game.lightning.trigger(engine_move.color, \
                         persist_frames=10)
+
+                    # record the spawn in the move log - without this suffix
+                    # (mirroring the human click-handler's compound notation,
+                    # e.g. "R5e>4f/Q@7c") the queen exists on the live board
+                    # but history replay has no record of how it got there,
+                    # and desyncs on its first subsequent move.
+                    spawn_dst = f"{sp_col + 1}{Square.get_alpharow(5 - sp_row)}"
+                    self.move_log[-1] += f"/Q@{spawn_dst}"
 
                 self._post_move_check_validation()
 
@@ -392,10 +541,22 @@ class Main:
             print(f"DEBUG: Move Log Update -> {self.move_log}")
              
             self.game.play_sound(captured)
-            
+
+            # "mate by capture": landing on the enemy's king house while their
+            # king is off a card square is an immediate win, independent of
+            # ordinary check/checkmate. Ported from the human-move handler
+            # (this AI-move path had no equivalent check at all before this).
+            # Setting the flag here is enough - _post_move_check_validation
+            # already checks board.king_mated first, before it would call
+            # _king_mated()/next_turn(), so it reports the win with the
+            # correct color and doesn't switch turns.
+            if self.game.board.squares[t_col][t_row].is_enemy_king_house(piece.color):
+                if self.game.board._opponent_king_on_noncard(piece.color):
+                    self.game.board.king_mated = True
+
             if auto_end_turn:
                 self._post_move_check_validation()
-                
+
             return True
             
         else:
@@ -496,8 +657,8 @@ class Main:
         self.btn_prev = pygame.Rect(arrow_x, base_y - 5, 35, 33) 
         self.btn_next = pygame.Rect(arrow_x + 45, base_y - 5, 35, 33) 
 
-        mouse_pos = pygame.mouse.get_pos() 
-        bg_color = (240, 240, 245)     
+        mouse_pos = self._get_mouse_pos()
+        bg_color = (240, 240, 245)
         base_border = (90, 90, 90)
         hover_border = (0, 0, 0) 
         
@@ -525,11 +686,16 @@ class Main:
         
         # --- AI LEVEL INDICATOR HERE ---
         diff_str = f"{self.game.ai_difficulty.upper()}"
-        # green for easy, orange for medium
-        diff_color = (0, 255, 0) if self.game.ai_difficulty == "Easy" else (255, 165, 0) 
+        # green for easy, orange for medium, red for hard
+        diff_colors = {'Easy': (0, 255, 0), 'Medium': (255, 165, 0), 'Hard': (255, 60, 60)}
+        diff_color = diff_colors.get(self.game.ai_difficulty, (255, 165, 0))
         diff_surf = arrow_font.render(diff_str, True, diff_color)
-        
-        self.screen.blit(diff_surf, (15, base_y + 70))
+
+        # center under the alpha-omega emblem, which show_cemetery() blits
+        # at x=5 scaled to 80px wide (game.py) - so its horizontal center is
+        # x=45.
+        diff_x = 45 - diff_surf.get_width() // 2
+        self.screen.blit(diff_surf, (diff_x, base_y + 70))
         
         
 # █▀▀ █▀█ █▀▄▀█ █▀▄▀█ ▄▀█ █▄░█ █▀▄   █▀▄▀█ █▀▀ █▄░█ █░█
@@ -551,6 +717,7 @@ class Main:
                 self.ai_thinking = False
                 self.move_log = []
                 self.state_history = []
+                self._autosaved = False
                 temp_bb = RampartBitboard()
                 temp_bb.sync_from_board(self.game.board)
                 self.state_history.append(temp_bb.get_state_hash())
@@ -568,8 +735,7 @@ class Main:
             elif index == 1: # Change Pieces
                 self.game.board.change_all_piece_textures()
             elif index == 2: # Toggle AI Difficulty
-                self.game.ai_difficulty = "Easy" if self.game.ai_difficulty == "Medium" else "Medium"
-                self.ai_engine.max_depth = 4 if self.game.ai_difficulty == 'Easy' else 5
+                self._cycle_ai_difficulty()
                 
         elif menu_type == 'help':
             if index == 0:   # Rules
@@ -618,7 +784,14 @@ class Main:
                 clicker = game.clicker
                 del self.need_refresh  # clear flag
                 print("References refreshed!")
-            
+
+            # pick up the AI's move as soon as the background search
+            # thread finishes, and keep the thinking hourglass animating
+            # every iteration of this loop (which has no frame cap)
+            self._poll_ai_thread()
+            self._autosave_finished_game()
+            game.hourglass.update()
+
             # show-methods
             screen.fill((0,0,0))
             game.show_bg(screen)
@@ -662,9 +835,9 @@ class Main:
                     game.show_cast_buttons(screen)
                     game.show_dead(screen)
                     # ensure the prompt is drawn
-                    game.show_cast_prompt(screen, self.my_color) 
-                    pygame.display.update()
-                    
+                    game.show_cast_prompt(screen, self.my_color)
+                    self._present()
+
                 elif self.game.board.king_stalemated:
                     screen.fill((0,0,0))
                     game.show_bg(screen)
@@ -673,19 +846,26 @@ class Main:
                     game.show_cast_buttons(screen)
                     game.show_dead(screen)
                     # ensure the prompt is drawn
-                    game.show_cast_prompt(screen, self.my_color) 
-                    pygame.display.update()
-                
+                    game.show_cast_prompt(screen, self.my_color)
+                    self._present()
+
             if dragger.dragging:
                 dragger.update_blit(screen)
-                
+
             if hasattr(self, 'rematch_complete') and self.rematch_complete:
-                pygame.display.flip()
+                self._present()
                 del self.rematch_complete
             
             
             for event in pygame.event.get():
-                
+                # mouse events report real on-screen pixels; every rect this
+                # file hit-tests against (board squares, buttons, cards) is
+                # defined in the fixed design resolution self.screen draws
+                # to - rewrite event.pos once here rather than at each of
+                # the many places below that read it.
+                if hasattr(event, 'pos'):
+                    event.pos = (int(event.pos[0] / self.ui_scale), int(event.pos[1] / self.ui_scale))
+
                 if self.ai_thinking:
                     # only allow quitting
                     if event.type == pygame.QUIT:
@@ -1198,8 +1378,10 @@ class Main:
                                         
                                     if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                         self.game.kill_prompt(self.my_color)
+                                        self.game.restore_cast_prompt(self.my_color)
                                     elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                         self.game.kill_prompt(self.my_color)
+                                        self.game.restore_cast_prompt(self.my_color)
                                         
                                     if board.squares[released_col][released_row].is_enemy_jack_house(game.next_player):
                                         game.set_cast_prompt(game.next_player)
@@ -1207,9 +1389,18 @@ class Main:
                                     if board.squares[released_col][released_row].is_enemy_king_house(game.next_player):
                                         if board._opponent_king_on_noncard(game.next_player):
                                             board.king_mated = True
-                                            game.set_mated_prompt(game.next_player)
-                                        
-                                    if board._king_mated(rival_player):
+
+                                    if board.king_mated:
+                                        # "mate by capture": the rival's own king house was just
+                                        # infiltrated while their king was off a card square.
+                                        # Checked first and separately from the ordinary
+                                        # checkmate call below, since the rival can easily still
+                                        # have legal moves available - board._king_mated() alone
+                                        # would return False here and fall through to
+                                        # game.next_turn(), silently discarding this flag and
+                                        # letting the game continue past the mate.
+                                        game.set_mated_prompt(rival_player.color)
+                                    elif board._king_mated(rival_player):
                                         game.set_mated_prompt(rival_player.color)
                                     else:
                                         # next turn/player
@@ -1270,39 +1461,50 @@ class Main:
                                         if len(clicker.clicked_cards) > 0:
                                             if clicker.has_2_raider_cards(clicker.clicked_cards) and clicker.has_sum_21(clicker.clicked_cards):
                                                 clicker.clicked_btn = 0
-                                                game.set_strike_prompt(game.next_player)
-                                                
+
                                                 player = board.players[1] if game.next_player == 'white' \
                                                     else board.players[0]
-                                                
+
                                                 board.calc_cast_moves(player, None, booL=True, known_combo=clicker.clicked_cards)
-                                                
+
+                                                if len(player.cast_moves) == 0:
+                                                    clicker.unclick_btn()
+                                                    game.set_no_strike_prompt(game.next_player)
+                                                else:
+                                                    game.set_strike_prompt(game.next_player)
+                                                    casting = True
+                                                    game.show_clicked_btns(screen)
+
                                                 game.play_card_sound()
-                                                casting = True
-                                                game.show_clicked_btns(screen)
-                                                
+
                                     elif 205 <= mouse_x <= 288:
                                         if len(clicker.clicked_cards) > 0:
                                             if clicker.has_board_card() and clicker.has_sum_21(clicker.clicked_cards):
                                                 clicker.clicked_btn = 1
-                                                
+
                                                 player = board.players[1] if game.next_player == 'white' \
                                                         else board.players[0]
-                                                        
-                                                if not board._enemy_queen_house_occupied(game.next_player) or \
-                                                    not board._queen_isdead(game.next_player) or \
-                                                        not clicker.has_2_raider_cards(clicker.clicked_cards):
-                                                    
-                                                    game.set_raise_prompt(game.next_player)
-                                                    board.calc_cast_moves(player, Raider(game.next_player), booL=True, known_combo=clicker.clicked_cards)
-                                                    print(f"Valid moves: {[(m.cast_type, [c.rank for c in m.cards]) for m in player.cast_moves]}")
-                                                                
+
+                                                board.calc_cast_moves(player, Raider(game.next_player), booL=True, known_combo=clicker.clicked_cards)
+
+                                                if len(player.cast_moves) == 0:
+                                                    clicker.unclick_btn()
+                                                    game.set_no_raise_prompt(game.next_player)
                                                 else:
-                                                    game.set_choose_grave_prompt(game.next_player)
-                                                    
+                                                    if not board._enemy_queen_house_occupied(game.next_player) or \
+                                                        not board._queen_isdead(game.next_player) or \
+                                                            not clicker.has_2_raider_cards(clicker.clicked_cards):
+
+                                                        game.set_raise_prompt(game.next_player)
+                                                        print(f"Valid moves: {[(m.cast_type, [c.rank for c in m.cards]) for m in player.cast_moves]}")
+
+                                                    else:
+                                                        game.set_choose_grave_prompt(game.next_player)
+
+                                                    casting = True
+                                                    game.show_clicked_btns(screen)
+
                                                 game.play_card_sound()
-                                                casting = True
-                                                game.show_clicked_btns(screen)
                                                     
                                 else:
                                     if 102 <= mouse_x <= 202:
@@ -1376,8 +1578,10 @@ class Main:
                                                     
                                                 if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                                 elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                         
                                                 if board._king_mated(rival_player):
                                                     game.set_mated_prompt(rival_player.color)
@@ -1431,8 +1635,10 @@ class Main:
                                                     
                                                 if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                                 elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                                     
                                                 if board._king_mated(rival_player):
                                                     
@@ -1528,8 +1734,10 @@ class Main:
                                                             
                                                         if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                             self.game.kill_prompt(self.my_color)
+                                                            self.game.restore_cast_prompt(self.my_color)
                                                         elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                             self.game.kill_prompt(self.my_color)
+                                                            self.game.restore_cast_prompt(self.my_color)
                                                             
                                                         if board._king_mated(rival_player):
                                                             
@@ -1584,8 +1792,10 @@ class Main:
                                                 
                                             if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                             elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                                 
                                             if board._king_mated(rival_player):
                                                 
@@ -1631,8 +1841,10 @@ class Main:
                                                 
                                             if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                             elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                                 
                                             if board._king_mated(rival_player):
                                                 
@@ -1676,7 +1888,7 @@ class Main:
                                 
                             else:
                                 # capture alphanumeric keys for name
-                                if len(self.game.current_save_name) < 20:
+                                if len(self.game.current_save_name) < 20 and                                     event.unicode.isprintable():
                                     self.game.current_save_name += event.unicode
                         
                         elif self.game.load_menu_mode:
@@ -1699,7 +1911,8 @@ class Main:
                                     
                                     self.move_log = self.game.history
                                     self.game.view_index = len(self.move_log)
-                                    
+                                    self._autosaved = False
+
                                     self.game.load_menu_mode = False
                                     board = self.game.board
                                     dragger = self.game.dragger
@@ -1764,9 +1977,8 @@ class Main:
                             
                             # change ai difficulty level
                             elif event.key == pygame.K_a:
-                                game.ai_difficulty = "Easy" if game.ai_difficulty == "Medium" else "Medium"
-                                self.ai_engine.max_depth = 4 if game.ai_difficulty == 'Easy' else 5
-                            
+                                self._cycle_ai_difficulty()
+
                             # flip board key
                             elif event.key == pygame.K_f:
                                 game.flip_board()
@@ -1856,7 +2068,7 @@ class Main:
                                 
                             else:
                                 # capture alphanumeric keys for name
-                                if len(self.game.current_save_name) < 20:
+                                if len(self.game.current_save_name) < 20 and                                     event.unicode.isprintable():
                                     self.game.current_save_name += event.unicode
                         
                         elif self.game.load_menu_mode:
@@ -1925,8 +2137,7 @@ class Main:
                                 game.board.change_all_piece_textures()
                             # change ai difficulty level
                             elif event.key == pygame.K_a:
-                                game.ai_difficulty = "Easy" if game.ai_difficulty == "Medium" else "Medium"
-                                self.ai_engine.max_depth = 4 if game.ai_difficulty == 'Easy' else 5
+                                self._cycle_ai_difficulty()
                             elif event.key == pygame.K_r:  # Restart from game over
                                 game.reset()
                                 
@@ -1965,21 +2176,47 @@ class Main:
                             elif event.key == pygame.K_RIGHT:
                                 if self.game.view_index < len(self.move_log):
                                     self.game.view_index += 1
-                                    self.game.recontruct_at_move(self.game.view_index, \
+                                    self.game.reconstruct_at_move(self.game.view_index, \
                                         self.move_log)
-                                    
+
                                     board = self.game.board
                                     dragger = self.game.dragger
                                     dragger.board.dragger = board
                                     clicker = self.game.clicker
                                     clicker.board = board
                                     print(f"Viewing move: {self.game.view_index}")
-                                    
+
+                    # mouse-driven history arrows (< and >) - the only mouse
+                    # interaction kept alive in the game-over state; unlike
+                    # the "in progress" branch this doesn't handle general
+                    # board/menu clicks, since nothing else is actionable
+                    # once the game has ended.
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        if event.button == 1 and hasattr(self, 'btn_prev') and \
+                            hasattr(self, 'btn_next'):
+                            mouse_pos = event.pos
+                            if self.btn_prev.collidepoint(mouse_pos):
+                                if self.game.view_index > 0:
+                                    self.game.view_index -= 1
+                                    self.game.reconstruct_at_move(self.game.view_index, self.move_log)
+                                    board = self.game.board
+                                    dragger = self.game.dragger
+                                    clicker = self.game.clicker
+                                    clicker.board = board
+                            elif self.btn_next.collidepoint(mouse_pos):
+                                if self.game.view_index < len(self.move_log):
+                                    self.game.view_index += 1
+                                    self.game.reconstruct_at_move(self.game.view_index, self.move_log)
+                                    board = self.game.board
+                                    dragger = self.game.dragger
+                                    clicker = self.game.clicker
+                                    clicker.board = board
+
                     elif event.type == pygame.QUIT:
                         pygame.quit()
                         sys.exit()
-            
-            pygame.display.update()
+
+            self._present()
 
 
 if __name__ == "__main__":

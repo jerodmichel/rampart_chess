@@ -31,6 +31,7 @@ from comprehensiveCastCache import *
 
 import time
 import copy
+from itertools import combinations
 
 class Board:
     
@@ -216,7 +217,7 @@ class Board:
         
         # generate notation
         prefix = "++" if cast_move.cast_type == 1 else "--"
-        p_char = piece.name[0].upper()
+        p_char = piece.name[0].upper() if piece else "X" # X if no piece
         target = f"{cast_move.final.col + 1}{Square.get_alpharow(5 - cast_move.final.row)}"
         cards_str = ",".join([RANKS[c.rank] for c in cast_move.cards])
         notation = f"{prefix}{p_char}@{target}({cards_str})"
@@ -228,7 +229,7 @@ class Board:
             self.squares[col][row].piece = None
             
         elif cast_move.cast_type == 1:
-            if piece.name == 'raider':
+            if piece and piece.name == 'raider':
                 self._raise_raider(cast_move.final.col, cast_move.final.row, player.color, card)
             elif piece.name == 'queen':
                 self._raise_queen(cast_move.final.col, cast_move.final.row, player.color, card)
@@ -394,7 +395,29 @@ class Board:
                         if isinstance(mv.final.piece, King):
                             print(f"[Check Found] {pc.name} at {col},{row} can attack king")
                             return True
-        print("[No Check Found]")                
+
+        # Two kings on adjacent squares always constitutes check, checked
+        # directly by position here rather than through the calc_moves()/
+        # pc.moves loop above: a king whose own house is infiltrated has its
+        # move list suppressed to nothing by king_moves()'s house-restriction,
+        # so that restricted list can't be trusted to report whether it still
+        # threatens its own neighboring squares - geometrically, a king always does.
+        my_king_pos = rival_king_pos = None
+        for col in range(COLS):
+            for row in range(ROWS):
+                sq = temp_board.squares[col][row]
+                if sq.has_piece() and isinstance(sq.piece, King):
+                    if sq.piece.color == player.color:
+                        my_king_pos = (col, row)
+                    else:
+                        rival_king_pos = (col, row)
+        if my_king_pos and rival_king_pos:
+            if abs(my_king_pos[0] - rival_king_pos[0]) <= 1 and \
+               abs(my_king_pos[1] - rival_king_pos[1]) <= 1:
+                print("[Check Found] adjacent enemy king")
+                return True
+
+        print("[No Check Found]")
         return False
     
     
@@ -426,14 +449,154 @@ class Board:
         
     def _king_mated(self, player):
         auX = self.has_no_valid_move(player.color) and self.has_no_valid_cast_move(player)
-            
+
         if auX and self.king_in_check(player):
             self.king_mated = True
         elif auX and not self.king_in_check(player):
             self.king_stalemated = True
-            
+
         return auX
-        
+
+    def _has_insufficient_material(self, color):
+        """A side has insufficient material if its only live pieces are its
+        King, plus at most one Knight (no Queen/Rook/Bishop/Raider)."""
+        names = [self.squares[col][row].piece.name
+                 for col in range(COLS) for row in range(ROWS)
+                 if self.squares[col][row].has_piece() and
+                 self.squares[col][row].piece.color == color]
+        knights = names.count('knight')
+        return knights <= 1 and all(n in ('king', 'knight') for n in names)
+
+    def is_draw_by_insufficient_material(self):
+        if not (self._has_insufficient_material('white') and
+                self._has_insufficient_material('black')):
+            return False
+
+        # King+knight-vs-king material is only a genuine dead draw when
+        # NEITHER king house is infiltrated: only then does each king fully
+        # threaten its own neighboring squares, blocking the other from
+        # ever approaching (see king_in_check()'s adjacency check).
+        # "Both occupied" is NOT equally safe, despite also blocking
+        # adjacency - whichever king is off-card while its own house is
+        # occupied gets auto-mated outright by king_moves()'s
+        # house-restriction side effect, so mate remains very possible
+        # (often outright forced) whenever both houses are occupied.
+        return not self._own_king_house_occupied('white') and \
+            not self._own_king_house_occupied('black')
+
+    def _is_bare_king(self, color):
+        """COLOR's only living piece is its king (no knight either)."""
+        names = [self.squares[col][row].piece.name
+                 for col in range(COLS) for row in range(ROWS)
+                 if self.squares[col][row].has_piece() and
+                 self.squares[col][row].piece.color == color]
+        return names == ['king']
+
+    def _can_ever_raise(self, color):
+        """Whether COLOR could still ever complete a raise-eligible hand,
+        using their remaining un-cast deck cards plus a single hypothetical
+        board card of any rank. Trying every rank (0-12) rather than just
+        assuming the most generous one (an ace) matters: an ace board card
+        is only the best partner when the deck side of the hand has no ace
+        of its own (it unlocks has_sum_21's sum-of-11-instead-of-21
+        shortcut) - if the deck combo already contains an ace, the best
+        partner is instead the highest-value card (10/J/Q/K), since the
+        shortcut only needs one ace in the whole hand. If no rank at all
+        completes any deck subset, no real board card - whatever it
+        actually is - ever could either, so this is a safe, permanent
+        "never" rather than a snapshot of the current hand.
+        Requires at least one raider to be alive somewhere at all, since
+        getting any board card into a hand requires an already-alive
+        raider standing on that card square (see the board-card click
+        handler) - a raise needs at least one board card no matter what
+        the deck holds.
+        Only proves a position is a dead draw when this returns False -
+        never used to conclude a position is winnable when True."""
+        has_any_raider = any(
+            self.squares[col][row].has_piece() and
+            self.squares[col][row].piece.name == 'raider' and
+            self.squares[col][row].piece.color == color
+            for col in range(COLS) for row in range(ROWS))
+        if not has_any_raider:
+            return False
+
+        deck_suit = 1 if color == 'white' else 0
+        remaining_ranks = [c.rank for c in self.cards[deck_suit] if not c.is_cast()]
+
+        # a raise combines exactly one board card with at most two deck
+        # cards (3 cards total, matching the game's cast hand-size cap)
+        for size in range(min(2, len(remaining_ranks)) + 1):
+            for combo in combinations(remaining_ranks, size):
+                for board_rank in range(13):
+                    ranks = list(combo) + [board_rank]
+                    total = sum(CARD_VAL[rk] for rk in ranks)
+                    has_ace = 0 in ranks
+                    if total == 21 or (has_ace and total == 11):
+                        return True
+        return False
+
+    def is_draw_by_locked_material(self):
+        """A second, positional kind of dead draw distinct from
+        is_draw_by_insufficient_material(): one side is down to a bare
+        king that has crossed into the other side's home half, that other
+        side's raiders are all permanently confined to their own half
+        (raiders can never cross back once they've moved into a half -
+        see raider_moves()'s row<3/row>2 branching), and that side can
+        never raise a fresh raider to place directly on the correct side
+        either. With none of that side's material able to ever reach the
+        bare king, mate is permanently unreachable.
+        Only meaningful when neither king house is occupied, same as
+        is_draw_by_insufficient_material() - if exactly one house is
+        occupied the clean king can already approach and mate on its own,
+        and if both are, whichever king is off-card gets auto-mated by
+        king_moves()'s house-restriction regardless of raiders (see that
+        function's docstring for both points)."""
+        # cheapest possible exit first: everything below is pointless
+        # (and the _can_ever_raise combinatorial search genuinely isn't
+        # free) unless someone is actually down to a bare king.
+        bare_king_colors = [c for c in ('white', 'black') if self._is_bare_king(c)]
+        if not bare_king_colors:
+            return False
+
+        if self._own_king_house_occupied('white') or \
+                self._own_king_house_occupied('black'):
+            return False
+
+        for weak_color in bare_king_colors:
+            strong_color = 'black' if weak_color == 'white' else 'white'
+
+            king_col = king_row = None
+            for col in range(COLS):
+                for row in range(ROWS):
+                    sq = self.squares[col][row]
+                    if sq.has_piece() and sq.piece.color == weak_color and \
+                            sq.piece.name == 'king':
+                        king_col, king_row = col, row
+                        break
+                if king_col is not None:
+                    break
+
+            king_half = 'black' if king_row < 3 else 'white'
+            if king_half == weak_color:
+                continue  # king is still on its own side - not "enemy land"
+
+            strong_raider_in_kings_half = any(
+                self.squares[c][r].has_piece() and
+                self.squares[c][r].piece.name == 'raider' and
+                self.squares[c][r].piece.color == strong_color and
+                (('black' if r < 3 else 'white') == king_half)
+                for c in range(COLS) for r in range(ROWS))
+            if strong_raider_in_kings_half:
+                continue  # an existing raider is already right there
+
+            if self._can_ever_raise(strong_color):
+                continue  # could still raise a fresh one directly onto that side
+
+            return True
+
+        return False
+
+
 
 # ╭━━━┳━━━┳╮╱╱╭━━━╮╭━╮╭━┳━━━┳╮╱╱╭┳━━━┳━━━╮
 # ┃╭━╮┃╭━╮┃┃╱╱┃╭━╮┃┃┃╰╯┃┃╭━╮┃╰╮╭╯┃╭━━┫╭━╮┃
@@ -453,10 +616,40 @@ class Board:
         # Try cache first
         cached_moves = self.cast_cache.get_cached_moves(player.color, state_hash)
         if cached_moves is not None:
-            # Use cache but still validate check conditions
+            # Use cache but still validate check conditions.
+            #
+            # Each cached move is re-validated using the piece(s) that its
+            # OWN cast_type calls for - never the `piece` argument this
+            # call happened to receive. A fresh (cache-miss) computation
+            # in _original_calc_cast_moves never used that argument to
+            # decide inclusion either: strike moves are always validated
+            # with piece=None, and raise moves are always validated against
+            # Raider (and Queen, if raise-queen is currently eligible),
+            # regardless of what piece the caller asked about. Validating
+            # against the caller's `piece` instead - the previous behavior
+            # here - was inconsistent with that and could validate a
+            # raise-type cached move with piece=None (e.g. when a strike
+            # listing is requested right after a raise listing populated
+            # the cache for this same position), crashing in cast_move()
+            # on piece.name for a None piece.
+            #
+            # (This also fixes `not bool` -> `not booL`: referencing the
+            # bool builtin here instead of the booL parameter meant this
+            # re-validation ran unconditionally, ignoring a caller that
+            # passed booL=False to skip it - unlike the cache-miss path
+            # below, which already respects booL correctly.)
+            color = player.color
+            queen_eligible = self._queen_isdead(color) and \
+                self._enemy_queen_house_occupied(color)
             valid_moves = []
             for move in cached_moves:
-                if not bool or not self.cast_in_check(player, piece, move):
+                if move.cast_type == 0:
+                    pieces_to_check = [None]
+                else:
+                    pieces_to_check = [Raider(color), Queen(color)] \
+                        if queen_eligible else [Raider(color)]
+                if not booL or any(not self.cast_in_check(player, p, move)
+                                    for p in pieces_to_check):
                     valid_moves.append(move)
             player.cast_moves = valid_moves
             return
@@ -1112,22 +1305,24 @@ class Board:
         return auX
     
     def _enemy_jack_house_occupied(self, color):
-        if color == 'white':
-            return self.squares[4][0].has_piece()
-        else:
-            return self.squares[5][5].has_piece()
+        # must be occupied by COLOR's own piece (the infiltrator), not just
+        # any piece - see _enemy_queen_house_occupied for the same reasoning.
+        sq = self.squares[4][0] if color == 'white' else self.squares[5][5]
+        return sq.has_piece() and sq.piece.color == color
     
     def _enemy_queen_house_occupied(self, color):
-        if color == 'white':
-            return self.squares[3][0].has_piece()
-        else:
-            return self.squares[6][5].has_piece()
+        # must be occupied by COLOR's own raider (the infiltrator), not just
+        # any piece - the square is on the opponent's home row, so their own
+        # raiders can legitimately sit there too, unrelated to infiltration.
+        sq = self.squares[3][0] if color == 'white' else self.squares[6][5]
+        return sq.has_piece() and sq.piece.color == color
             
     def _own_king_house_occupied(self, color):
-        if color == 'white':
-            return self.squares[7][5].has_piece()
-        else:
-            return self.squares[2][0].has_piece()
+        # must be occupied by an ENEMY piece (the infiltrator) - COLOR's own
+        # piece sitting on its own king-house square isn't an infiltration,
+        # same reasoning as _enemy_queen_house_occupied/_enemy_jack_house_occupied.
+        sq = self.squares[7][5] if color == 'white' else self.squares[2][0]
+        return sq.has_piece() and sq.piece.color != color
         
     def _opponent_king_on_noncard(self, color):
         # check if opponent's king is on non-card square
@@ -1162,10 +1357,10 @@ class Board:
     def _add_dead_pieces(self, color):
         
         if color == 'white':
-            for row in range(GRAVES-4):
+            for row in range(GRAVES-5):
                 self.graves[1][row] = Grave(1, row, Raider(color))
         else:
-            for row in range(4, GRAVES):
+            for row in range(5, GRAVES):
                 self.graves[0][row] = Grave(0, row, Raider(color))
                 
                 
@@ -1201,11 +1396,13 @@ class Board:
                     for crd in deck:
                         auX = [crD1, crD2]
                         auX.append(crd)
-                        
+
                         if not crd.is_cast() and self.clicker.has_sum_21(auX):
                             possible_hand = [crD1, crD2, crd]
                             return possible_hand
-                        
+
+        return []
+
     def _sift_cards2(self, possible_hand, deck):
         for crd in possible_hand:
             for crd1 in deck:

@@ -261,10 +261,14 @@ class RampartCastGenerator:
         valid_card_mask = bb.CARD_MASK & ~bb.ALL_HOUSES
         caster_raiders = my_raiders & valid_card_mask
         caster_squares = list(bb.get_set_bits(caster_raiders))
-        
-        # queen must be dead (in graveyard)
-        if graveyard['queen'] > 0:
-            
+
+        # queen must be dead (in graveyard) AND a raider must have
+        # infiltrated the enemy queen house (Rule: "Queen's House: Unlocks
+        # spawning your Queen" - this was missing entirely; matches the
+        # pygame board's own _enemy_queen_house_occupied check)
+        enemy_queen_house_sq = 3 if color == 'white' else 56
+        if graveyard['queen'] > 0 and (my_raiders & (1 << enemy_queen_house_sq)):
+
             # define spawn zones (Rows b,c for white; d,e for black)
             if color == 'white':
                 spawn_zone_mask = 0x3FFFFC0000000 
