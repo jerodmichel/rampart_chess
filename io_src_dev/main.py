@@ -88,6 +88,21 @@ test_sound = pygame.mixer.Sound('assets/sounds/thunder_strike.wav')
 test_sound.play()
 
 import sys
+
+# On Windows, when stdout/stderr aren't attached to a real console (e.g.
+# launched as a subprocess with piped output, as launcher.py does), Python
+# falls back to the OS's legacy codepage (cp1252) instead of UTF-8 to
+# encode printed text. Several debug prints in this codebase use emoji,
+# which crashes with UnicodeEncodeError under that codepage. Force UTF-8
+# so those prints (and any future ones) never depend on the console's
+# encoding.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, 'reconfigure'):
+        try:
+            _stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
 import copy
 import threading
 import queue
@@ -106,14 +121,38 @@ class Main:
     def __init__(self):
         os.environ['SDL_VIDEO_CENTERED'] = '1'
         pygame.init()
-        # SCALED lets SDL fit/scale this window to whatever the actual
-        # display resolution is, instead of assuming every monitor can
-        # show a fixed WIDTH+200 x HEIGHT+40+RAMPART_HEIGHT window
-        self.screen = pygame.display.set_mode(
-            (WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT), pygame.SCALED)
+
+        # pygame.SCALED alone doesn't shrink a window below its requested
+        # size - by itself it only ever scales UP to an integer multiple on
+        # a larger display, never down, so on a screen smaller than the
+        # design resolution (WIDTH+200 x HEIGHT+40+RAMPART_HEIGHT, i.e.
+        # 1000x860) the window used to render at full size regardless,
+        # overflowing the screen. Instead, every existing draw call keeps
+        # targeting self.screen - an off-screen Surface at the fixed design
+        # resolution, completely unchanged - and self.display is the real,
+        # on-screen window, sized to actually fit whatever screen this runs
+        # on. _present() scales the former into the latter once per frame.
+        design_w, design_h = WIDTH + 200, HEIGHT + 40 + RAMPART_HEIGHT
+        try:
+            display_info = pygame.display.Info()
+            screen_w, screen_h = display_info.current_w, display_info.current_h
+        except Exception:
+            screen_w, screen_h = design_w, design_h
+
+        scale = min(1.0, (screen_w * 0.95) / design_w, (screen_h * 0.85) / design_h)
+        display_w = max(1, int(design_w * scale))
+        display_h = max(1, int(design_h * scale))
+
+        self.screen = pygame.Surface((design_w, design_h))
+        self.display = pygame.display.set_mode((display_w, display_h), pygame.SCALED)
+        self.ui_scale = scale
         pygame.display.set_caption('Rampart')
         self.game = Game()
         self.game.play_strike_sound()
+        # game.py's own show_side_menu() reads the real mouse position
+        # directly for a hover effect - give it the same scale factor so
+        # that stays aligned with the design-resolution rects it hit-tests.
+        self.game.ui_scale = self.ui_scale
         
         
 # ╭━╮╱╭┳━━━┳━━━━┳╮╭╮╭┳━━━┳━━━┳╮╭━┳━━┳━╮╱╭┳━━━╮
@@ -170,6 +209,25 @@ class Main:
         
         # history
         self.move_log = []
+
+    def _get_mouse_pos(self):
+        """pygame.mouse.get_pos() reports real on-screen pixels, but every
+        click/hover rect in this file and game.py is defined in the fixed
+        design resolution self.screen draws to - convert back to that
+        space here rather than at every one of the many call sites."""
+        x, y = pygame.mouse.get_pos()
+        return (int(x / self.ui_scale), int(y / self.ui_scale))
+
+    def _present(self):
+        """Scale the fixed-resolution off-screen surface (self.screen, what
+        every draw call in this file and game.py actually targets) into the
+        real, screen-sized window and show it. Call this wherever the code
+        used to call pygame.display.update()/flip() directly."""
+        if self.display.get_size() == self.screen.get_size():
+            self.display.blit(self.screen, (0, 0))
+        else:
+            pygame.transform.smoothscale(self.screen, self.display.get_size(), self.display)
+        pygame.display.update()
         
     def start_networking(self, game_id):
         
@@ -417,6 +475,7 @@ class Main:
         # reset game objects
         self.game.reset()
         self.game = Game()
+        self.game.ui_scale = self.ui_scale
         self.need_refresh = True
         
         # swap colors
@@ -632,8 +691,10 @@ class Main:
                             
                             if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                 self.game.kill_prompt(self.my_color)
+                                self.game.restore_cast_prompt(self.my_color)
                             elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                 self.game.kill_prompt(self.my_color)
+                                self.game.restore_cast_prompt(self.my_color)
 
                             # show if in check
                             if is_check:
@@ -685,8 +746,10 @@ class Main:
                         
                         if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                             self.game.kill_prompt(self.my_color)
+                            self.game.restore_cast_prompt(self.my_color)
                         elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                             self.game.kill_prompt(self.my_color)
+                            self.game.restore_cast_prompt(self.my_color)
                         
                         if is_check:
                             print(">> Setting check prompt for", self.my_color)
@@ -695,9 +758,16 @@ class Main:
                         if self.game.board.squares[item.final.col][item.final.row].is_own_king_house(my_player.color):
                             if self.game.board._opponent_king_on_noncard(opponent.color):
                                 self.game.board.king_mated = True
-                                self.game.set_mated_prompt(my_player.color)
-                            
-                        if self.game.board._king_mated(my_player):
+
+                        if self.game.board.king_mated:
+                            # "mate by capture": checked first and separately from the
+                            # ordinary checkmate call below, since my_player can easily
+                            # still have legal moves available - board._king_mated()
+                            # alone would return False here and fall through to
+                            # game.next_turn(), silently discarding this flag and
+                            # letting the game continue past the mate.
+                            self.game.set_mated_prompt(my_player.color)
+                        elif self.game.board._king_mated(my_player):
                             self.game.set_mated_prompt(my_player.color)
                         else:
                             # next turn/player
@@ -753,8 +823,10 @@ class Main:
                         
                         if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                             self.game.kill_prompt(self.my_color)
+                            self.game.restore_cast_prompt(self.my_color)
                         elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                             self.game.kill_prompt(self.my_color)
+                            self.game.restore_cast_prompt(self.my_color)
 
                         # show if in check
                         if is_check:
@@ -930,7 +1002,7 @@ class Main:
 
     def _start_host_ui(self):
         self.status_message = "Creating game..."
-        pygame.display.flip()  # force UI update
+        self._present()  # force UI update
         
         # existing host code:
         self.host_new_game()  
@@ -1026,14 +1098,18 @@ class Main:
         """Routes sidebar clicks to the actual game logic"""
         if menu_type == 'game':
             if index == 0:   # save Game
-                if self.is_host: 
+                if self.is_host:
                     self.game.save_naming_mode = True
+                else:
+                    self.status_message = "Only the host can save the game"
             elif index == 1: # load Game
                 if self.is_host:
-                    if not os.path.exists('saves'): 
+                    if not os.path.exists('saves'):
                         os.makedirs('saves', exist_ok=True)
                     self.game.save_files = [f for f in os.listdir('saves') if f.endswith('.json')]
                     self.game.load_menu_mode = True
+                else:
+                    self.status_message = "Only the host can load a game"
             elif index == 2: # Rematch
                 if not self.rematch_requested and not self.opponent_rematch_requested:
                     self.request_rematch()
@@ -1156,12 +1232,19 @@ class Main:
                 dragger.update_blit(screen)
                 
             if hasattr(self, 'rematch_complete') and self.rematch_complete:
-                pygame.display.flip()
+                self._present()
                 del self.rematch_complete
-            
-            
+
+
             for event in pygame.event.get():
-                
+                # mouse events report real on-screen pixels; every rect this
+                # file hit-tests against (board squares, buttons, cards) is
+                # defined in the fixed design resolution self.screen draws
+                # to - rewrite event.pos once here rather than at each of
+                # the many places below that read it.
+                if hasattr(event, 'pos'):
+                    event.pos = (int(event.pos[0] / self.ui_scale), int(event.pos[1] / self.ui_scale))
+
                 if not board.king_mated and not board.king_stalemated:
                     
                     if game.next_state == 'update1':
@@ -1696,8 +1779,10 @@ class Main:
                                         
                                     if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                         self.game.kill_prompt(self.my_color)
+                                        self.game.restore_cast_prompt(self.my_color)
                                     elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                         self.game.kill_prompt(self.my_color)
+                                        self.game.restore_cast_prompt(self.my_color)
                                         
                                     if board.squares[released_col][released_row].is_enemy_jack_house(game.next_player):
                                         game.set_cast_prompt(game.next_player)
@@ -1705,9 +1790,20 @@ class Main:
                                     if board.squares[released_col][released_row].is_enemy_king_house(game.next_player):
                                         if board._opponent_king_on_noncard(game.next_player):
                                             board.king_mated = True
-                                            game.set_mated_prompt(game.next_player)
-                                        
-                                    if board._king_mated(rival_player):
+
+                                    if board.king_mated:
+                                        # "mate by capture": the rival's own king house was just
+                                        # infiltrated while their king was off a card square.
+                                        # rival_player, not game.next_player (the mover) -
+                                        # set_mated_prompt's color argument is the side that
+                                        # lost. Checked first and separately from the ordinary
+                                        # checkmate call below, since the rival can easily still
+                                        # have legal moves available - board._king_mated() alone
+                                        # would return False here and fall through to
+                                        # game.next_turn(), silently discarding this flag and
+                                        # letting the game continue past the mate.
+                                        game.set_mated_prompt(rival_player.color)
+                                    elif board._king_mated(rival_player):
                                         game.set_mated_prompt(rival_player.color)
                                     else:
                                         # next turn/player
@@ -1781,39 +1877,50 @@ class Main:
                                         if len(clicker.clicked_cards) > 0:
                                             if clicker.has_2_raider_cards(clicker.clicked_cards) and clicker.has_sum_21(clicker.clicked_cards):
                                                 clicker.clicked_btn = 0
-                                                game.set_strike_prompt(game.next_player)
-                                                
+
                                                 player = board.players[1] if game.next_player == 'white' \
                                                     else board.players[0]
-                                                
+
                                                 board.calc_cast_moves(player, None, booL=True)
-                                                
+
+                                                if len(player.cast_moves) == 0:
+                                                    clicker.unclick_btn()
+                                                    game.set_no_strike_prompt(game.next_player)
+                                                else:
+                                                    game.set_strike_prompt(game.next_player)
+                                                    casting = True
+                                                    game.show_clicked_btns(screen)
+
                                                 game.play_card_sound()
-                                                casting = True
-                                                game.show_clicked_btns(screen)
-                                                
+
                                     elif 205 <= mouse_x <= 288:
                                         if len(clicker.clicked_cards) > 0:
                                             if clicker.has_board_card() and clicker.has_sum_21(clicker.clicked_cards):
                                                 clicker.clicked_btn = 1
-                                                
+
                                                 player = board.players[1] if game.next_player == 'white' \
                                                         else board.players[0]
-                                                        
-                                                if not board._enemy_queen_house_occupied(game.next_player) or \
-                                                    not board._queen_isdead(game.next_player) or \
-                                                        not clicker.has_2_raider_cards(clicker.clicked_cards):
-                                                    
-                                                    game.set_raise_prompt(game.next_player)
-                                                    board.calc_cast_moves(player, Raider(game.next_player), booL=True)
-                                                    print(f"Valid moves: {[(m.cast_type, [c.rank for c in m.cards]) for m in player.cast_moves]}")
-                                                                
+
+                                                board.calc_cast_moves(player, Raider(game.next_player), booL=True)
+
+                                                if len(player.cast_moves) == 0:
+                                                    clicker.unclick_btn()
+                                                    game.set_no_raise_prompt(game.next_player)
                                                 else:
-                                                    game.set_choose_grave_prompt(game.next_player)
-                                                    
+                                                    if not board._enemy_queen_house_occupied(game.next_player) or \
+                                                        not board._queen_isdead(game.next_player) or \
+                                                            not clicker.has_2_raider_cards(clicker.clicked_cards):
+
+                                                        game.set_raise_prompt(game.next_player)
+                                                        print(f"Valid moves: {[(m.cast_type, [c.rank for c in m.cards]) for m in player.cast_moves]}")
+
+                                                    else:
+                                                        game.set_choose_grave_prompt(game.next_player)
+
+                                                    casting = True
+                                                    game.show_clicked_btns(screen)
+
                                                 game.play_card_sound()
-                                                casting = True
-                                                game.show_clicked_btns(screen)
                                                     
                                 else:
                                     if 102 <= mouse_x <= 202:
@@ -1894,8 +2001,10 @@ class Main:
                                                     
                                                 if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                                 elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                         
                                                 if board._king_mated(rival_player):
                                                     game.set_mated_prompt(rival_player.color)
@@ -1957,8 +2066,10 @@ class Main:
                                                     
                                                 if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                                 elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                     self.game.kill_prompt(self.my_color)
+                                                    self.game.restore_cast_prompt(self.my_color)
                                                     
                                                 if board._king_mated(rival_player):
                                                     
@@ -2058,8 +2169,10 @@ class Main:
                                                             
                                                         if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                             self.game.kill_prompt(self.my_color)
+                                                            self.game.restore_cast_prompt(self.my_color)
                                                         elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                             self.game.kill_prompt(self.my_color)
+                                                            self.game.restore_cast_prompt(self.my_color)
                                                             
                                                         if board._king_mated(rival_player):
                                                             
@@ -2117,8 +2230,10 @@ class Main:
                                                 
                                             if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                             elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                                 
                                             if board._king_mated(rival_player):
                                                 
@@ -2173,8 +2288,10 @@ class Main:
                                                 
                                             if self.my_color == 'white' and self.game.white_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                             elif self.my_color == 'black' and self.game.black_cast_prompt == 'in-check':
                                                 self.game.kill_prompt(self.my_color)
+                                                self.game.restore_cast_prompt(self.my_color)
                                                 
                                             if board._king_mated(rival_player):
                                                 
@@ -2260,9 +2377,14 @@ class Main:
                                     self.broadcast_loaded_game()
                             elif event.key == pygame.K_ESCAPE:
                                 self.game.load_menu_mode = False
-                        
-                        # chat functions
-                        if self.chat_active:
+
+                        # chat functions - chained as elif (not a separate if)
+                        # so that typing into the save-name/load-menu boxes
+                        # above doesn't ALSO fall through here and toggle
+                        # chat (or, in the else branch below, fire any of
+                        # the single-letter game shortcuts) on every
+                        # matching keystroke.
+                        elif self.chat_active:
                             if event.key == pygame.K_RETURN:
                                 if self.chat_text.strip():
                                     self.fb.send_chat_message(self.game_id, self.my_color, self.chat_text)
@@ -2337,7 +2459,9 @@ class Main:
                             elif event.key == pygame.K_s:
                                 if self.is_host:
                                     self.game.save_naming_mode = True
-                           
+                                else:
+                                    self.status_message = "Only the host can save the game"
+
                             # load game (host only)
                             elif event.key == pygame.K_l:
                                 if self.is_host:
@@ -2345,7 +2469,9 @@ class Main:
                                         os.makedirs('saves', exist_ok=True)
                                     self.game.save_files = [f for f in os.listdir('saves') if f.endswith('.json')]
                                     self.game.load_menu_mode = not self.game.load_menu_mode
-                            
+                                else:
+                                    self.status_message = "Only the host can load a game"
+
                             # start network keys
                             elif event.key == pygame.K_h:
                                 self._start_host_ui()
@@ -2455,9 +2581,13 @@ class Main:
                                     self.broadcast_loaded_game()
                             elif event.key == pygame.K_ESCAPE:
                                 self.game.load_menu_mode = False
-                    
-                        # change theme
-                        if event.key == pygame.K_t:
+
+                        # change theme - chained as elif (not a separate if)
+                        # so that typing into the save-name/load-menu boxes
+                        # above doesn't ALSO fall through here and fire any
+                        # of these single-letter game shortcuts on every
+                        # matching keystroke.
+                        elif event.key == pygame.K_t:
                             game.change_theme()
                             game.change_emblem()
                             game.change_dead_card()
@@ -2513,7 +2643,9 @@ class Main:
                         elif event.key == pygame.K_s:
                             if self.is_host:
                                 self.game.save_naming_mode = True
-                       
+                            else:
+                                self.status_message = "Only the host can save the game"
+
                         # load game (host only)
                         elif event.key == pygame.K_l:
                             if self.is_host:
@@ -2521,7 +2653,9 @@ class Main:
                                     os.makedirs('saves', exist_ok=True)
                                 self.game.save_files = [f for f in os.listdir('saves') if f.endswith('.json')]
                                 self.game.load_menu_mode = not self.game.load_menu_mode
-                        
+                            else:
+                                self.status_message = "Only the host can load a game"
+
                     # quit application
                     elif event.type == pygame.QUIT:
                         print("QUIT EVENT RECEIVED - STARTING CLEANUP")
@@ -2613,7 +2747,7 @@ class Main:
             self.btn_next = pygame.Rect(arrow_x + 45, base_y - 5, 35, 33) 
 
             # 2. draw rectangles with HOVER POP
-            mouse_pos = pygame.mouse.get_pos() 
+            mouse_pos = self._get_mouse_pos()
             
             bg_color = (240, 240, 245)     
             base_border = (90, 90, 90)
@@ -2642,8 +2776,8 @@ class Main:
             # arrow texts
             self.screen.blit(arrow_font.render("<", True, get_color(self.btn_prev)), (self.btn_prev.x + 12, self.btn_prev.y + 6))
             self.screen.blit(arrow_font.render(">", True, get_color(self.btn_next)), (self.btn_next.x + 12, self.btn_next.y + 6))
-            
-            pygame.display.update()
+
+            self._present()
 
 
 if __name__ == "__main__":

@@ -21,13 +21,19 @@ from const import *
 
 class RampartBitboard:
     
-    @staticmethod
     def _gen_card_mask_static():
+        # deliberately undecorated: called immediately below, while still
+        # inside the class body, to compute CARD_SQUARES - a bare name
+        # lookup here just calls the plain function, but if this were a
+        # @staticmethod, calling it by name in the class body only works
+        # on Python 3.10+ (staticmethod objects weren't callable before
+        # that), which broke on Python 3.8 with
+        # "TypeError: 'staticmethod' object is not callable".
         mask = 0
         for col, row in CARDSQS:
             mask |= (1 << ((row * 10) + col))
         return mask
-    
+
     # static constants
     CARD_SQUARES = _gen_card_mask_static()
     RAMPART_BARRIER = 0x000000003FFFFC00 # Rows C and D
@@ -82,18 +88,11 @@ class RampartBitboard:
         self.white_graveyard = {'raiders': 5, 'queen': 1}
         self.black_graveyard = {'raiders': 5, 'queen': 1}
 
-        # CONSTANT MASKS (calculate once)
-        self.CARD_SQUARES = self._gen_card_mask()
-        
-
-    def _gen_card_mask(self):
-        mask = 0
-        from const import CARDSQS
-        for col, row in CARDSQS:
-            # index = (Row * 10) + column
-            bit_idx = (row * 10) + col
-            mask |= (1 << bit_idx)
-        return mask
+        # NOTE: CARD_SQUARES/CARD_MASK are already precomputed once as class
+        # attributes (see _gen_card_mask_static() above) - re-deriving a
+        # per-instance copy here was pure waste, since nothing ever read it
+        # and RampartBitboard() gets constructed on every single .copy(),
+        # which happens on every candidate move during search.
 
     def get_occupied(self):
         white = 0

@@ -1,0 +1,7 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+numpy==2.4.4
+# pulled in transitively via io_src_dev_ai/clicker.py's "import pygame" -
+# that import is dead code (nothing in the game-logic call path actually
+# uses pygame), but it still has to be importable for board.py to load.
+pygame==2.6.1

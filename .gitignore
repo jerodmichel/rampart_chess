@@ -1,2 +1,17 @@
 __pycache__/
 *.pyc
+
+# PyInstaller build intermediates
+build/
+dist/
+*.spec
+
+# Packaged releases (built locally, distributed via GitHub Releases instead
+# of committed to git - they're large compiled binaries, not source)
+RampartChessWindows/
+RampartChessLinux/
+*.tar.gz
+*.tar.xz
+
+# runtime debug log
+launch_error.log
