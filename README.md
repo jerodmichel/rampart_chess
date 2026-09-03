@@ -20,7 +20,7 @@ A strategic hybrid of chess and cardplay where players battle across a rampart b
 ## 🎮 Download & Play (Windows)
 No installation required! To play immediately:
 1. Go to the **[Releases](../../releases)** tab on the right side of this page.
-2. Download the latest `Rampart_Windows_v1.0.zip`.
+2. Download the latest `RampartChessWindows_v1.3.zip`.
 3. Extract the folder to your PC and double-click **`Rampart.exe`** (the launcher) to play!
 
 ## Video Demo
