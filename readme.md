@@ -53,7 +53,7 @@ Watch full games of Rampart:
 | **Tactical Depth** | Lightning animations • Graveyard resurrection mechanics                    |
 
 ## Official Rules
-[![Rulebook PDF](https://img.shields.io/badge/Download-Rulebook-blue)](https://osf.io/a3cfz)  
+[![Rulebook PDF](https://img.shields.io/badge/Download-Rulebook-blue)](https://apecrank.net/rampart_rulebook/)  
 Complete strategy guide including card combinations and special moves.
 
 ---
@@ -118,5 +118,5 @@ Developed by **Jerod Michel** using:
 
 **Splash art/other art:** Leland Struebig/Billy Hill
 
-**Additional Code Support:** Google Gemini (for helping me cross the finish line).
+**Additional Code Support:** Google Gemini and Claude (for helping me cross the finish line).
 
