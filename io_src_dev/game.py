@@ -790,6 +790,9 @@ class Game:
             elif self.white_cast_prompt == 'no-strike':
                 text = font.render('No eligible raider to strike.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.white_cast_prompt == 'strike-needs-2-board':
+                text = font.render('Striking requires two board cards.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.white_cast_prompt == 'make21':
                 text = font.render('Choose cards from your deck and from the board that sum to 21.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
@@ -840,6 +843,9 @@ class Game:
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.black_cast_prompt == 'no-strike':
                 text = font.render('No eligible raider to strike.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.black_cast_prompt == 'strike-needs-2-board':
+                text = font.render('Striking requires two board cards.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.black_cast_prompt == 'make21':
                 text = font.render('Choose cards from your deck and from the board that sum to 21.',True,(255, 255, 255))
@@ -1068,7 +1074,14 @@ class Game:
             self.white_cast_prompt = 'no-strike'
         else:
             self.black_cast_prompt = 'no-strike'
-            
+
+    def set_strike_needs_two_board_prompt(self, color):
+        if color == 'white':
+            self.white_cast_prompt = 'strike-needs-2-board'
+        else:
+            self.black_cast_prompt = 'strike-needs-2-board'
+
+
     def set_make_21_prompt(self, color):
         if color == 'white':
             self.white_cast_prompt = 'make21'

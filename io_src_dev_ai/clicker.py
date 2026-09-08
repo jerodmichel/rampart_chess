@@ -83,7 +83,13 @@ class Clicker:
         else:
             self.card = None
             self.clicked = False
-            
+
+    def unclick_all_cards(self):
+        self.clicked_cards = []
+        self.card = None
+        self.clicked = False
+
+
     def has_board_card(self):
         aux = []
         for card in self.clicked_cards:

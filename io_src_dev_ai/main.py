@@ -995,15 +995,24 @@ class Main:
                             # 1. check history arrows (< and >)
                             if hasattr(self, 'btn_prev') and self.btn_prev.collidepoint(mouse_pos):
                                 if self.game.view_index > 0:
+                                    # Viewing history only makes sense at the live
+                                    # position - drop any in-progress card/button
+                                    # selection rather than carry it along.
+                                    clicker.unclick_all_cards()
+                                    clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index -= 1
                                     self.game.reconstruct_at_move(self.game.view_index, self.move_log)
                                     board = self.game.board
                                     dragger.board = board
                                     clicker.board = board
                                 continue
-                                
+
                             elif hasattr(self, 'btn_next') and self.btn_next.collidepoint(mouse_pos):
                                 if self.game.view_index < len(self.move_log):
+                                    clicker.unclick_all_cards()
+                                    clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index += 1
                                     self.game.reconstruct_at_move(self.game.view_index, self.move_log)
                                     board = self.game.board
@@ -1055,49 +1064,71 @@ class Main:
                                     clicked_suit, clicked_rank = game.get_card_position(event.pos[0], event.pos[1])
                                 
                             if clicked_col is not None:  # clicked on main board
-                                if clicker.clicked_btn == None:
+                                clicked_bsq = board.squares[clicked_col][clicked_row]
+
+                                if len(clicker.clicked_cards) > 0 and clicked_bsq.is_card() and \
+                                    clicked_bsq.has_piece() and clicked_row not in [0, 5] and \
+                                        clicker.is_clicked(clicked_bsq.card):
+                                    # Clicking one of our own already-highlighted board
+                                    # cards always unselects it, regardless of whether a
+                                    # STRIKE/RAISE button is currently committed - card
+                                    # (de)selection order shouldn't matter to the player.
+                                    # Since a committed button only ever means "the
+                                    # currently-highlighted cards are a legal combo",
+                                    # changing the cards un-commits it too.
+                                    clicker.unclick_card(clicked_bsq.card)
+                                    clicker.unclick_btn()
+                                    casting = False
+                                    # play sound
+                                    game.play_card_sound()
+                                    # show methods
+                                    game.show_bg(screen)
+                                    self.draw_command_strip()
+                                    game.show_last_move(screen)
+                                    game.show_moves(screen)
+                                    game.show_pieces(screen)
+                                    game.show_clicked_cards(screen)
+                                    game.show_dead(screen)
+                                    game.show_dead_cards(screen)
+                                    if len(clicker.clicked_cards) == 0:
+                                        game.set_cast_prompt(game.next_player)
+                                    else:
+                                        game.set_make_21_prompt(game.next_player)
+
+                                elif clicker.clicked_btn == None:
                                     if len(clicker.clicked_cards) > 0:
-                                        if board.squares[clicked_col][clicked_row].is_card() and \
-                                            board.squares[clicked_col][clicked_row].has_piece() and \
+                                        if clicked_bsq.is_card() and clicked_bsq.has_piece() and \
                                                 clicked_row not in [0, 5]:
-                                            card = board.squares[clicked_col][clicked_row].card
-                                            piece = board.squares[clicked_col][clicked_row].piece
-                                            if not clicker.is_clicked(card):
-                                                if piece.name == 'raider' and \
-                                                        piece.color == game.next_player:
-                                                    clicker.explic_save_card(card)
-                                                    clicker.click_card(card)
-                                                    # play sound
-                                                    game.play_card_sound()
-                                                    # show methods
-                                                    game.show_bg(screen)
-                                                    self.draw_command_strip()
-                                                    game.show_last_move(screen)
-                                                    game.show_moves(screen)
-                                                    game.show_pieces(screen)
-                                                    game.show_clicked_cards(screen)
-                                                    game.show_dead(screen)
-                                                    game.show_dead_cards(screen)
-                                                    
-                                                    if clicker.has_sum_21(clicker.clicked_cards):
-                                                        game.set_choose_cast_prompt(game.next_player)
-                                            else:
-                                                clicker.unclick_card(card)
+                                            card = clicked_bsq.card
+                                            piece = clicked_bsq.piece
+                                            if piece.name == 'raider' and \
+                                                    piece.color == game.next_player:
+                                                clicker.explic_save_card(card)
+                                                clicker.click_card(card)
                                                 # play sound
                                                 game.play_card_sound()
-                                                if len(clicker.clicked_cards) == 0:
-                                                    casting = False
-                                                    game.set_cast_prompt(game.next_player)
+                                                # show methods
+                                                game.show_bg(screen)
+                                                self.draw_command_strip()
+                                                game.show_last_move(screen)
+                                                game.show_moves(screen)
+                                                game.show_pieces(screen)
+                                                game.show_clicked_cards(screen)
+                                                game.show_dead(screen)
+                                                game.show_dead_cards(screen)
+
+                                                if clicker.has_sum_21(clicker.clicked_cards):
+                                                    game.set_choose_cast_prompt(game.next_player)
                                     else:
                                         # clicked square has a piece?
-                                        if board.squares[clicked_col][clicked_row].has_piece():
-                                            piece = board.squares[clicked_col][clicked_row].piece
+                                        if clicked_bsq.has_piece():
+                                            piece = clicked_bsq.piece
                                             # check if piece (color) is valid
                                             if piece.color == game.next_player and \
                                                 self.my_color == game.next_player:
-                                                    
+
                                                 board.calc_moves(piece, clicked_col, clicked_row, bool=True)
-                                                
+
                                                 dragger.save_initial(clicked_col, clicked_row)
                                                 dragger.drag_piece(piece)
                                                 # show methods
@@ -1109,7 +1140,7 @@ class Main:
                                                 game.show_clicked_cards(screen)
                                                 game.show_dead(screen)
                                                 game.show_dead_cards(screen)
-                            
+
         
                             if ((2 <= clicker.mouseX <= 2+CWIDTH and clicker.mouseY <= 800-CEM_HEIGHT) or 
                                 (902 <= clicker.mouseX <= 902+CWIDTH and CEM_HEIGHT <= clicker.mouseY <= 800)):
@@ -1139,10 +1170,16 @@ class Main:
                                             
                                             if in_deck_area:
                                                 clicker.unclick_card(board.cards[clicked_suit][clicked_rank])
+                                                # A committed STRIKE/RAISE only ever means
+                                                # "the highlighted cards are a legal combo" -
+                                                # changing the cards un-commits it too.
+                                                clicker.unclick_btn()
+                                                casting = False
                                                 game.play_card_sound()
                                                 if len(clicker.clicked_cards) == 0:
-                                                    casting = False
                                                     game.set_cast_prompt(game.next_player)
+                                                else:
+                                                    game.set_make_21_prompt(game.next_player)
                                                 
 
 # █▀▄▀█ █▀█ █░█ █▀ █▀▀ █▀▄▀█ █▀█ ▀█▀ █ █▀█ █▄░█
@@ -1477,6 +1514,14 @@ class Main:
 
                                                 game.play_card_sound()
 
+                                            elif clicker.has_sum_21(clicker.clicked_cards):
+                                                # A legal 21 combo, but it doesn't have the
+                                                # two board cards striking needs - tell the
+                                                # player why, instead of the click doing
+                                                # nothing at all.
+                                                game.set_strike_needs_two_board_prompt(game.next_player)
+                                                game.play_card_sound()
+
                                     elif 205 <= mouse_x <= 288:
                                         if len(clicker.clicked_cards) > 0:
                                             if clicker.has_board_card() and clicker.has_sum_21(clicker.clicked_cards):
@@ -1510,18 +1555,29 @@ class Main:
                                     if 102 <= mouse_x <= 202:
                                         game.play_card_sound()
                                         clicker.unclick_btn()
+                                        # Cancelling an already-committed cast button
+                                        # unselects every highlighted card too, so the
+                                        # player always returns to a clean slate here
+                                        # rather than needing to unclick cards one by
+                                        # one afterwards.
+                                        clicker.unclick_all_cards()
                                         clicker.unclick_grv()
                                         game.kill_dom_hover()
                                         game.kill_grave_hover()
-                                                
+                                        casting = False
+                                        game.set_cast_prompt(game.next_player)
+
                                     elif 205 <= mouse_x <= 288:
                                         game.play_card_sound()
                                         clicker.unclick_btn()
+                                        clicker.unclick_all_cards()
                                         clicker.unclick_grv()
                                         game.kill_dom_hover()
                                         game.kill_grave_hover()
-                                    
-                                    
+                                        casting = False
+                                        game.set_cast_prompt(game.next_player)
+
+
                             else:
                                 clicked_col = max(0, min(COLS-1, (mouse_x - 100) // RWIDTH))
                                 clicked_row = max(0, min(ROWS-1, mouse_y // RHEIGHT))
@@ -1986,24 +2042,33 @@ class Main:
                             # view history
                             elif event.key == pygame.K_LEFT:
                                 if self.game.view_index > 0:
+                                    # Viewing history only makes sense at the live
+                                    # position - drop any in-progress card/button
+                                    # selection rather than carry it along.
+                                    self.game.clicker.unclick_all_cards()
+                                    self.game.clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index -= 1
                                     # trigger reconstruction of baord at this index
                                     self.game.reconstruct_at_move(self.game.view_index, \
                                         self.move_log)
-                                    
+
                                     board = self.game.board
                                     dragger = self.game.dragger
                                     dragger.board.dragger = board
                                     clicker = self.game.clicker
                                     clicker.board = board
                                     print(f"Viewing move: {self.game.view_index}")
-                                    
+
                             elif event.key == pygame.K_RIGHT:
                                 if self.game.view_index < len(self.move_log):
+                                    self.game.clicker.unclick_all_cards()
+                                    self.game.clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index += 1
                                     self.game.reconstruct_at_move(self.game.view_index, \
                                         self.move_log)
-                                    
+
                                     board = self.game.board
                                     dragger = self.game.dragger
                                     dragger.board.dragger = board
@@ -2161,20 +2226,26 @@ class Main:
                             # view history
                             elif event.key == pygame.K_LEFT:
                                 if self.game.view_index > 0:
+                                    self.game.clicker.unclick_all_cards()
+                                    self.game.clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index -= 1
                                     # trigger reconstruction of baord at this index
                                     self.game.reconstruct_at_move(self.game.view_index, \
                                         self.move_log)
-                                    
+
                                     board = self.game.board
                                     dragger = self.game.dragger
                                     dragger.board.dragger = board
                                     clicker = self.game.clicker
                                     clicker.board = board
                                     print(f"Viewing move: {self.game.view_index}")
-                                    
+
                             elif event.key == pygame.K_RIGHT:
                                 if self.game.view_index < len(self.move_log):
+                                    self.game.clicker.unclick_all_cards()
+                                    self.game.clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index += 1
                                     self.game.reconstruct_at_move(self.game.view_index, \
                                         self.move_log)
@@ -2197,6 +2268,9 @@ class Main:
                             mouse_pos = event.pos
                             if self.btn_prev.collidepoint(mouse_pos):
                                 if self.game.view_index > 0:
+                                    self.game.clicker.unclick_all_cards()
+                                    self.game.clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index -= 1
                                     self.game.reconstruct_at_move(self.game.view_index, self.move_log)
                                     board = self.game.board
@@ -2205,6 +2279,9 @@ class Main:
                                     clicker.board = board
                             elif self.btn_next.collidepoint(mouse_pos):
                                 if self.game.view_index < len(self.move_log):
+                                    self.game.clicker.unclick_all_cards()
+                                    self.game.clicker.unclick_btn()
+                                    casting = False
                                     self.game.view_index += 1
                                     self.game.reconstruct_at_move(self.game.view_index, self.move_log)
                                     board = self.game.board

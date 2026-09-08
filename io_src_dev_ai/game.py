@@ -802,6 +802,9 @@ class Game:
             elif self.white_cast_prompt == 'no-strike':
                 text = font.render('No eligible raider to strike.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.white_cast_prompt == 'strike-needs-2-board':
+                text = font.render('Striking requires two board cards.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.white_cast_prompt == 'make21':
                 text = font.render('Choose cards from your deck and from the board that sum to 21.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
@@ -857,6 +860,9 @@ class Game:
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.black_cast_prompt == 'no-strike':
                 text = font.render('No eligible raider to strike.',True,(255, 255, 255))
+                surface.blit(text,(320, 805 + RAMPART_HEIGHT))
+            elif self.black_cast_prompt == 'strike-needs-2-board':
+                text = font.render('Striking requires two board cards.',True,(255, 255, 255))
                 surface.blit(text,(320, 805 + RAMPART_HEIGHT))
             elif self.black_cast_prompt == 'make21':
                 text = font.render('Choose cards from your deck and from the board that sum to 21.',True,(255, 255, 255))
@@ -1094,7 +1100,14 @@ class Game:
             self.white_cast_prompt = 'no-strike'
         else:
             self.black_cast_prompt = 'no-strike'
-            
+
+    def set_strike_needs_two_board_prompt(self, color):
+        if color == 'white':
+            self.white_cast_prompt = 'strike-needs-2-board'
+        else:
+            self.black_cast_prompt = 'strike-needs-2-board'
+
+
     def set_make_21_prompt(self, color):
         if color == 'white':
             self.white_cast_prompt = 'make21'
@@ -1499,6 +1512,13 @@ class Game:
                     rank_idx = RANKS.index(label)
                     # mark card as cast in reconstructed board
                     self.board.cards[deck_suit][rank_idx].cast = True
+
+            # Board.cast_move() normally sets this as a side effect of
+            # actually casting - since replay drives the board directly via
+            # _raise_raider/_raise_queen/_send_to_grave instead, it has to be
+            # set here too, or show_last_move() keeps highlighting whatever
+            # the previous (non-cast) history entry left behind.
+            self.board.last_move = Cast_move([], target_sq, 0 if not is_raise else 1)
                 
         # handle compound moves
         elif "/" in notation:
@@ -1511,7 +1531,13 @@ class Game:
             q_col, q_row = self._parse_square_token(q_target)
             self.board._raise_queen(q_col, q_row, self.next_player, self.board.\
                 squares[q_col][q_row].card)
-                
+
+            # same reasoning as the plain cast-move branch above - the queen
+            # spawn is the actual final action of this compound move, so it's
+            # what should end up highlighted.
+            self.board.last_move = Cast_move([], self.board.squares[q_col][q_row], 1)
+
+
 
 # █▀▀ █▀█ █▀▄▀█ █▀▄▀█ ▄▀█ █▄░█ █▀▄   █▀▄▀█ █▀▀ █▄░█ █░█
 # █▄▄ █▄█ █░▀░█  █░▀░█ █▀█ █░▀█ █▄▀    █░▀░█ ██▄ █░▀█ █▄█

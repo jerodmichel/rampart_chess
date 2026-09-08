@@ -678,13 +678,23 @@ class Board:
         deck = self.cards[1] if color == 'white' else self.cards[0]
                             
         if len(possible_hand) > 2:
-            
-            possible_hand = self._sift_cards(possible_hand, deck)
-            possible_hand2 = self._sift_cards2(possible_hand, deck)
+
+            all_board_cards = possible_hand
+            possible_hand = self._sift_cards(all_board_cards, deck)
+            possible_hand2 = self._sift_cards2(all_board_cards, deck)
             print(f"possible_hand2 combos: {possible_hand2}")
             print(f"valid_sum: {self.clicker.has_sum_21(possible_hand2)}")
-            
-            
+
+            if not possible_hand:
+                # No 2-board-card + 1-deck-card strike combo exists - fall
+                # back to a raise combo (1 board card + 1 or 2 deck cards),
+                # trying every board card in turn. The == 1 branch below
+                # only ever has one board card to try; this generalizes it
+                # to however many are on the board.
+                possible_hand = self._find_single_board_raise_combo(
+                    all_board_cards, deck) or []
+
+
         elif len(possible_hand) == 2:
             
             possible_hand2 = self._sift_cards2(possible_hand, deck)
@@ -1389,6 +1399,29 @@ class Board:
         indices = [sq.piece.idx3 for col in self.squares for sq in col if sq.has_piece()]
         return max(set(indices), key=indices.count) if indices else 0
             
+    def _find_single_board_raise_combo(self, board_cards, deck):
+        # Raise combo of exactly one board card plus one or two deck
+        # cards summing to 21 (with ace flexibility via has_sum_21).
+        # Tries every candidate board card, preferring a 1-deck-card
+        # completion over a 2-deck-card one - see _sift_cards, which
+        # only ever looks for a 2-board-card combo and misses this case.
+        for board_card in board_cards:
+            for crd1 in deck:
+                if not crd1.is_cast() and \
+                    self.clicker.has_sum_21([board_card, crd1]):
+                    return [board_card, crd1]
+
+        for board_card in board_cards:
+            for crd1 in deck:
+                if crd1.is_cast():
+                    continue
+                for crd2 in deck:
+                    if crd1 != crd2 and not crd2.is_cast() and \
+                        self.clicker.has_sum_21([board_card, crd1, crd2]):
+                        return [board_card, crd1, crd2]
+
+        return None
+
     def _sift_cards(self, possible_hand, deck):
         for crD1 in possible_hand:
             for crD2 in possible_hand:
