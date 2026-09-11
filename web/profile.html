@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Profile - Rampart</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <div id="navMenu">
+      <button id="navMenuBtn" aria-label="Menu" title="Menu">&#9776;</button>
+      <div id="navMenuDropdown" hidden>
+        <a href="index.html">Home</a>
+        <a href="profile.html">Profile</a>
+        <a href="stats.html">Stats</a>
+      </div>
+    </div>
+    <a id="homeLink" href="index.html"><h1>Rampart</h1></a>
+  </div>
+</header>
+
+<main id="profilePage">
+  <p id="signedOutMessage" hidden>Please sign in on the <a href="index.html">Home page</a> first.</p>
+
+  <div id="profileContent" hidden>
+    <div id="profileHeader">
+      <div id="avatarWrap">
+        <img id="avatarImg" alt="Avatar" hidden>
+        <canvas id="avatarCanvas" width="128" height="128" hidden></canvas>
+        <button id="avatarEditBtn" title="Change avatar">Edit</button>
+        <input id="avatarFileInput" type="file" accept="image/*" hidden>
+      </div>
+      <div id="profileInfo">
+        <h2 id="profileUsername"></h2>
+        <div id="bioDisplay">
+          <p id="bioText"></p>
+          <button id="bioEditBtn">Edit bio</button>
+        </div>
+        <div id="bioEditor" hidden>
+          <textarea id="bioTextarea" maxlength="280" rows="3"></textarea>
+          <div>
+            <button id="bioSaveBtn">Save</button>
+            <button id="bioCancelBtn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Games</h3>
+    <div id="gamesLedger"></div>
+  </div>
+</main>
+
+<script type="module" src="js/profile.js"></script>
+</body>
+</html>

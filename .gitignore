@@ -15,3 +15,7 @@ RampartChessLinux/
 
 # runtime debug log
 launch_error.log
+
+# Firebase Admin SDK service-account credentials - never commit these
+serviceAccountKey.json
+*firebase-adminsdk*.json

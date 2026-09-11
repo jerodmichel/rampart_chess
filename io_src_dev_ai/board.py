@@ -1284,8 +1284,11 @@ class Board:
                            (deck_card.rank == 0 and self._card_sum([deck_card]) + 10 == needed):
                             return [board_cards[i], board_cards[j], deck_card]
         
-        # CASE 2: 1 board card + 1-2 deck cards (for raise)
-        if need_board_count >= 1 and len(board_cards) >= 1:
+        # CASE 2: 1 board card + 1-2 deck cards (for raise only - a strike
+        # search that found no valid 2-board pairing above must NOT fall
+        # back to this, or it silently returns a 1-board combo as if it
+        # were a valid strike)
+        if need_board_count == 1 and len(board_cards) >= 1:
             # Try 1 board + 1 deck
             for board_card in board_cards:
                 for deck_card in deck_cards:

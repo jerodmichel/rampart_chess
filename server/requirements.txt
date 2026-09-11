@@ -5,3 +5,4 @@ numpy==2.4.4
 # that import is dead code (nothing in the game-logic call path actually
 # uses pygame), but it still has to be importable for board.py to load.
 pygame==2.6.1
+firebase-admin==6.7.0

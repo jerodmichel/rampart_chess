@@ -1473,10 +1473,21 @@ class Game:
                 print(f"DEBUG: History sync error! No piece found at {src_str} for move: {notation}")
                 return # Skip this invalid move instead of crashing
             
+            # Board.move() overwrites the destination unconditionally - it
+            # never sends a captured piece to the grave itself, that's
+            # always the caller's job. The live click-handler does this
+            # (main.py, right before calling board.move()); this replay
+            # path never did, so browsing history to a position just after
+            # a normal-move capture showed one fewer piece in the grave
+            # than the live game actually had at that point.
+            captured = self.board.squares[t_col][t_row].piece
+            if captured is not None and captured.name in ('raider', 'queen'):
+                self.board._send_to_grave(captured)
+
             move = Move(Square(f_col, f_row), Square(t_col, t_row))
-            
+
             self.board.move(piece, move)
-        
+
         # handle cast moves and queen spawns
         elif "++" in notation or "--" in notation:
             is_raise = "++" in notation

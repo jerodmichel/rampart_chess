@@ -1,0 +1,213 @@
+:root {
+    color-scheme: light dark;
+    --bg: #1b1c17;
+    --panel: #26271f;
+    --panel-border: #3c3d33;
+    --text: #eee;
+    --muted: #a0a196;
+    --accent: #c86464;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-border);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.6em;
+    letter-spacing: 1px;
+}
+
+#newGamePanel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9em;
+}
+
+select, button {
+    font-family: inherit;
+    font-size: 0.95em;
+    padding: 4px 8px;
+    background: #33342a;
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+}
+
+button {
+    cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+    background: #40412f;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+#statusLine {
+    text-align: center;
+    padding: 10px;
+    font-size: 1.1em;
+    min-height: 1.4em;
+}
+
+#gameArea {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 0 16px 40px;
+}
+
+.deckPanel {
+    width: 90px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.deckPanel h2 {
+    font-size: 0.95em;
+    margin: 0 0 8px;
+    text-align: center;
+}
+
+.deck {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.deckCard {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    background: #3a3b2f;
+}
+
+.deckCard.used {
+    opacity: 0.35;
+    text-decoration: line-through;
+}
+
+.grave {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 10px;
+    justify-content: center;
+}
+
+.grave img {
+    width: 22px;
+    height: 22px;
+    opacity: 0.85;
+}
+
+#boardSection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+#boardCanvas {
+    background: #000;
+    border: 2px solid var(--panel-border);
+    border-radius: 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+#castPanel {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    max-width: 640px;
+    flex-wrap: wrap;
+}
+
+.castGroup {
+    flex: 1;
+    min-width: 160px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.castGroup h3 {
+    margin: 0 0 6px;
+    font-size: 0.9em;
+    color: var(--muted);
+}
+
+.castList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 140px;
+    overflow-y: auto;
+}
+
+.castList li button {
+    width: 100%;
+    text-align: left;
+    font-size: 0.82em;
+}
+
+.castList:empty::after {
+    content: "none available";
+    color: var(--muted);
+    font-size: 0.8em;
+    font-style: italic;
+}
+
+#historyPanel {
+    width: 160px;
+    max-height: 500px;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+#historyPanel h2 {
+    font-size: 0.95em;
+    margin: 0 0 8px;
+}
+
+#historyList {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 0.85em;
+    color: var(--muted);
+}

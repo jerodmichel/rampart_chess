@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rampart</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <div id="navMenu">
+      <button id="navMenuBtn" aria-label="Menu" title="Menu">&#9776;</button>
+      <div id="navMenuDropdown" hidden>
+        <a href="index.html">Home</a>
+        <a href="profile.html">Profile</a>
+        <a href="stats.html">Stats</a>
+      </div>
+    </div>
+    <a id="homeLink" href="index.html"><h1>Rampart</h1></a>
+  </div>
+  <div id="authPanel">
+    <span id="authStatus"></span>
+    <input id="authEmail" type="email" placeholder="Email" size="16">
+    <input id="authPassword" type="password" placeholder="Password" size="12">
+    <input id="authUsername" type="text" placeholder="Username" hidden>
+    <button id="signUpBtn">Sign Up</button>
+    <button id="logInBtn">Log In</button>
+    <button id="logOutBtn" hidden>Log Out</button>
+  </div>
+</header>
+
+<div id="playModes">
+  <section class="playModeBand">
+    <h2>Play vs Computer</h2>
+    <div id="newGamePanel">
+      <label>AI plays:
+        <select id="aiColorSelect">
+          <option value="black" selected>Black</option>
+          <option value="white">White</option>
+        </select>
+      </label>
+      <label>Difficulty:
+        <select id="aiDifficultySelect">
+          <option value="Easy">Easy</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Hard">Hard</option>
+        </select>
+      </label>
+      <button id="newGameBtn">New Game</button>
+    </div>
+  </section>
+  <section class="playModeBand">
+    <h2>Play vs Human</h2>
+    <div id="challengePanel" hidden>
+      <div id="challengeSend">
+        <input id="challengeUsername" type="text" placeholder="Username to challenge">
+        <select id="challengeColorSelect">
+          <option value="random" selected>Random color</option>
+          <option value="white">I play White</option>
+          <option value="black">I play Black</option>
+        </select>
+        <select id="challengeTimeControlSelect">
+          <option value="30min" selected>30 minutes</option>
+          <option value="1hour">1 hour</option>
+          <option value="1day_per_move">1 day per move</option>
+        </select>
+        <button id="sendChallengeBtn">Challenge</button>
+      </div>
+      <div id="incomingChallenges"></div>
+      <div id="outgoingChallenges"></div>
+    </div>
+  </section>
+</div>
+
+<div id="statusLine">Start a new game to begin.</div>
+
+<main id="boardWrap">
+  <div id="clocks" hidden>
+    <span id="blackClock">Black: --:--</span>
+    <span id="whiteClock">White: --:--</span>
+  </div>
+  <canvas id="boardCanvas"></canvas>
+  <div id="belowBoard">
+    <div id="displayPanel">
+      <div id="displaySettings">
+        <button id="displaySettingsBtn" title="Display settings">&#9881; Display</button>
+        <div id="displaySettingsDropdown" hidden>
+          <label>Theme:
+            <select id="themeSelect"></select>
+          </label>
+          <label>Piece style:
+            <select id="pieceSetSelect"></select>
+          </label>
+          <label><input type="checkbox" id="effectsToggle" checked> Thunder &amp; lightning</label>
+        </div>
+      </div>
+      <button id="flipBoardBtn" title="Flip the board">Flip Board</button>
+    </div>
+    <div id="historyControls">
+      <button id="historyPrevBtn" title="Previous move">&larr;</button>
+      <button id="historyLiveBtn" title="Return to the live position">Live</button>
+      <button id="historyNextBtn" title="Next move">&rarr;</button>
+    </div>
+  </div>
+  <div id="gameActions" hidden>
+    <button id="resignBtn">Resign</button>
+    <button id="offerDrawBtn">Offer Draw</button>
+    <button id="acceptDrawBtn" hidden>Accept Draw</button>
+    <button id="declineDrawBtn" hidden>Decline Draw</button>
+  </div>
+</main>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

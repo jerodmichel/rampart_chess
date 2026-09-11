@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rampart</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <h1>Rampart</h1>
+  <div id="newGamePanel">
+    <label>AI plays:
+      <select id="aiColorSelect">
+        <option value="black" selected>Black</option>
+        <option value="white">White</option>
+      </select>
+    </label>
+    <label>Difficulty:
+      <select id="aiDifficultySelect">
+        <option value="Easy">Easy</option>
+        <option value="Medium" selected>Medium</option>
+      </select>
+    </label>
+    <button id="newGameBtn">New Game</button>
+  </div>
+</header>
+
+<div id="statusLine">Start a new game to begin.</div>
+
+<main id="gameArea" hidden>
+  <section id="blackPanel" class="deckPanel">
+    <h2>Black</h2>
+    <div id="blackDeck" class="deck"></div>
+    <div id="blackGrave" class="grave"></div>
+  </section>
+
+  <section id="boardSection">
+    <canvas id="boardCanvas"></canvas>
+    <div id="castPanel">
+      <div class="castGroup">
+        <h3>Strike</h3>
+        <ul id="strikeList" class="castList"></ul>
+      </div>
+      <div class="castGroup">
+        <h3>Raise Raider</h3>
+        <ul id="raiseRaiderList" class="castList"></ul>
+      </div>
+      <div class="castGroup">
+        <h3>Raise Queen</h3>
+        <ul id="raiseQueenList" class="castList"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="whitePanel" class="deckPanel">
+    <h2>White</h2>
+    <div id="whiteDeck" class="deck"></div>
+    <div id="whiteGrave" class="grave"></div>
+  </section>
+
+  <section id="historyPanel">
+    <h2>Moves</h2>
+    <ol id="historyList"></ol>
+  </section>
+</main>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

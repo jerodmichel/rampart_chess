@@ -1,0 +1,407 @@
+@font-face {
+    font-family: 'Cinzel Web';
+    src: url('assets/fonts/Cinzel-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+}
+
+:root {
+    color-scheme: dark;
+    --bg: #141410;
+    --panel: #26271f;
+    --panel-border: #3c3d33;
+    --text: #eee;
+    --muted: #a0a196;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-border);
+}
+
+header h1 {
+    margin: 0;
+    margin-top: 6px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-size: 1.9em;
+    letter-spacing: 1px;
+}
+
+#headerLeft {
+    display: flex;
+    align-items: center;
+}
+
+#homeLink {
+    display: block;
+    margin-left: 10px;
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Shared "click to open, click elsewhere to close" dropdown look, for both
+   the hamburger nav menu and the board's display-settings menu. */
+#navMenu, #displaySettings {
+    position: relative;
+}
+
+#navMenuBtn {
+    font-size: 1.3em;
+    line-height: 1;
+    padding: 4px 10px;
+}
+
+#navMenuDropdown, #displaySettingsDropdown {
+    position: absolute;
+    left: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    min-width: 170px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    z-index: 20;
+}
+
+#navMenuDropdown {
+    top: 100%;
+    margin-top: 4px;
+}
+
+/* Opens upward instead of downward - this button sits near the bottom of
+   the page content, so a downward menu would open into empty space below
+   the board rather than toward anything useful. */
+#displaySettingsDropdown {
+    bottom: 100%;
+    margin-bottom: 4px;
+}
+
+/* `display` must live here, not in the rule above - an ID selector still
+   beats the browser's built-in `[hidden] { display: none }` regardless of
+   its own specificity (author rules always win over user-agent ones), so
+   putting it on the unconditional rule would make the JS hidden-attribute
+   toggle silently do nothing. */
+#navMenuDropdown:not([hidden]), #displaySettingsDropdown:not([hidden]) {
+    display: flex;
+}
+
+#navMenuDropdown a {
+    display: block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--text);
+    text-decoration: none;
+}
+
+#navMenuDropdown a:hover {
+    background: #40412f;
+}
+
+#newGamePanel, #displayPanel, #authPanel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9em;
+}
+
+#authPanel {
+    gap: 6px;
+}
+
+#authStatus {
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+select, button, input {
+    font-family: inherit;
+    font-size: 0.95em;
+    padding: 4px 8px;
+    background: #33342a;
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+}
+
+button { cursor: pointer; }
+button:hover:not(:disabled) { background: #40412f; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+#playModes {
+    display: flex;
+    flex-direction: column;
+    max-width: 1000px;
+    margin: 10px auto 0;
+    padding: 0 15px;
+}
+
+.playModeBand {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.playModeBand:last-child {
+    border-bottom: none;
+}
+
+.playModeBand h2 {
+    margin: 0;
+    min-width: 130px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-size: 0.95em;
+    font-weight: normal;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+#challengePanel {
+    font-size: 0.9em;
+}
+
+#challengeSend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.challengeRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    color: var(--muted);
+}
+
+#statusLine {
+    text-align: center;
+    padding: 8px;
+    font-size: 0.95em;
+    color: var(--muted);
+    min-height: 1.2em;
+}
+
+#boardWrap {
+    position: relative;
+    width: 1000px;
+    max-width: 100%;
+    margin: 10px auto 40px;
+}
+
+#boardCanvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: pointer;
+}
+
+#belowBoard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 0 15px;
+}
+
+#historyControls {
+    display: flex;
+    gap: 10px;
+}
+
+#historyControls button {
+    min-width: 60px;
+    padding: 6px 14px;
+    font-size: 1em;
+}
+
+#gameActions {
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* See the comment above #navMenuDropdown:not([hidden]) - same reason. */
+#gameActions:not([hidden]) {
+    display: flex;
+}
+
+#gameActions button {
+    padding: 6px 14px;
+}
+
+#acceptDrawBtn, #declineDrawBtn {
+    background: rgb(159, 43, 104);
+    color: white;
+}
+
+/* Plain/functional for now - a placeholder for the alchemical-hourglass
+   styling planned for these later. */
+#clocks {
+    justify-content: space-between;
+    padding: 4px 15px 8px;
+    font-family: monospace;
+    font-size: 1.3em;
+    color: var(--muted);
+}
+
+/* See the comment above #navMenuDropdown:not([hidden]) - same reason. */
+#clocks:not([hidden]) {
+    display: flex;
+}
+
+#clocks .clockActive {
+    color: var(--text);
+    font-weight: bold;
+}
+
+.placeholderPage {
+    max-width: 1000px;
+    margin: 60px auto;
+    padding: 0 15px;
+    text-align: center;
+    color: var(--muted);
+}
+
+/* ---- profile page ------------------------------------------------------ */
+
+#profilePage {
+    max-width: 700px;
+    margin: 30px auto 60px;
+    padding: 0 15px;
+}
+
+#signedOutMessage {
+    text-align: center;
+    color: var(--muted);
+    margin-top: 60px;
+}
+
+#signedOutMessage a {
+    color: var(--text);
+}
+
+#profileHeader {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+#avatarWrap {
+    position: relative;
+    width: 128px;
+    height: 128px;
+    flex: none;
+}
+
+#avatarImg, #avatarCanvas {
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--panel-border);
+    /* pixelated identicon should stay crisp/blocky, not blurred when
+       upscaled from its native canvas resolution */
+    image-rendering: pixelated;
+}
+
+#avatarEditBtn {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    padding: 4px 10px;
+    font-size: 0.8em;
+    border-radius: 999px;
+}
+
+#profileInfo {
+    flex: 1;
+}
+
+#profileUsername {
+    margin: 0 0 6px;
+    font-family: 'Cinzel Web', Georgia, serif;
+}
+
+#bioText {
+    margin: 0 0 6px;
+    color: var(--muted);
+    white-space: pre-wrap;
+}
+
+#bioEditor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#bioTextarea {
+    width: 100%;
+    resize: vertical;
+    font-family: inherit;
+}
+
+#profilePage h3 {
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 6px;
+}
+
+.ledgerRow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--panel-border);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.ledgerRow:hover {
+    background: var(--panel);
+}
+
+.ledgerOpponent {
+    flex: 1;
+}
+
+.ledgerColor, .ledgerTimeControl, .ledgerDate {
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+.ledgerResult {
+    font-weight: bold;
+    min-width: 70px;
+    text-align: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.ledgerWin { background: #2d5a2d; color: #b6f2b6; }
+.ledgerLoss { background: #5a2d2d; color: #f2b6b6; }
+.ledgerDraw { background: #4a4a3a; color: #ddd; }
+.ledgerOngoing { background: #33342a; color: var(--muted); }
+
