@@ -57,11 +57,19 @@ class GameSession:
     }
 
     def __init__(self, ai_color="black", ai_difficulty="Medium", white_uid=None, black_uid=None,
-                 time_control=None):
+                 time_control=None, white_username=None, black_username=None):
         """ai_color=None means a real two-human game (see challenges.py) -
         white_uid/black_uid then identify who's allowed to move each side
         (enforced in app.py, not here); both stay None for the existing
         anonymous human-vs-AI mode, which still needs no account at all.
+
+        white_username/black_username are cached display names (passed in
+        once at creation by whichever app.py endpoint already resolved
+        them, e.g. accept_challenge) purely for to_dict()'s consumers (the
+        web client's on-board name/rating labels) - GameSession itself
+        never uses them and never re-resolves them from Firebase, so a
+        username change after a game starts won't retroactively update it,
+        matching how a persisted game_records username snapshot works too.
 
         time_control (None | one of TIME_CONTROLS' keys) is likewise only
         meaningful for a real two-human game - an AI opponent has its own
@@ -73,8 +81,11 @@ class GameSession:
         self.move_log = []
         self.state_history = []
         self.ai_color = ai_color
+        self.ai_difficulty = ai_difficulty  # unused/meaningless when ai_color is None
         self.white_uid = white_uid
         self.black_uid = black_uid
+        self.white_username = white_username
+        self.black_username = black_username
         self.resigned_by = None  # 'white' | 'black' | None
         self.draw_agreed = False
         self.draw_offered_by = None  # 'white' | 'black' | None - most recent offer
@@ -91,11 +102,14 @@ class GameSession:
             initial_ms = self.TIME_CONTROLS[time_control]["ms"]
             self.white_remaining_ms = initial_ms
             self.black_remaining_ms = initial_ms
-            self.clock_running_since_ms = int(time.time() * 1000)
         else:
             self.white_remaining_ms = None
             self.black_remaining_ms = None
-            self.clock_running_since_ms = None
+        # None until the first move is actually made (see _tick_clock) -
+        # neither side's clock runs while white is still looking at the
+        # board for the first time, only once white's first move starts
+        # black's clock.
+        self.clock_running_since_ms = None
 
         temp_bb = RampartBitboard()
         temp_bb.sync_from_board(self.board)
@@ -158,26 +172,34 @@ class GameSession:
         accumulates) and starts the run for whoever moves next. Called from
         _post_move so every move-executing path (human or AI, normal or
         cast) goes through this same single choke point. No-op for untimed
-        games (time_control is None), which includes every AI game."""
+        games (time_control is None), which includes every AI game.
+
+        On the very first call for a game (clock_running_since_ms still
+        None - white's first move), there's nothing to deduct yet: neither
+        side's clock has been running while white looked at the board for
+        the first time. This just starts the clock for whoever moves next."""
         if self.time_control is None:
             return
         now_ms = int(time.time() * 1000)
-        elapsed_ms = now_ms - self.clock_running_since_ms
         is_pool = self.TIME_CONTROLS[self.time_control]["kind"] == "pool"
         period_ms = self.TIME_CONTROLS[self.time_control]["ms"]
 
-        if mover_color == "white":
-            self.white_remaining_ms = max(0, self.white_remaining_ms - elapsed_ms) if is_pool else period_ms
-        else:
-            self.black_remaining_ms = max(0, self.black_remaining_ms - elapsed_ms) if is_pool else period_ms
+        if self.clock_running_since_ms is not None:
+            elapsed_ms = now_ms - self.clock_running_since_ms
+            if mover_color == "white":
+                self.white_remaining_ms = max(0, self.white_remaining_ms - elapsed_ms) if is_pool else period_ms
+            else:
+                self.black_remaining_ms = max(0, self.black_remaining_ms - elapsed_ms) if is_pool else period_ms
         self.clock_running_since_ms = now_ms
 
     def _check_timeout(self):
         """Lazily evaluates whether whoever's on the clock right now has
         run out - called before any read or move-attempt so a timeout is
         detected without needing a background scheduler polling every game
-        in memory. No-op for untimed games or a game that's already over."""
-        if self.time_control is None or self.is_game_over():
+        in memory. No-op for untimed games, a game that's already over, or
+        one where the clock hasn't started yet (before white's first move -
+        nobody can time out before the game has even begun)."""
+        if self.time_control is None or self.clock_running_since_ms is None or self.is_game_over():
             return
         now_ms = int(time.time() * 1000)
         elapsed_ms = now_ms - self.clock_running_since_ms
@@ -190,9 +212,13 @@ class GameSession:
         on the clock is exactly its stored value; the side currently on the
         clock has the still-elapsing time subtracted live, so a client
         polling this sees an accurate countdown rather than a number that
-        only updates once per move."""
+        only updates once per move. Before the clock has started (white's
+        first move not yet made), both sides just show their full initial
+        time with nothing subtracted."""
         if self.time_control is None:
             return None, None
+        if self.clock_running_since_ms is None:
+            return self.white_remaining_ms, self.black_remaining_ms
         now_ms = int(time.time() * 1000)
         elapsed_ms = now_ms - self.clock_running_since_ms
         white_ms, black_ms = self.white_remaining_ms, self.black_remaining_ms
@@ -597,8 +623,11 @@ class GameSession:
             "id": self.id,
             "next_player": self.next_player,
             "ai_color": self.ai_color,
+            "ai_difficulty": self.ai_difficulty,
             "white_uid": self.white_uid,
             "black_uid": self.black_uid,
+            "white_username": self.white_username,
+            "black_username": self.black_username,
             "history": self.move_log,
             "king_mated": bool(self.board.king_mated),
             "king_stalemated": bool(self.board.king_stalemated),
@@ -606,6 +635,7 @@ class GameSession:
             "time_control": self.time_control,
             "white_time_ms": white_ms,
             "black_time_ms": black_ms,
+            "clock_running": self.clock_running_since_ms is not None,
             "result": self.result(),
             "view_index": len(self.move_log),
             "is_live": True,
@@ -718,8 +748,11 @@ class GameSession:
             "id": self.id,
             "next_player": next_player,
             "ai_color": self.ai_color,
+            "ai_difficulty": self.ai_difficulty,
             "white_uid": self.white_uid,
             "black_uid": self.black_uid,
+            "white_username": self.white_username,
+            "black_username": self.black_username,
             "history": self.move_log,
             "king_mated": bool(self.board.king_mated) if is_live else False,
             "king_stalemated": bool(self.board.king_stalemated) if is_live else False,
@@ -755,9 +788,26 @@ class ReplayOnlyGame:
 
     def __init__(self, record):
         self.id = record["id"]
-        self.ai_color = None  # only human-vs-human games are persisted at all
         self.white_uid = record.get("white_uid")
         self.black_uid = record.get("black_uid")
+        # ai_color isn't itself a persisted field (game_records.py's schema
+        # has no such key) - infer it the same way every vs-AI game already
+        # shapes its uids: the AI's side is whichever one has no uid at all.
+        # Both set means a real human-vs-human game. This used to be
+        # hardcoded to None with a comment claiming only human-vs-human
+        # games get persisted - no longer true since AI-game persistence
+        # was added for a signed-in human side, so a persisted AI game
+        # replayed after a server restart was silently mislabeled as
+        # human-vs-human until this fix.
+        if self.white_uid is None and self.black_uid is not None:
+            self.ai_color = "white"
+        elif self.black_uid is None and self.white_uid is not None:
+            self.ai_color = "black"
+        else:
+            self.ai_color = None
+        self.ai_difficulty = record.get("ai_difficulty")
+        self.white_username = record.get("white_username")
+        self.black_username = record.get("black_username")
         self.time_control = record.get("time_control")
         self.move_log = record.get("history", [])
         self._result = record.get("result")
@@ -780,8 +830,11 @@ class ReplayOnlyGame:
             "id": self.id,
             "next_player": next_player,
             "ai_color": self.ai_color,
+            "ai_difficulty": self.ai_difficulty,
             "white_uid": self.white_uid,
             "black_uid": self.black_uid,
+            "white_username": self.white_username,
+            "black_username": self.black_username,
             "history": self.move_log,
             # king_mated/king_stalemated were only ever a live GameSession's
             # own board flags, not persisted - the unified `result` field
@@ -792,6 +845,7 @@ class ReplayOnlyGame:
             "draw_offered_by": None,
             "white_time_ms": None,
             "black_time_ms": None,
+            "clock_running": False,
             "result": self._result if is_live else None,
             "view_index": index,
             "is_live": is_live,

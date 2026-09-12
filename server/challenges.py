@@ -17,6 +17,7 @@ module from needing to know about GameSession/GAMES at all).
 """
 
 import random
+import time
 
 from fastapi import HTTPException
 from firebase_admin import db
@@ -27,6 +28,24 @@ import accounts
 # TIME_CONTROLS) so this module still doesn't need to know GameSession
 # exists at all - it just validates and stores a string.
 TIME_CONTROLS = ("30min", "1hour", "1day_per_move")
+
+# How long a challenge can sit unanswered before it auto-expires, so
+# pending invites nobody responds to don't just pile up forever - the user
+# explicitly asked for a cap on this. 24 hours, independent of whatever
+# time_control the challenge itself proposes for the eventual game.
+CHALLENGE_EXPIRY_MS = 24 * 60 * 60 * 1000
+
+
+def _expire_if_stale(challenge_id: str, record: dict) -> dict:
+    """Lazily transitions a pending challenge past CHALLENGE_EXPIRY_MS to
+    'expired' - evaluated on read rather than a background job, same
+    lazy-eval pattern as GameSession._check_timeout for game clocks."""
+    created_at = record.get("created_at")
+    if (record.get("status") == "pending" and created_at is not None
+            and int(time.time() * 1000) - created_at > CHALLENGE_EXPIRY_MS):
+        db.reference(f"challenges/{challenge_id}").update({"status": "expired"})
+        record = {**record, "status": "expired"}
+    return record
 
 
 def create_challenge(from_uid: str, from_username: str, to_username: str, color: str = "random",
@@ -66,17 +85,25 @@ def _get(challenge_id: str) -> dict:
     record = db.reference(f"challenges/{challenge_id}").get()
     if record is None:
         raise HTTPException(status_code=404, detail="no such challenge")
-    return record
+    return _expire_if_stale(challenge_id, record)
 
 
 def list_incoming(uid: str) -> list:
     results = db.reference("challenges").order_by_child("to_uid").equal_to(uid).get() or {}
-    return [{"challenge_id": k, **v} for k, v in results.items() if v.get("status") == "pending"]
+    out = []
+    for k, v in results.items():
+        v = _expire_if_stale(k, v)
+        if v.get("status") == "pending":
+            out.append({"challenge_id": k, **v})
+    return out
 
 
 def list_outgoing(uid: str) -> list:
+    # Every status (including a freshly-expired one) - unlike list_incoming,
+    # this is the challenger's own view of what they sent, so it should
+    # show "expired" rather than just silently disappearing.
     results = db.reference("challenges").order_by_child("from_uid").equal_to(uid).get() or {}
-    return [{"challenge_id": k, **v} for k, v in results.items()]
+    return [{"challenge_id": k, **_expire_if_stale(k, v)} for k, v in results.items()]
 
 
 def accept(challenge_id: str, uid: str) -> dict:

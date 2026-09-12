@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rules - RampartChess</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <div id="navMenu">
+      <button id="navMenuBtn" aria-label="Menu" title="Menu">&#9776;</button>
+      <div id="navMenuDropdown" hidden>
+        <a href="index.html">Home</a>
+        <a href="profile.html">Profile</a>
+        <a href="stats.html">Stats</a>
+        <a href="messages.html">Messages</a>
+        <a href="rules.html">Game Rules</a>
+        <a href="legal.html">Terms &amp; Privacy</a>
+      </div>
+    </div>
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
+  </div>
+  <div id="accountHeader" hidden>
+    <div id="notifBell">
+      <button id="notifBtn" title="Notifications"><img class="bellIcon" src="assets/misc/gothic_bell.png" alt=""><span id="notifBadge" hidden>0</span></button>
+      <div id="notifDropdown" hidden></div>
+    </div>
+    <div id="avatarMenu">
+      <span id="headerUserLabel"></span>
+      <button id="avatarMenuBtn" title="Account">
+        <img id="headerAvatarImg" alt="Avatar" hidden>
+        <canvas id="headerAvatarCanvas" width="28" height="28" hidden></canvas>
+      </button>
+      <div id="avatarMenuDropdown" hidden>
+        <a href="profile.html">Profile</a>
+        <button id="headerLogOutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="rulesPage">
+  <h2>About RampartChess</h2>
+  <p>
+    RampartChess is a strategic hybrid of chess and cardplay, where two players compete
+    to checkmate their opponent's king using a combination of tactical piece movement
+    and deck-based casting.
+  </p>
+
+  <h3>Quick reference</h3>
+  <ul id="rulesSummary">
+    <li><strong>Materials &amp; setup:</strong> 1 standard deck of cards (White uses Spades, Black
+      uses Clubs). Pieces per player: 8 Raiders (pawns), 1 Rook, 1 Knight, 1 Bishop, 1 Queen, and
+      1 King. The board's bottom half is Diamonds, top half is Hearts. Houses sit on the Jack,
+      Queen, and King cards on the back rows.</li>
+    <li><strong>Piece movement:</strong> Raiders move 1 space in any direction and capture
+      diagonally, but can never cross back over the rampart (the mid-board barrier). Knights,
+      Rooks, Bishops, Queens, and Kings all move as they do in standard chess.</li>
+    <li><strong>Casting &amp; houses:</strong> Casting requires using exactly 3 cards totaling 21.
+      Raiders are the only pieces allowed inside an enemy house. The Jack's House unlocks
+      spawning and striking; the Queen's House unlocks spawning your Queen; the King's House
+      restricts the enemy King to card squares only.</li>
+    <li><strong>Raising (spawning):</strong> Use 1-2 Raiders on card squares plus 1-2 deck cards to
+      make 21. Discard the deck cards, then place a captured Raider or Queen on an empty square in
+      your own territory.</li>
+    <li><strong>Striking (capturing):</strong> Requires a Raider in the enemy Jack's House. Use 2
+      Raiders on card squares plus 1 deck card to make 21 and capture an enemy Raider.</li>
+  </ul>
+
+  <h2>Official Rulebook</h2>
+  <p>
+    <a href="https://apecrank.net/rampart_rulebook/" target="_blank" rel="noopener">
+      Open the full rulebook in a new tab &#8599;
+    </a>
+    - or read it right here:
+  </p>
+  <iframe id="rulebookFrame" src="https://apecrank.net/rampart_rulebook/"
+          title="Official RampartChess Rulebook"></iframe>
+</main>
+
+<script type="module" src="js/header.js"></script>
+<script type="module">
+  import { initNavMenu } from './js/nav.js';
+  initNavMenu();
+</script>
+</body>
+</html>

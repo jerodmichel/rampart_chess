@@ -105,12 +105,101 @@ export const api = {
         });
     },
 
+    updateCountry(country) {
+        return request('/profile/country', {
+            method: 'POST',
+            body: JSON.stringify({ country }),
+        });
+    },
+
     myGames() {
         return request('/profile/games');
     },
 
     findUser(username) {
         return request(`/auth/users/${encodeURIComponent(username)}`);
+    },
+
+    // -- public player profiles (viewing someone ELSE's stats/history) --
+
+    playerProfile(username) {
+        return request(`/players/${encodeURIComponent(username)}`);
+    },
+
+    playerGames(username) {
+        return request(`/players/${encodeURIComponent(username)}/games`);
+    },
+
+    playerRatingHistory(username) {
+        return request(`/players/${encodeURIComponent(username)}/rating_history`);
+    },
+
+    playerRank(username) {
+        return request(`/players/${encodeURIComponent(username)}/rank`);
+    },
+
+    playerBadges(username) {
+        return request(`/players/${encodeURIComponent(username)}/badges`);
+    },
+
+    // -- spectating -------------------------------------------------------
+
+    liveGames() {
+        return request('/games/live');
+    },
+
+    // -- friends ------------------------------------------------------------
+
+    sendFriendRequest(username) {
+        return request('/friends/request', {
+            method: 'POST',
+            body: JSON.stringify({ to_username: username }),
+        });
+    },
+
+    incomingFriendRequests() {
+        return request('/friends/incoming');
+    },
+
+    outgoingFriendRequests() {
+        return request('/friends/outgoing');
+    },
+
+    acceptFriendRequest(requestId) {
+        return request(`/friends/${requestId}/accept`, { method: 'POST' });
+    },
+
+    declineFriendRequest(requestId) {
+        return request(`/friends/${requestId}/decline`, { method: 'POST' });
+    },
+
+    dismissFriendRequest(requestId) {
+        return request(`/friends/${requestId}/dismiss`, { method: 'POST' });
+    },
+
+    friends() {
+        return request('/friends');
+    },
+
+    removeFriend(username) {
+        return request(`/friends/${encodeURIComponent(username)}/remove`, { method: 'POST' });
+    },
+
+    // -- direct messages (friends only) -------------------------------------
+
+    sendDirectMessage(username, text) {
+        return request(`/messages/${encodeURIComponent(username)}`, {
+            method: 'POST',
+            body: JSON.stringify({ text }),
+        });
+    },
+
+    directMessages(username) {
+        return request(`/messages/${encodeURIComponent(username)}`);
+    },
+
+    inbox() {
+        return request('/messages');
     },
 
     // -- challenges (match invites) -----------------------------------
@@ -151,6 +240,12 @@ export const api = {
         return request(`/games/${gameId}/resign`, { method: 'POST' });
     },
 
+    // Only valid with zero moves played - disposes of the game instead of
+    // recording a loss (see server/app.py's /abort).
+    abort(gameId) {
+        return request(`/games/${gameId}/abort`, { method: 'POST' });
+    },
+
     offerDraw(gameId) {
         return request(`/games/${gameId}/offer_draw`, { method: 'POST' });
     },
@@ -160,5 +255,18 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ accept }),
         });
+    },
+
+    // -- chat (human-vs-human games only) --------------------------------
+
+    sendChatMessage(gameId, text) {
+        return request(`/games/${gameId}/chat`, {
+            method: 'POST',
+            body: JSON.stringify({ text }),
+        });
+    },
+
+    chatMessages(gameId) {
+        return request(`/games/${gameId}/chat`);
     },
 };

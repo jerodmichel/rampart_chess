@@ -47,16 +47,168 @@ header h1 {
 }
 
 #homeLink {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-left: 10px;
     color: inherit;
     text-decoration: none;
 }
 
+#siteLogo {
+    height: 34px;
+    width: auto;
+}
+
 /* Shared "click to open, click elsewhere to close" dropdown look, for both
    the hamburger nav menu and the board's display-settings menu. */
-#navMenu, #displaySettings {
+#navMenu, #displaySettings, #notifBell, #avatarMenu {
     position: relative;
+}
+
+#accountHeader {
+    align-items: center;
+    gap: 10px;
+    margin-left: 14px;
+}
+
+#accountHeader:not([hidden]) {
+    display: flex;
+}
+
+#notifBtn {
+    font-size: 1.1em;
+    line-height: 1;
+    padding: 4px 8px;
+    position: relative;
+}
+
+.bellIcon {
+    height: 1.5em;
+    width: auto;
+    vertical-align: -0.3em;
+    display: inline-block;
+}
+
+#notifBadge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 8px;
+    background: #b5442e;
+    color: #fff;
+    font-size: 0.7em;
+    line-height: 16px;
+    text-align: center;
+}
+
+/* display must live in a :not([hidden]) rule, not the unconditional one
+   above - see the #navMenuDropdown comment for why. */
+#notifBadge:not([hidden]) {
+    display: inline-block;
+}
+
+#notifDropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    min-width: 240px;
+    max-width: 320px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    z-index: 20;
+}
+
+#notifDropdown:not([hidden]) {
+    display: flex;
+}
+
+#notifDropdown p {
+    margin: 4px;
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+.notifRow {
+    display: block;
+    padding: 6px 8px;
+    border-radius: 4px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.9em;
+}
+
+.notifRow:hover {
+    background: #40412f;
+}
+
+#avatarMenu {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#headerUserLabel {
+    font-size: 0.9em;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+#avatarMenuBtn {
+    padding: 2px;
+    border-radius: 50%;
+    line-height: 0;
+}
+
+#avatarMenuBtn img, #avatarMenuBtn canvas {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+}
+
+#avatarMenuDropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    min-width: 140px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    z-index: 20;
+}
+
+#avatarMenuDropdown:not([hidden]) {
+    display: flex;
+}
+
+#avatarMenuDropdown a, #avatarMenuDropdown button {
+    display: block;
+    width: 100%;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--text);
+    text-decoration: none;
+    text-align: left;
+    background: transparent;
+    border: none;
+}
+
+#avatarMenuDropdown a:hover, #avatarMenuDropdown button:hover {
+    background: #40412f;
 }
 
 #navMenuBtn {
@@ -112,11 +264,25 @@ header h1 {
     background: #40412f;
 }
 
-#newGamePanel, #displayPanel, #authPanel {
+#newGamePanel, #displayPanel {
     display: flex;
     align-items: center;
     gap: 12px;
     font-size: 0.9em;
+}
+
+/* #authPanel is now toggled via .hidden (see renderAuthUI in main.js) -
+   split out of the rule above and given its own :not([hidden]) guard, or
+   this hits the same #navMenuDropdown gotcha (an id-selector display rule
+   beats [hidden] regardless of specificity). */
+#authPanel {
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9em;
+}
+
+#authPanel:not([hidden]) {
+    display: flex;
 }
 
 #authPanel {
@@ -126,6 +292,42 @@ header h1 {
 #authStatus {
     color: var(--muted);
     font-size: 0.9em;
+}
+
+#forgotPasswordBtn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    text-decoration: underline;
+    padding: 0;
+    font-size: 0.85em;
+}
+
+#forgotPasswordBtn:hover:not(:disabled) {
+    background: transparent;
+    color: var(--text);
+}
+
+/* A plain #id{display:...} rule beats [hidden]'s built-in display:none
+   regardless of specificity - see the #navMenuDropdown comment below for
+   the same gotcha, hit again here. */
+#verifyEmailBanner {
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 15px;
+    background: #4a3a1a;
+    color: #f2d9a6;
+    font-size: 0.9em;
+    text-align: center;
+}
+
+#verifyEmailBanner:not([hidden]) {
+    display: flex;
+}
+
+#verifyEmailBanner button {
+    font-size: 0.85em;
 }
 
 select, button, input {
@@ -177,6 +379,28 @@ button:disabled { opacity: 0.5; cursor: default; }
     font-size: 0.9em;
 }
 
+/* Lives at the bottom of #boardWrap now (after display settings, and
+   after chat during a multiplayer game) - boardWrap itself is already
+   centered/width-constrained, so this just needs the same top-margin
+   spacing its siblings (#gameActions, #chatPanel) use. */
+#liveGamesPanel {
+    margin: 10px 15px 0;
+}
+
+#liveGamesPanel h2 {
+    margin: 0 0 4px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-size: 0.95em;
+    font-weight: normal;
+    color: var(--muted);
+}
+
+#liveGamesList p {
+    color: var(--muted);
+    font-size: 0.9em;
+    margin: 4px 0;
+}
+
 #challengeSend {
     display: flex;
     align-items: center;
@@ -212,6 +436,13 @@ button:disabled { opacity: 0.5; cursor: default; }
     width: 100%;
     height: auto;
     cursor: pointer;
+    margin-top: 8px;
+    aspect-ratio: 1000 / 860;
+    /* Only ever visible with no game loaded - drawScreen() (render.js)
+       opaquely fills the whole canvas the instant a game exists, painting
+       right over this; it's only ever showing through on the actual
+       canvas pixels during the blank state before/between games. */
+    background: var(--bg) url('assets/misc/queen_watermark.png') center / auto 60% no-repeat;
 }
 
 #belowBoard {
@@ -222,6 +453,15 @@ button:disabled { opacity: 0.5; cursor: default; }
     gap: 12px;
     margin-top: 10px;
     padding: 0 15px;
+}
+
+#quickActions {
+    display: flex;
+    gap: 10px;
+}
+
+#quickActions button {
+    padding: 6px 14px;
 }
 
 #historyControls {
@@ -257,6 +497,46 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 /* Plain/functional for now - a placeholder for the alchemical-hourglass
    styling planned for these later. */
+#playerNames {
+    justify-content: space-between;
+    padding: 4px 15px 0;
+    font-size: 0.95em;
+    color: var(--text);
+}
+
+#playerNames:not([hidden]) {
+    display: flex;
+}
+
+.playerSlot {
+    display: flex;
+    align-items: center;
+}
+
+.playerNameLink {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
+    text-decoration: none;
+}
+
+.playerNameLink:hover .playerNameText {
+    text-decoration: underline;
+}
+
+.playerAvatarWrap img, .playerAvatarWrap canvas {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+}
+
+.playerNameText {
+    font-size: 0.95em;
+}
+
 #clocks {
     justify-content: space-between;
     padding: 4px 15px 8px;
@@ -275,6 +555,445 @@ button:disabled { opacity: 0.5; cursor: default; }
     font-weight: bold;
 }
 
+/* Only shown for a human-vs-human game with a real opponent (see
+   updateChatPanel in main.js) - same gating as #gameActions. */
+#chatPanel {
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 15px 0;
+    padding: 8px 12px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    background: var(--panel);
+}
+
+/* See the comment above #navMenuDropdown:not([hidden]) - same reason. */
+#chatPanel:not([hidden]) {
+    display: flex;
+}
+
+#chatMessages {
+    max-height: 140px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.9em;
+}
+
+#chatMessages .chatMsg {
+    overflow-wrap: break-word;
+}
+
+#chatMessages .chatAuthor {
+    font-weight: bold;
+    color: var(--muted);
+}
+
+#chatInputRow {
+    display: flex;
+    gap: 6px;
+}
+
+#chatInputRow input {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ---- messages page ------------------------------------------------------ */
+
+#messagesPage {
+    gap: 20px;
+    max-width: 1000px;
+    margin: 30px auto 60px;
+    padding: 0 15px;
+    align-items: flex-start;
+}
+
+#messagesPage:not([hidden]) {
+    display: flex;
+}
+
+#friendsColumn {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#addFriendBox {
+    display: flex;
+    gap: 6px;
+}
+
+#addFriendInput {
+    flex: 1;
+}
+
+#addFriendStatus {
+    color: var(--muted);
+    font-size: 0.85em;
+    min-height: 1.2em;
+    margin: 4px 0 0;
+}
+
+.requestRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 0.9em;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.requestRow span {
+    flex: 1;
+}
+
+#friendsColumn h3 {
+    margin: 14px 0 4px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+    font-weight: normal;
+    font-size: 0.95em;
+}
+
+.friendRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.friendRow:hover {
+    background: var(--panel);
+}
+
+.friendRow.active {
+    background: var(--panel);
+    border-color: #3987e5;
+}
+
+.friendRow span:first-child {
+    flex: 1;
+}
+
+.friendProfileLink {
+    font-size: 0.8em;
+    color: var(--muted);
+    text-decoration: none;
+}
+
+.friendProfileLink:hover {
+    text-decoration: underline;
+}
+
+#threadColumn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 420px;
+}
+
+#threadHeader {
+    margin: 0 0 10px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--text);
+    font-weight: normal;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 8px;
+}
+
+#threadMessages {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 420px;
+    margin-bottom: 10px;
+}
+
+.threadMsg {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 6px 10px;
+    max-width: 80%;
+    align-self: flex-start;
+}
+
+.threadMsgText {
+    color: var(--text);
+    overflow-wrap: break-word;
+}
+
+.threadMsgMeta {
+    color: var(--muted);
+    font-size: 0.75em;
+    margin-top: 2px;
+}
+
+#threadInputRow {
+    gap: 8px;
+}
+
+#threadInputRow:not([hidden]) {
+    display: flex;
+}
+
+#threadInput {
+    flex: 1;
+}
+
+#legalPage {
+    max-width: 800px;
+    margin: 30px auto 60px;
+    padding: 0 15px;
+    line-height: 1.5;
+}
+
+#legalPage h2 {
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 6px;
+    margin-top: 32px;
+}
+
+#legalPage h3 {
+    margin-bottom: 4px;
+}
+
+#legalNotice {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--muted);
+}
+
+#rulesPage {
+    max-width: 900px;
+    margin: 30px auto 60px;
+    padding: 0 15px;
+}
+
+#rulesPage h2 {
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 6px;
+}
+
+#rulesSummary li {
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+#rulebookFrame {
+    width: 100%;
+    height: 80vh;
+    min-height: 500px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    background: #fff;
+}
+
+/* ---- stats page --------------------------------------------------------- */
+
+#statsPage {
+    max-width: 900px;
+    margin: 30px auto 60px;
+    padding: 0 15px;
+}
+
+#statsUsername {
+    font-family: 'Cinzel Web', Georgia, serif;
+    margin-bottom: 4px;
+}
+
+#statTiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 16px 0 28px;
+}
+
+.statTile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+}
+
+.statLabel {
+    font-size: 0.8em;
+    color: var(--muted);
+}
+
+.statValue {
+    font-size: 1.6em;
+    font-weight: 600;
+    /* proportional figures at display size, not tabular-nums - see
+       marks-and-anatomy.md's stat-tile contract */
+}
+
+.viz-root {
+    --chart-line: #3987e5;
+    --chart-grid: var(--panel-border);
+    --chart-text: var(--muted);
+}
+
+#chartHeader {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#chartHeader h3 {
+    margin: 0;
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+    font-weight: normal;
+}
+
+#rangeFilters {
+    display: flex;
+    gap: 6px;
+}
+
+.rangeBtn {
+    padding: 4px 10px;
+    font-size: 0.85em;
+    background: transparent;
+    border: 1px solid var(--panel-border);
+}
+
+.rangeBtn.active {
+    background: var(--panel);
+    border-color: var(--chart-line);
+    color: var(--text);
+}
+
+#chartContainer {
+    position: relative;
+    margin-top: 10px;
+}
+
+#ratingChart {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.chartGridline {
+    stroke: var(--chart-grid);
+    stroke-width: 1;
+}
+
+.chartAxisLabel {
+    fill: var(--chart-text);
+    font-size: 11px;
+}
+
+.chartLine {
+    stroke: var(--chart-line);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.chartMarkerRing {
+    fill: var(--bg);
+}
+
+.chartMarkerDot {
+    fill: var(--chart-line);
+}
+
+.chartEndLabel {
+    fill: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.chartCrosshair {
+    stroke: var(--chart-grid);
+    stroke-width: 1;
+}
+
+.chartHoverDot {
+    fill: var(--chart-line);
+    stroke: var(--bg);
+    stroke-width: 2;
+}
+
+#chartTooltip {
+    position: absolute;
+    transform: translate(-50%, -130%);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    pointer-events: none;
+    white-space: nowrap;
+    font-size: 0.85em;
+}
+
+.chartTooltipValue {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.chartTooltipDate {
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+#chartEmptyState {
+    color: var(--muted);
+    text-align: center;
+    padding: 40px 0;
+}
+
+#tableViewToggle {
+    margin-top: 10px;
+    font-size: 0.85em;
+}
+
+#ratingTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.9em;
+}
+
+#ratingTable th, #ratingTable td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--panel-border);
+    font-variant-numeric: tabular-nums;
+}
+
+#ratingTable th {
+    color: var(--muted);
+    font-weight: normal;
+}
+
 .placeholderPage {
     max-width: 1000px;
     margin: 60px auto;
@@ -289,6 +1008,16 @@ button:disabled { opacity: 0.5; cursor: default; }
     max-width: 700px;
     margin: 30px auto 60px;
     padding: 0 15px;
+}
+
+#playerSearch {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+#playerSearchInput {
+    flex: 1;
 }
 
 #signedOutMessage {
@@ -344,6 +1073,31 @@ button:disabled { opacity: 0.5; cursor: default; }
     font-family: 'Cinzel Web', Georgia, serif;
 }
 
+#profileRating {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+/* A plain #id{display:...} rule beats [hidden]'s built-in display:none
+   regardless of specificity - see the #navMenuDropdown comment for the
+   same gotcha (hit again here: this is exactly why the button kept
+   showing on your own profile after a hard refresh). */
+#addFriendRow {
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+#addFriendRow:not([hidden]) {
+    display: flex;
+}
+
+#addFriendStatus {
+    color: var(--muted);
+    font-size: 0.85em;
+}
+
 #bioText {
     margin: 0 0 6px;
     color: var(--muted);
@@ -351,9 +1105,56 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 #bioEditor {
-    display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+#bioEditor:not([hidden]) {
+    display: flex;
+}
+
+#countryRow {
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+#countryRow:not([hidden]) {
+    display: flex;
+}
+
+#countryLabel {
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+#countryEditor {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0 0 10px;
+}
+
+#countryEditor:not([hidden]) {
+    display: flex;
+}
+
+#extinctStateHint {
+    color: var(--muted);
+    font-size: 0.85em;
+    margin: 4px 0 0;
+}
+
+#countryEditorButtons {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.extinctFlagIcon {
+    height: 1em;
+    width: auto;
+    vertical-align: -0.15em;
 }
 
 #bioTextarea {
@@ -369,14 +1170,36 @@ button:disabled { opacity: 0.5; cursor: default; }
     padding-bottom: 6px;
 }
 
+#profileFriendsList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+#profileFriendsList a {
+    padding: 4px 10px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.9em;
+}
+
+#profileFriendsList a:hover {
+    background: #40412f;
+}
+
+/* A plain div, not an <a> - it holds two SEPARATE links (opponent's
+   profile vs. the game itself) side by side, since either needs to be
+   independently clickable rather than one swallowing the other. */
 .ledgerRow {
     display: flex;
     align-items: center;
     gap: 14px;
     padding: 8px 4px;
     border-bottom: 1px solid var(--panel-border);
-    color: var(--text);
-    text-decoration: none;
 }
 
 .ledgerRow:hover {
@@ -385,6 +1208,20 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .ledgerOpponent {
     flex: 1;
+    color: var(--text);
+    text-decoration: none;
+}
+
+a.ledgerOpponent:hover {
+    text-decoration: underline;
+}
+
+.ledgerGameLink {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--text);
+    text-decoration: none;
 }
 
 .ledgerColor, .ledgerTimeControl, .ledgerDate {
@@ -404,4 +1241,56 @@ button:disabled { opacity: 0.5; cursor: default; }
 .ledgerLoss { background: #5a2d2d; color: #f2b6b6; }
 .ledgerDraw { background: #4a4a3a; color: #ddd; }
 .ledgerOngoing { background: #33342a; color: var(--muted); }
+
+.badgeCategory {
+    margin: 0 0 16px;
+}
+
+.badgeCategory h4 {
+    margin: 0 0 2px;
+}
+
+.badgeCategorySubtitle {
+    color: var(--muted);
+    font-size: 0.85em;
+    margin: 0 0 8px;
+}
+
+.badgeRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.badgeCell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 88px;
+    padding: 8px 4px;
+    border-radius: 6px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    text-align: center;
+}
+
+.badgeIcon {
+    font-size: 2em;
+    line-height: 1;
+}
+
+.badgeName {
+    font-size: 0.75em;
+    color: var(--text);
+}
+
+.badgeLocked {
+    opacity: 0.35;
+    filter: grayscale(1);
+}
+
+.badgeLocked .badgeName {
+    color: var(--muted);
+}
 

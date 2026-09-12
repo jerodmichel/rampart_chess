@@ -4,6 +4,9 @@
     ".write": "auth != null",
     "challenges": {
       ".indexOn": ["from_uid", "to_uid"]
+    },
+    "friend_requests": {
+      ".indexOn": ["from_uid", "to_uid"]
     }
   }
 }

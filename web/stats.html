@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Stats - Rampart</title>
+<title>Stats - RampartChess</title>
 <link rel="icon" href="favicon.ico" />
 <link rel="stylesheet" href="style.css" />
 </head>
@@ -16,20 +16,86 @@
         <a href="index.html">Home</a>
         <a href="profile.html">Profile</a>
         <a href="stats.html">Stats</a>
+        <a href="messages.html">Messages</a>
+        <a href="rules.html">Game Rules</a>
+        <a href="legal.html">Terms &amp; Privacy</a>
       </div>
     </div>
-    <a id="homeLink" href="index.html"><h1>Rampart</h1></a>
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
+  </div>
+  <div id="accountHeader" hidden>
+    <div id="notifBell">
+      <button id="notifBtn" title="Notifications"><img class="bellIcon" src="assets/misc/gothic_bell.png" alt=""><span id="notifBadge" hidden>0</span></button>
+      <div id="notifDropdown" hidden></div>
+    </div>
+    <div id="avatarMenu">
+      <span id="headerUserLabel"></span>
+      <button id="avatarMenuBtn" title="Account">
+        <img id="headerAvatarImg" alt="Avatar" hidden>
+        <canvas id="headerAvatarCanvas" width="28" height="28" hidden></canvas>
+      </button>
+      <div id="avatarMenuDropdown" hidden>
+        <a href="profile.html">Profile</a>
+        <button id="headerLogOutBtn">Sign Out</button>
+      </div>
+    </div>
   </div>
 </header>
 
-<main class="placeholderPage">
-  <h2>Stats</h2>
-  <p>Coming soon - ratings and stats will live here.</p>
+<main id="statsPage">
+  <div id="playerSearch">
+    <input id="playerSearchInput" type="text" placeholder="Find a player by username...">
+    <button id="playerSearchBtn">View</button>
+  </div>
+
+  <p id="signedOutMessage" hidden></p>
+
+  <div id="statsContent" hidden>
+    <h2 id="statsUsername"></h2>
+
+    <div id="statTiles">
+      <div class="statTile">
+        <span class="statLabel">Current Rating</span>
+        <span class="statValue" id="statCurrentRating"></span>
+      </div>
+      <div class="statTile">
+        <span class="statLabel">Peak Rating</span>
+        <span class="statValue" id="statPeakRating"></span>
+      </div>
+      <div class="statTile">
+        <span class="statLabel">Global Rank</span>
+        <span class="statValue" id="statRank"></span>
+      </div>
+      <div class="statTile">
+        <span class="statLabel">Rated Games Played</span>
+        <span class="statValue" id="statGamesPlayed"></span>
+      </div>
+    </div>
+
+    <div id="chartSection" class="viz-root">
+      <div id="chartHeader">
+        <h3>Rating Timeline</h3>
+        <div id="rangeFilters">
+          <button class="rangeBtn" data-range="30d">Last 30 Days</button>
+          <button class="rangeBtn" data-range="6m">Last 6 Months</button>
+          <button class="rangeBtn active" data-range="all">All Time</button>
+        </div>
+      </div>
+      <div id="chartContainer">
+        <svg id="ratingChart" viewBox="0 0 640 260" preserveAspectRatio="none"></svg>
+        <div id="chartTooltip" hidden></div>
+        <p id="chartEmptyState" hidden>No rated games yet - play a human-vs-human game to start a rating history.</p>
+      </div>
+      <button id="tableViewToggle">View as table</button>
+      <table id="ratingTable" hidden>
+        <thead><tr><th>Date</th><th>Rating</th></tr></thead>
+        <tbody id="ratingTableBody"></tbody>
+      </table>
+    </div>
+  </div>
 </main>
 
-<script type="module">
-  import { initNavMenu } from './js/nav.js';
-  initNavMenu();
-</script>
+<script type="module" src="js/header.js"></script>
+<script type="module" src="js/stats.js"></script>
 </body>
 </html>

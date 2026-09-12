@@ -15,7 +15,10 @@ import re
 from fastapi import HTTPException
 from firebase_admin import db
 
+import ratings
+
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,20}$")
+_COUNTRY_RE = re.compile(r"^[A-Z]{2,4}$")
 BIO_MAX_LENGTH = 280
 
 
@@ -50,7 +53,14 @@ def register_username(uid: str, username: str) -> dict:
     except ValueError:
         raise HTTPException(status_code=409, detail=f'username "{username}" is already taken')
 
-    profile = {"username": username, "created_at": {".sv": "timestamp"}}
+    profile = {
+        "username": username,
+        "created_at": {".sv": "timestamp"},
+        "rating": ratings.STARTING_RATING,
+        "peak_rating": ratings.STARTING_RATING,
+        "games_played": 0,
+        "reached_master": False,
+    }
     db.reference(f"users/{uid}").set(profile)
     return {"uid": uid, "username": username}
 
@@ -72,6 +82,28 @@ def update_bio(uid: str, bio: str) -> dict:
     if ref.get() is None:
         raise HTTPException(status_code=404, detail="no account registered for this user")
     ref.update({"bio": bio})
+    return get_profile(uid)
+
+
+def update_country(uid: str, country: str) -> dict:
+    """`country` is usually a 2-letter ISO 3166-1 alpha-2 code (e.g. 'US'),
+    self-reported (never geolocated) - matching how chess.com's flag works.
+    It can also be one of the invented 2-4 letter codes for an extinct
+    state (e.g. 'USSR') from web/js/extinctStates.js, for the "not finding
+    your state?" fallback picker on Profile - those have no ISO code and no
+    Unicode flag emoji, so they're rendered from a local SVG instead.
+    Empty string clears it. Only the shape is validated here; the actual
+    list of valid codes/names lives client-side in the pickers (countries.js
+    / extinctStates.js) so this stays a plain reference-data-free check."""
+    if country and not _COUNTRY_RE.match(country):
+        raise HTTPException(status_code=400, detail="country must be a 2-4 letter code (e.g. 'US')")
+    ref = db.reference(f"users/{uid}")
+    if ref.get() is None:
+        raise HTTPException(status_code=404, detail="no account registered for this user")
+    # RTDB's update() treats a None value as "delete this key" - exactly
+    # what clearing the country should do (same reasoning as game_records's
+    # result field note).
+    ref.update({"country": country or None})
     return get_profile(uid)
 
 

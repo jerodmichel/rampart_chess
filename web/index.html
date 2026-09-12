@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Rampart</title>
+<title>RampartChess</title>
 <link rel="icon" href="favicon.ico" />
 <link rel="stylesheet" href="style.css" />
 </head>
@@ -16,9 +16,12 @@
         <a href="index.html">Home</a>
         <a href="profile.html">Profile</a>
         <a href="stats.html">Stats</a>
+        <a href="messages.html">Messages</a>
+        <a href="rules.html">Game Rules</a>
+        <a href="legal.html">Terms &amp; Privacy</a>
       </div>
     </div>
-    <a id="homeLink" href="index.html"><h1>Rampart</h1></a>
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
   </div>
   <div id="authPanel">
     <span id="authStatus"></span>
@@ -27,9 +30,31 @@
     <input id="authUsername" type="text" placeholder="Username" hidden>
     <button id="signUpBtn">Sign Up</button>
     <button id="logInBtn">Log In</button>
-    <button id="logOutBtn" hidden>Log Out</button>
+    <button id="forgotPasswordBtn" type="button">Forgot password?</button>
+  </div>
+  <div id="accountHeader" hidden>
+    <div id="notifBell">
+      <button id="notifBtn" title="Notifications"><img class="bellIcon" src="assets/misc/gothic_bell.png" alt=""><span id="notifBadge" hidden>0</span></button>
+      <div id="notifDropdown" hidden></div>
+    </div>
+    <div id="avatarMenu">
+      <span id="headerUserLabel"></span>
+      <button id="avatarMenuBtn" title="Account">
+        <img id="headerAvatarImg" alt="Avatar" hidden>
+        <canvas id="headerAvatarCanvas" width="28" height="28" hidden></canvas>
+      </button>
+      <div id="avatarMenuDropdown" hidden>
+        <a href="profile.html">Profile</a>
+        <button id="headerLogOutBtn">Sign Out</button>
+      </div>
+    </div>
   </div>
 </header>
+
+<div id="verifyEmailBanner" hidden>
+  Please verify your email address - check your inbox for a link.
+  <button id="resendVerificationBtn">Resend email</button>
+</div>
 
 <div id="playModes">
   <section class="playModeBand">
@@ -74,9 +99,13 @@
   </section>
 </div>
 
-<div id="statusLine">Start a new game to begin.</div>
+<div id="statusLine">Start a new game.</div>
 
 <main id="boardWrap">
+  <div id="playerNames" hidden>
+    <div id="blackPlayerSlot" class="playerSlot"></div>
+    <div id="whitePlayerSlot" class="playerSlot"></div>
+  </div>
   <div id="clocks" hidden>
     <span id="blackClock">Black: --:--</span>
     <span id="whiteClock">White: --:--</span>
@@ -98,6 +127,10 @@
       </div>
       <button id="flipBoardBtn" title="Flip the board">Flip Board</button>
     </div>
+    <div id="quickActions">
+      <button id="abortBtn" hidden>Abort</button>
+      <button id="resignBtn" hidden>Resign</button>
+    </div>
     <div id="historyControls">
       <button id="historyPrevBtn" title="Previous move">&larr;</button>
       <button id="historyLiveBtn" title="Return to the live position">Live</button>
@@ -105,13 +138,24 @@
     </div>
   </div>
   <div id="gameActions" hidden>
-    <button id="resignBtn">Resign</button>
     <button id="offerDrawBtn">Offer Draw</button>
     <button id="acceptDrawBtn" hidden>Accept Draw</button>
     <button id="declineDrawBtn" hidden>Decline Draw</button>
   </div>
+  <div id="chatPanel" hidden>
+    <div id="chatMessages"></div>
+    <div id="chatInputRow">
+      <input id="chatInput" type="text" placeholder="Message your opponent..." maxlength="500">
+      <button id="chatSendBtn">Send</button>
+    </div>
+  </div>
+  <div id="liveGamesPanel">
+    <h2>Live Games</h2>
+    <div id="liveGamesList"></div>
+  </div>
 </main>
 
+<script type="module" src="js/header.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

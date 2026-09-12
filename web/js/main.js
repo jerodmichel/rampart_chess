@@ -1,5 +1,10 @@
 import { api, setTokenProvider } from './api.js';
-import { signUpWithEmail, logInWithEmail, logOut, onAuthChange, getIdToken } from './firebase.js';
+import { flagNode } from './extinctStates.js';
+import {
+    signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl,
+    sendVerificationEmail, isEmailVerified, resetPassword,
+} from './firebase.js';
+import { drawIdenticon } from './identicon.js';
 import { initNavMenu, setupDropdown } from './nav.js';
 import {
     CARD_VAL, CARD_SQUARES, ROWS,
@@ -36,6 +41,8 @@ const historyNextBtn = document.getElementById('historyNextBtn');
 const effectsToggle = document.getElementById('effectsToggle');
 const flipBoardBtn = document.getElementById('flipBoardBtn');
 const gameActions = document.getElementById('gameActions');
+const quickActions = document.getElementById('quickActions');
+const abortBtn = document.getElementById('abortBtn');
 const resignBtn = document.getElementById('resignBtn');
 const offerDrawBtn = document.getElementById('offerDrawBtn');
 const acceptDrawBtn = document.getElementById('acceptDrawBtn');
@@ -43,6 +50,13 @@ const declineDrawBtn = document.getElementById('declineDrawBtn');
 const clocksBar = document.getElementById('clocks');
 const whiteClockEl = document.getElementById('whiteClock');
 const blackClockEl = document.getElementById('blackClock');
+const playerNamesBar = document.getElementById('playerNames');
+const whitePlayerSlot = document.getElementById('whitePlayerSlot');
+const blackPlayerSlot = document.getElementById('blackPlayerSlot');
+const chatPanel = document.getElementById('chatPanel');
+const chatMessagesEl = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
 
 // Thunder (sound) + lightning (animation) always fire together on desktop
 // (every cast trigger site calls both one line apart - see effects.py/
@@ -82,13 +96,16 @@ function playCastSound(kind) {
 // if a previous sign-up never finished claiming one) this also calls
 // POST /auth/register to claim one via server/accounts.py.
 
+const authPanel = document.getElementById('authPanel');
 const authStatus = document.getElementById('authStatus');
 const authEmail = document.getElementById('authEmail');
 const authPassword = document.getElementById('authPassword');
 const authUsername = document.getElementById('authUsername');
 const signUpBtn = document.getElementById('signUpBtn');
 const logInBtn = document.getElementById('logInBtn');
-const logOutBtn = document.getElementById('logOutBtn');
+const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+const verifyEmailBanner = document.getElementById('verifyEmailBanner');
+const resendVerificationBtn = document.getElementById('resendVerificationBtn');
 
 let currentProfile = null; // {uid, username} once signed in AND registered
 
@@ -99,18 +116,25 @@ let pendingUsernameClaim = false;
 
 function renderAuthUI(message) {
     const signedIn = currentProfile !== null || pendingUsernameClaim;
+    // Once fully signed in (a real username claimed), the whole sign-in
+    // form is redundant - the header's avatar/notifications widget
+    // (header.js) covers "who's signed in" and Sign Out now. Still shown
+    // during pendingUsernameClaim, since that step still needs authUsername.
+    authPanel.hidden = currentProfile !== null;
     authEmail.hidden = signedIn;
     authPassword.hidden = signedIn;
     signUpBtn.hidden = signedIn;
     logInBtn.hidden = signedIn;
-    logOutBtn.hidden = !signedIn;
+    forgotPasswordBtn.hidden = signedIn;
     authUsername.hidden = !pendingUsernameClaim;
     challengePanel.hidden = currentProfile === null;
 
+    // Soft nudge only - nothing server-side is gated on this (see
+    // firebase.js's sendVerificationEmail comment), just a reminder banner.
+    verifyEmailBanner.hidden = !signedIn || isEmailVerified();
+
     if (message) {
         authStatus.textContent = message;
-    } else if (currentProfile) {
-        authStatus.textContent = `Signed in as ${currentProfile.username}`;
     } else if (pendingUsernameClaim) {
         authStatus.textContent = 'Choose a username to finish setting up your account:';
     } else {
@@ -168,9 +192,39 @@ signUpBtn.addEventListener('click', async () => {
     }
     try {
         await signUpWithEmail(authEmail.value, authPassword.value);
+        sendVerificationEmail().catch(() => {}); // best-effort - the resend button covers a failure here
         await refreshProfile();
     } catch (e) {
         renderAuthUI(friendlyErrorMessage(e));
+    }
+});
+
+forgotPasswordBtn.addEventListener('click', async () => {
+    if (!authEmail.value) {
+        renderAuthUI('Enter your email above first, then click "Forgot password?" again.');
+        return;
+    }
+    try {
+        await resetPassword(authEmail.value);
+        renderAuthUI('Password reset email sent, if that address has an account.');
+    } catch (e) {
+        renderAuthUI(friendlyErrorMessage(e));
+    }
+});
+
+resendVerificationBtn.addEventListener('click', async () => {
+    resendVerificationBtn.disabled = true;
+    try {
+        await sendVerificationEmail();
+        resendVerificationBtn.textContent = 'Sent!';
+    } catch (e) {
+        resendVerificationBtn.textContent = 'Resend email';
+        setStatus(`Error: ${e.message}`);
+    } finally {
+        setTimeout(() => {
+            resendVerificationBtn.disabled = false;
+            resendVerificationBtn.textContent = 'Resend email';
+        }, 5000);
     }
 });
 
@@ -187,14 +241,9 @@ logInBtn.addEventListener('click', async () => {
     }
 });
 
-logOutBtn.addEventListener('click', async () => {
-    await logOut();
-    currentProfile = null;
-    pendingUsernameClaim = false;
-    renderAuthUI();
-    incomingChallengesList.innerHTML = '';
-    outgoingChallengesList.innerHTML = '';
-});
+// Sign Out itself now lives in the header's avatar dropdown (header.js) -
+// it does a full navigation to index.html, so there's no in-place state
+// to reset here.
 
 authUsername.addEventListener('keydown', async (evt) => {
     if (evt.key !== 'Enter' || !pendingUsernameClaim) return;
@@ -377,6 +426,59 @@ sendChallengeBtn.addEventListener('click', async () => {
         setStatus(friendlyErrorMessage(e));
     }
 });
+
+// ---- live games (spectating) -------------------------------------------
+//
+// Public - no sign-in required to watch. Opens read-only in the exact same
+// board view a finished game's ledger link already uses (see loadGame/
+// afterStateUpdate below) - humanColor() naturally returns null for a
+// spectator, which already hides every write-capable control (moves,
+// casting, resign/draw, chat).
+
+const liveGamesList = document.getElementById('liveGamesList');
+
+function renderLiveGames(games) {
+    liveGamesList.innerHTML = '';
+    if (games.length === 0) {
+        const empty = document.createElement('p');
+        empty.textContent = 'No live games right now.';
+        liveGamesList.appendChild(empty);
+        return;
+    }
+    for (const g of games) {
+        const row = document.createElement('div');
+        row.className = 'ledgerRow';
+        const label = document.createElement('span');
+        label.className = 'ledgerOpponent';
+        label.textContent = `${g.white_username} vs ${g.black_username}`;
+        const timeControl = document.createElement('span');
+        timeControl.className = 'ledgerTimeControl';
+        timeControl.textContent = g.time_control || '';
+        const watchBtn = document.createElement('button');
+        watchBtn.textContent = 'Watch';
+        watchBtn.addEventListener('click', () => spectateGame(g.id));
+        row.append(label, timeControl, watchBtn);
+        liveGamesList.appendChild(row);
+    }
+}
+
+async function refreshLiveGames() {
+    try {
+        renderLiveGames(await api.liveGames());
+    } catch (e) { /* background poll - a transient failure just retries next tick */ }
+}
+
+async function spectateGame(watchGameId) {
+    setBusy(true);
+    try {
+        loadGame(await api.getGame(watchGameId));
+        await afterStateUpdate();
+    } catch (e) {
+        setStatus(`Error: ${e.message}`);
+    } finally {
+        setBusy(false);
+    }
+}
 
 // Matches board.py's notation convention: "++" prefixes every Raise-family
 // cast (raise, raise-from-grave, raise-queen), "--" every Strike. The free
@@ -789,11 +891,30 @@ function setBusy(b) {
 function updateGameActionButtons() {
     if (!state || isBrowsingHistory() || isGameOver(state) || !humanColor()) {
         gameActions.hidden = true;
+        abortBtn.hidden = true;
+        resignBtn.hidden = true;
         return;
     }
-    gameActions.hidden = false;
+
+    // Before any move, aborting (disposing of the game, no result recorded)
+    // replaces resigning (which would record a loss and get saved) - see
+    // server/app.py's /abort.
+    const noMovesPlayed = state.history.length === 0;
+    abortBtn.hidden = !noMovesPlayed;
+    resignBtn.hidden = noMovesPlayed;
 
     const isHumanVsHuman = state.ai_color === null;
+
+    // An AI game never has Offer Draw competing for room (there's no one
+    // for the AI to negotiate with), so Resign lives in the quick row next
+    // to Abort there. Human-vs-human needs more horizontal space for the
+    // draw-offer UI, so Resign moves down into gameActions with it instead.
+    const resignHome = isHumanVsHuman ? gameActions : quickActions;
+    if (resignBtn.parentElement !== resignHome) {
+        resignHome.insertBefore(resignBtn, resignHome.firstChild);
+    }
+    gameActions.hidden = !isHumanVsHuman;
+
     const mine = humanColor();
     const incomingOffer = isHumanVsHuman && state.draw_offered_by && state.draw_offered_by !== mine;
     const myOwnPendingOffer = isHumanVsHuman && state.draw_offered_by === mine;
@@ -804,6 +925,66 @@ function updateGameActionButtons() {
 
     acceptDrawBtn.hidden = !incomingOffer;
     declineDrawBtn.hidden = !incomingOffer;
+}
+
+// ---- chat (human-vs-human games only) ----------------------------------
+//
+// Same participant-only gating as offer_draw/#gameActions - server/chat.py
+// rejects anything else, but hiding the panel entirely for an AI game (or
+// a signed-out spectator with no humanColor()) avoids ever hitting that.
+
+let chatMessages = []; // cache of the last list fetched from the server
+
+function renderChatMessages() {
+    chatMessagesEl.innerHTML = '';
+    for (const msg of chatMessages) {
+        const row = document.createElement('div');
+        row.className = 'chatMsg';
+        const author = document.createElement('span');
+        author.className = 'chatAuthor';
+        author.textContent = msg.uid === currentProfile?.uid ? 'You' : msg.username;
+        row.appendChild(author);
+        row.appendChild(document.createTextNode(`: ${msg.text}`));
+        chatMessagesEl.appendChild(row);
+    }
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+function updateChatPanel() {
+    const show = Boolean(state) && state.ai_color === null && Boolean(humanColor());
+    chatPanel.hidden = !show;
+}
+
+async function sendChatMessage() {
+    const text = chatInput.value.trim();
+    if (!text || !gameId) return;
+    chatInput.value = '';
+    try {
+        chatMessages.push(await api.sendChatMessage(gameId, text));
+        renderChatMessages();
+    } catch (e) {
+        setStatus(`Error: ${e.message}`);
+    }
+}
+
+chatSendBtn.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Enter') sendChatMessage();
+});
+
+async function pollChat() {
+    if (!gameId || !state || state.ai_color !== null || !humanColor()) return;
+    const pollingGameId = gameId;
+    let fresh;
+    try {
+        fresh = await api.chatMessages(pollingGameId);
+    } catch (e) {
+        return; // transient - next tick retries
+    }
+    if (gameId !== pollingGameId) return; // stale response - a different game loaded meanwhile
+    if (fresh.length === chatMessages.length) return;
+    chatMessages = fresh;
+    renderChatMessages();
 }
 
 // ---- clocks -----------------------------------------------------------
@@ -833,10 +1014,12 @@ function updateClocks() {
         return;
     }
     clocksBar.hidden = false;
-    // Frozen (no live interpolation) while over or while browsing a past
-    // position - state itself is still the live game either way, so this
-    // just stops the display from ticking rather than changing what it reads.
-    const frozen = isBrowsingHistory() || isGameOver(state) || clockSyncedAt === null;
+    // Frozen (no live interpolation) while over, while browsing a past
+    // position, or before white's first move has actually started the
+    // clock (see clock_running in game_session.py) - state itself is still
+    // the live game either way, so this just stops the display from
+    // ticking rather than changing what it reads.
+    const frozen = isBrowsingHistory() || isGameOver(state) || clockSyncedAt === null || !state.clock_running;
     const elapsedSinceSync = frozen ? 0 : Date.now() - clockSyncedAt;
     let whiteMs = state.white_time_ms;
     let blackMs = state.black_time_ms;
@@ -850,13 +1033,92 @@ function updateClocks() {
     blackClockEl.classList.toggle('clockActive', !frozen && state.next_player === 'black');
 }
 
+// ---- player name/avatar/rating labels ("respective sides of the board") -
+//
+// Fetched once per game (usernames/ratings don't change mid-game) rather
+// than on every render - see the playerLabelsForGameId guard in renderAll.
+// Rating/avatar are looked up fresh via the public profile endpoint rather
+// than trusting anything cached, since they can differ from what this
+// client last saw. A human side is a clickable link to that player's
+// profile (with their avatar); the AI side is plain text naming its
+// difficulty, since there's no profile to link to.
+
+let playerLabelsForGameId = null;
+
+async function buildPlayerEntry(slot, username, isAiSide, difficulty) {
+    slot.innerHTML = '';
+    if (isAiSide) {
+        const span = document.createElement('span');
+        span.className = 'playerNameText';
+        span.textContent = difficulty ? `Computer (${difficulty})` : 'Computer';
+        slot.appendChild(span);
+        return true;
+    }
+    if (!username) return false;
+
+    let profile = null;
+    try {
+        profile = await api.playerProfile(username);
+    } catch (e) { /* fall back to a plain, avatar-less name below */ }
+
+    const link = document.createElement('a');
+    link.className = 'playerNameLink';
+    link.href = `profile.html?user=${encodeURIComponent(username)}`;
+
+    if (profile) {
+        const avatarWrap = document.createElement('span');
+        avatarWrap.className = 'playerAvatarWrap';
+        const img = document.createElement('img');
+        img.alt = '';
+        img.hidden = true;
+        const canvas = document.createElement('canvas');
+        canvas.width = 24;
+        canvas.height = 24;
+        avatarWrap.append(img, canvas);
+        link.appendChild(avatarWrap);
+
+        const url = await getAvatarUrl(profile.uid);
+        if (url) {
+            img.src = url;
+            img.hidden = false;
+        } else {
+            drawIdenticon(canvas, profile.uid);
+        }
+    }
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'playerNameText';
+    const flag = flagNode(profile?.country);
+    if (flag) textSpan.append(flag, ' ');
+    textSpan.append(`${username} (${profile?.rating ?? 1200})`);
+    link.appendChild(textSpan);
+
+    slot.appendChild(link);
+    return true;
+}
+
+async function refreshPlayerLabels() {
+    const forGameId = gameId;
+    const [whiteHasContent, blackHasContent] = await Promise.all([
+        buildPlayerEntry(whitePlayerSlot, state.white_username, state.ai_color === 'white', state.ai_difficulty),
+        buildPlayerEntry(blackPlayerSlot, state.black_username, state.ai_color === 'black', state.ai_difficulty),
+    ]);
+    if (gameId !== forGameId) return; // switched games while these lookups were in flight
+    playerNamesBar.hidden = !whiteHasContent && !blackHasContent;
+}
+
 function renderAll() {
     clockSyncedAt = Date.now(); // state.*_time_ms above is only ever fresh right here
     drawCanvas();
     updateHistoryButtons();
     updateGameActionButtons();
+    updateChatPanel();
     updateClocks();
-    setStatus(gameId ? '' : 'Start a new game to begin.');
+    if (gameId !== playerLabelsForGameId) {
+        playerLabelsForGameId = gameId;
+        if (gameId) refreshPlayerLabels(); else playerNamesBar.hidden = true;
+    }
+    setStatus(gameId ? '' : 'Start a new game.');
 }
 
 // ---- game flow --------------------------------------------------------
@@ -915,6 +1177,9 @@ function loadGame(newState) {
     viewState = null;
     viewIndex = null;
     cancelCasting();
+    chatMessages = [];
+    chatMessagesEl.innerHTML = '';
+    chatInput.value = '';
     // orient the board toward whoever's actually looking at it (chess.com/
     // lichess convention) - humanColor() already resolves correctly for
     // both an AI opponent and a real human-vs-human game. A player can
@@ -1112,6 +1377,24 @@ resignBtn.addEventListener('click', async () => {
     }
 });
 
+abortBtn.addEventListener('click', async () => {
+    if (!state || busy) return;
+    if (!confirm("Abort this game? It hasn't started yet, so it won't be saved.")) return;
+    setBusy(true);
+    try {
+        await api.abort(gameId);
+        // The game no longer exists anywhere (session dropped, any record
+        // deleted) - a full reload is the simplest way back to a clean
+        // "no game" state instead of trying to unwind local UI state for a
+        // game that's gone.
+        window.location.href = 'index.html';
+    } catch (e) {
+        setStatus(`Error: ${e.message}`);
+    } finally {
+        setBusy(false);
+    }
+});
+
 offerDrawBtn.addEventListener('click', async () => {
     if (!state || busy || offerDrawBtn.disabled) return;
     setBusy(true);
@@ -1182,6 +1465,9 @@ async function pollActiveGame() {
 
 setInterval(() => { if (currentProfile) refreshChallenges(); }, 5000);
 setInterval(pollActiveGame, 3000);
+setInterval(pollChat, 3000);
+refreshLiveGames();
+setInterval(refreshLiveGames, 8000);
 setInterval(updateClocks, 250); // smooth countdown between the poll's 3s syncs
 
 // ---- opening a game linked from the Profile page's ledger ----------------

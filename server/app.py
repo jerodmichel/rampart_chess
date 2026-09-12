@@ -5,27 +5,57 @@ JS/rendering work happens. In-memory game storage only for now (fine for
 local testing; a real deployment would move this to Firestore so state
 survives across Cloud Run instances/restarts)."""
 
+import os
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 import accounts
+import badges
+import chat
 import challenges
+import friends
 import game_records
+import messages
+import ratings
 from firebase_auth import get_current_uid, get_optional_uid
 from game_session import GameSession, IllegalMoveError, ReplayOnlyGame
 
 app = FastAPI(title="Rampart API")
 
-# wide-open for local dev; tighten to the real client origin before deploying
+# Was allow_origins=["*"] - fine while this only ever talked to a
+# same-machine dev server, not once real strangers can reach it. No real
+# domain exists yet (see project-rampart-browser-port memory), so this
+# defaults to the local dev ports web/ actually gets served from
+# (python -m http.server / VS Code Live Server's usual picks); set
+# ALLOWED_ORIGINS (comma-separated) to override once there's a real one -
+# zero code changes needed at that point.
+_DEFAULT_ORIGINS = "http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080,http://127.0.0.1:8080"
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Per-IP rate limiting (in-memory - fine for a single server instance,
+# same scale assumption as the in-memory GAMES dict below) on the
+# endpoints most worth throttling: account creation, chat, challenges, and
+# starting a new game (the last one because an anonymous vs-AI game is
+# free to spam and each one spins up a real search). Read-only endpoints
+# (legal_moves, GET /games/{id}, etc.) are left unlimited.
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 GAMES: dict[str, GameSession] = {}
 
@@ -77,10 +107,11 @@ def _authorize_mover(session: GameSession, uid: Optional[str]) -> None:
 
 
 def _resigning_color(session: GameSession, uid: Optional[str]) -> str:
-    """Unlike a move, resigning isn't gated by whose turn it is - either
-    participant can resign at any time. An AI game has exactly one human
-    (whichever color isn't the AI's), so no account is needed to identify
-    who's resigning there, same as the rest of that mode."""
+    """Unlike a move, resigning (or aborting - see /abort below) isn't
+    gated by whose turn it is - either participant can act at any time. An
+    AI game has exactly one human (whichever color isn't the AI's), so no
+    account is needed to identify who's acting there, same as the rest of
+    that mode."""
     if session.ai_color is not None:
         return "black" if session.ai_color == "white" else "white"
     if uid == session.white_uid:
@@ -90,11 +121,35 @@ def _resigning_color(session: GameSession, uid: Optional[str]) -> str:
     raise HTTPException(status_code=403, detail="you are not a participant in this game")
 
 
+def _finalize_if_needed(session: GameSession) -> None:
+    """Idempotent - the first time (and only the first time) a session is
+    observed to be over, persists its final game_records entry and applies
+    Elo changes (human-vs-human games only). Called after every mutating
+    endpoint's routine save AND from GET /games/{id}, because a TIMEOUT
+    ending is only ever discovered lazily via to_dict()'s _check_timeout()
+    - every mutating endpoint already refuses to act once is_game_over()
+    is true, so without also checking here on a mere read, a timeout's
+    final record/rating update would never happen at all. The extra
+    game_records.save_game_record call on the exact move/read that ends a
+    non-timeout game is redundant but harmless - that function overwrites
+    the record with the same data either way."""
+    if not session.is_game_over() or getattr(session, "_finalized", False):
+        return
+    session._finalized = True
+    game_records.save_game_record(session)
+    if session.white_uid and session.black_uid:
+        pre_white = ratings.get_rating_state(session.white_uid)
+        pre_black = ratings.get_rating_state(session.black_uid)
+        ratings.apply_game_result(session)
+        badges.check_and_award(session, pre_white["rating"], pre_black["rating"])
+
+
 def _participant_color(session: GameSession, uid: Optional[str]) -> str:
-    """Draw offers only make sense between two real opponents - there's no
-    one for an AI to negotiate with."""
+    """Shared by anything that only makes sense between two real opponents
+    (draw offers, chat) - there's no one for an AI to negotiate or chat
+    with."""
     if session.white_uid is None and session.black_uid is None:
-        raise HTTPException(status_code=400, detail="this game has no opponent to offer a draw to")
+        raise HTTPException(status_code=400, detail="this game has no human opponent")
     if uid == session.white_uid:
         return "white"
     if uid == session.black_uid:
@@ -120,7 +175,8 @@ class RegisterRequest(BaseModel):
 
 
 @app.post("/auth/register")
-def register(req: RegisterRequest, uid: str = Depends(get_current_uid)):
+@limiter.limit("5/minute")
+def register(request: Request, req: RegisterRequest, uid: str = Depends(get_current_uid)):
     return accounts.register_username(uid, req.username)
 
 
@@ -136,6 +192,51 @@ def find_user(username: str, uid: str = Depends(get_current_uid)):
     return {"username": username, "uid": accounts.lookup_uid(username)}
 
 
+# -- public player profiles ----------------------------------------------
+#
+# Distinct from /auth/me (always the caller's own account) and
+# /auth/users/{username} (auth-required, uid-only, for challenge targeting)
+# - these are for viewing SOMEONE ELSE's stats/history, so no sign-in is
+# required and nothing sensitive is exposed (accounts.get_profile never
+# stores email/etc. at all - that's Firebase Auth's own concern).
+
+@app.get("/players/{username}")
+def get_player_profile(username: str):
+    return accounts.get_profile(accounts.lookup_uid(username))
+
+
+@app.get("/players/{username}/games")
+def get_player_games(username: str):
+    """Every human-vs-human/persisted game this account has played - same
+    data /profile/games returns for your own account, just reachable by
+    username instead of requiring you to BE that account."""
+    return game_records.list_games_for_uid(accounts.lookup_uid(username))
+
+
+@app.get("/players/{username}/rating_history")
+def get_player_rating_history(username: str):
+    """Every rated-game rating snapshot for this account, oldest first -
+    the data behind the Stats page's Rating Timeline chart. Date-range
+    filtering (Last 30 Days / 6 Months / All Time) happens client-side on
+    this same list rather than as separate query params - the dataset per
+    player is small enough that there's no reason to make three round trips
+    instead of one."""
+    return ratings.get_rating_history(accounts.lookup_uid(username))
+
+
+@app.get("/players/{username}/rank")
+def get_player_rank(username: str):
+    return ratings.get_rank(accounts.lookup_uid(username))
+
+
+@app.get("/players/{username}/badges")
+def get_player_badges(username: str):
+    """{badge_id: {unlocked_at}} for every badge this account has earned -
+    see badges.py for what's checked and when. Phase 1: Ladder Trophies,
+    Tenure Badges, Giant Slayer, Kingslayer, Blitzkrieg."""
+    return badges.get_badges(accounts.lookup_uid(username))
+
+
 # -- challenges (match invites) ------------------------------------------
 #
 # The actual human-vs-human GameSession is only ever created here, on
@@ -149,7 +250,8 @@ class ChallengeRequest(BaseModel):
 
 
 @app.post("/challenges")
-def create_challenge(req: ChallengeRequest, uid: str = Depends(get_current_uid)):
+@limiter.limit("10/minute")
+def create_challenge(request: Request, req: ChallengeRequest, uid: str = Depends(get_current_uid)):
     profile = accounts.get_profile(uid)
     return challenges.create_challenge(
         uid, profile["username"], req.to_username, req.color, req.time_control)
@@ -175,7 +277,8 @@ def accept_challenge(challenge_id: str, uid: str = Depends(get_current_uid)):
     black_username = record["to_username"] if challenger_is_white else record["from_username"]
 
     session = GameSession(ai_color=None, white_uid=white_uid, black_uid=black_uid,
-                           time_control=record.get("time_control"))
+                           time_control=record.get("time_control"),
+                           white_username=white_username, black_username=black_username)
     GAMES[session.id] = session
     challenges.mark_accepted(challenge_id, session.id)
     game_records.save_game_record(session, white_username, black_username)
@@ -240,8 +343,31 @@ def _serialize_cast_moves(moves_by_category: dict) -> dict:
     return out
 
 
+@app.get("/games/live")
+def list_live_games():
+    """Public spectator list - every in-memory, still-in-progress
+    human-vs-human game. AI games are excluded (no second human to watch
+    against) and so is anything already over. Each id opens read-only in
+    the exact same board view a finished game's ledger link already uses -
+    GameSession/main.js don't care who's looking, only whether the
+    viewer's own uid happens to match a color (see humanColor() in
+    main.js), so no separate "spectator mode" was needed."""
+    out = []
+    for session in GAMES.values():
+        if session.ai_color is not None or session.is_game_over():
+            continue
+        out.append({
+            "id": session.id,
+            "white_username": accounts.get_profile(session.white_uid)["username"],
+            "black_username": accounts.get_profile(session.black_uid)["username"],
+            "time_control": session.time_control,
+        })
+    return out
+
+
 @app.post("/games")
-def new_game(req: NewGameRequest, uid: Optional[str] = Depends(get_optional_uid)):
+@limiter.limit("10/minute")
+def new_game(request: Request, req: NewGameRequest, uid: Optional[str] = Depends(get_optional_uid)):
     # Signed-in play vs the AI is still fully optional (no account required
     # to play at all, exactly as it's always worked) - but if the caller IS
     # signed in, tag their own color with their uid so this game attaches
@@ -250,8 +376,12 @@ def new_game(req: NewGameRequest, uid: Optional[str] = Depends(get_optional_uid)
     # uid-less - there's no account on that side to attach anything to.
     white_uid = uid if req.ai_color == "black" else None
     black_uid = uid if req.ai_color == "white" else None
+    human_username = accounts.get_profile(uid)["username"] if uid else None
+    white_username = human_username if req.ai_color == "black" else None
+    black_username = human_username if req.ai_color == "white" else None
     session = GameSession(ai_color=req.ai_color, ai_difficulty=req.ai_difficulty,
-                           white_uid=white_uid, black_uid=black_uid)
+                           white_uid=white_uid, black_uid=black_uid,
+                           white_username=white_username, black_username=black_username)
     GAMES[session.id] = session
     game_records.save_game_record(session, ai_difficulty=req.ai_difficulty)
     return session.to_dict()
@@ -259,7 +389,11 @@ def new_game(req: NewGameRequest, uid: Optional[str] = Depends(get_optional_uid)
 
 @app.get("/games/{game_id}")
 def get_game(game_id: str):
-    return get_view(game_id).to_dict()
+    view = get_view(game_id)
+    state = view.to_dict()
+    if isinstance(view, GameSession):
+        _finalize_if_needed(view)
+    return state
 
 
 @app.get("/games/{game_id}/history/{index}")
@@ -292,6 +426,15 @@ def update_bio(req: BioRequest, uid: str = Depends(get_current_uid)):
     return accounts.update_bio(uid, req.bio)
 
 
+class CountryRequest(BaseModel):
+    country: str  # ISO code (e.g. 'US') or an extinct-state code (e.g. 'USSR') - empty string clears it
+
+
+@app.post("/profile/country")
+def update_profile_country(req: CountryRequest, uid: str = Depends(get_current_uid)):
+    return accounts.update_country(uid, req.country.upper())
+
+
 @app.get("/games/{game_id}/legal_moves")
 def legal_moves(game_id: str, col: int, row: int):
     session = get_session(game_id)
@@ -313,6 +456,7 @@ def make_move(game_id: str, req: NormalMoveRequest, uid: Optional[str] = Depends
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
     game_records.save_game_record(session)
+    _finalize_if_needed(session)
     state = session.to_dict()
     state["notation"] = notation
     return state
@@ -327,6 +471,7 @@ def make_cast_move(game_id: str, req: CastMoveRequest, uid: Optional[str] = Depe
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
     game_records.save_game_record(session)
+    _finalize_if_needed(session)
     state = session.to_dict()
     state["notation"] = notation
     return state
@@ -357,6 +502,7 @@ def cast_combo_move(game_id: str, req: CastComboMoveRequest, uid: Optional[str] 
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
     game_records.save_game_record(session)
+    _finalize_if_needed(session)
     state = session.to_dict()
     state["notation"] = notation
     return state
@@ -390,7 +536,50 @@ def resign(game_id: str, uid: Optional[str] = Depends(get_optional_uid)):
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
     game_records.save_game_record(session)
+    _finalize_if_needed(session)
     return session.to_dict()
+
+
+@app.post("/games/{game_id}/abort")
+def abort_game(game_id: str, uid: Optional[str] = Depends(get_optional_uid)):
+    """Only valid before a single move has been made - lets either
+    participant walk away from a game that hasn't really started, without
+    it counting as a resignation (a loss) or being saved anywhere. Unlike
+    every other mutating endpoint, this doesn't call save_game_record - it
+    deletes the session outright, and any record already written at
+    creation time (new_game/accept_challenge persist one immediately for a
+    signed-in player) is deleted right along with it.
+
+    Deliberately doesn't use get_session() - unlike a move or a resignation,
+    aborting needs no live Board/AI state at all, only the uids and move
+    count, which the persisted record already has. So unlike every other
+    mutating endpoint, this still works even after a server restart drops
+    the live session - unmet, a zero-move game orphaned that way could
+    never be cleaned up (it'd sit forever as an unplayable "ongoing" entry
+    in a ledger, since get_session's 409 blocks every other action too)."""
+    session = GAMES.get(game_id)
+    if session is not None:
+        _resigning_color(session, uid)  # just to check the caller is a participant
+        if session.move_log:
+            raise HTTPException(status_code=400, detail="can't abort a game once a move has been made")
+        if session.is_game_over():
+            raise HTTPException(status_code=400, detail="the game is already over")
+        del GAMES[game_id]
+        game_records.delete_game_record(session.id, session.white_uid, session.black_uid)
+        return {"status": "aborted"}
+
+    record = game_records.get_game_record(game_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"no game with id {game_id}")
+    white_uid, black_uid = record.get("white_uid"), record.get("black_uid")
+    if not uid or uid not in (white_uid, black_uid):
+        raise HTTPException(status_code=403, detail="you are not a participant in this game")
+    if record.get("history"):
+        raise HTTPException(status_code=400, detail="can't abort a game once a move has been made")
+    if record.get("result"):
+        raise HTTPException(status_code=400, detail="the game is already over")
+    game_records.delete_game_record(game_id, white_uid, black_uid)
+    return {"status": "aborted"}
 
 
 @app.post("/games/{game_id}/offer_draw")
@@ -413,4 +602,112 @@ def respond_draw(game_id: str, req: DrawResponseRequest, uid: str = Depends(get_
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
     game_records.save_game_record(session)  # only meaningful on accept, but harmless either way
+    _finalize_if_needed(session)
     return session.to_dict()
+
+
+# -- chat -----------------------------------------------------------------
+#
+# Participant-only, same as offer_draw/respond_draw above - _participant_color
+# raises for either an AI game (no opponent to chat with) or a non-participant.
+
+class ChatMessageRequest(BaseModel):
+    text: str
+
+
+@app.post("/games/{game_id}/chat")
+@limiter.limit("20/minute")
+def send_chat_message(request: Request, game_id: str, req: ChatMessageRequest, uid: str = Depends(get_current_uid)):
+    session = get_session(game_id)
+    _participant_color(session, uid)
+    profile = accounts.get_profile(uid)
+    return chat.send_message(game_id, uid, profile["username"], req.text)
+
+
+@app.get("/games/{game_id}/chat")
+def get_chat_messages(game_id: str, uid: str = Depends(get_current_uid)):
+    # get_view (not get_session) - a finished/persisted game's chat history
+    # should stay readable the same way its move history does.
+    session = get_view(game_id)
+    _participant_color(session, uid)
+    return chat.list_messages(game_id)
+
+
+# -- friends --------------------------------------------------------------
+#
+# Same request/accept/decline/dismiss lifecycle as challenges above -
+# friends.py mirrors challenges.py's shape deliberately. Requires the
+# repo's database.rules.json .indexOn addition for "friend_requests" to
+# actually be deployed (pasted into the console) - see that file's comment.
+
+class FriendRequestBody(BaseModel):
+    to_username: str
+
+
+@app.post("/friends/request")
+@limiter.limit("10/minute")
+def send_friend_request(request: Request, req: FriendRequestBody, uid: str = Depends(get_current_uid)):
+    profile = accounts.get_profile(uid)
+    return friends.send_request(uid, profile["username"], req.to_username)
+
+
+@app.get("/friends/incoming")
+def list_incoming_friend_requests(uid: str = Depends(get_current_uid)):
+    return friends.list_incoming(uid)
+
+
+@app.get("/friends/outgoing")
+def list_outgoing_friend_requests(uid: str = Depends(get_current_uid)):
+    return friends.list_outgoing(uid)
+
+
+@app.post("/friends/{request_id}/accept")
+def accept_friend_request(request_id: str, uid: str = Depends(get_current_uid)):
+    return friends.accept(request_id, uid)
+
+
+@app.post("/friends/{request_id}/decline")
+def decline_friend_request(request_id: str, uid: str = Depends(get_current_uid)):
+    friends.decline(request_id, uid)
+    return {"status": "declined"}
+
+
+@app.post("/friends/{request_id}/dismiss")
+def dismiss_friend_request(request_id: str, uid: str = Depends(get_current_uid)):
+    friends.dismiss(request_id, uid)
+    return {"status": "dismissed"}
+
+
+@app.get("/friends")
+def list_my_friends(uid: str = Depends(get_current_uid)):
+    return friends.list_friends(uid)
+
+
+@app.post("/friends/{username}/remove")
+def remove_friend(username: str, uid: str = Depends(get_current_uid)):
+    friends.remove_friend(uid, username)
+    return {"status": "removed"}
+
+
+# -- direct messages (friends only) ----------------------------------------
+
+class DirectMessageBody(BaseModel):
+    text: str
+
+
+@app.post("/messages/{username}")
+@limiter.limit("20/minute")
+def send_direct_message(request: Request, username: str, req: DirectMessageBody,
+                         uid: str = Depends(get_current_uid)):
+    profile = accounts.get_profile(uid)
+    return messages.send_message(uid, profile["username"], username, req.text)
+
+
+@app.get("/messages/{username}")
+def get_direct_messages(username: str, uid: str = Depends(get_current_uid)):
+    return messages.list_messages(uid, username)
+
+
+@app.get("/messages")
+def get_inbox(uid: str = Depends(get_current_uid)):
+    return messages.list_inbox(uid)

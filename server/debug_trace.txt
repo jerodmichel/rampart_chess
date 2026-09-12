@@ -91030,3 +91030,583 @@ Move: (5,2) -> (4,2)
 === IN_CHECK CALLED ===
 Piece: white raider
 Move: (5,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (0,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (0,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (3,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (2,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (3,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (2,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (5,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (0,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (0,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (3,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (2,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (5,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (0,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (3,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (2,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (3,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (2,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (5,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (0,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (4,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (3,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (3,2) -> (2,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (5,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (7,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,4)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (6,3) -> (5,2)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: black raider
+Move: (0,2) -> (0,3)
+
+=== IN_CHECK CALLED ===
+Piece: black knight
+Move: (2,1) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: black knight
+Move: (2,1) -> (3,3)
+
+=== IN_CHECK CALLED ===
+Piece: black knight
+Move: (2,1) -> (1,3)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (6,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (5,1)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,2)
+
+=== IN_CHECK CALLED ===
+Piece: white raider
+Move: (5,2) -> (4,1)

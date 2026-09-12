@@ -45,7 +45,13 @@ def get_current_uid(authorization: Optional[str] = Header(None)) -> str:
         raise HTTPException(status_code=401, detail="missing bearer token")
     token = authorization.removeprefix("Bearer ")
     try:
-        decoded = firebase_auth_sdk.verify_id_token(token)
+        # clock_skew_seconds tolerates a token being verified a moment
+        # "before" its own issued-at time - a real, documented Firebase
+        # edge case (not a wrong local clock - confirmed NTP-synced) when
+        # a client verifies a token immediately after minting it: Google's
+        # own token-issuing and token-verifying systems can disagree by a
+        # sub-second amount, which a strict (default 0) check rejects.
+        decoded = firebase_auth_sdk.verify_id_token(token, clock_skew_seconds=10)
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"invalid auth token: {e}")
     return decoded["uid"]

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Messages - RampartChess</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <div id="navMenu">
+      <button id="navMenuBtn" aria-label="Menu" title="Menu">&#9776;</button>
+      <div id="navMenuDropdown" hidden>
+        <a href="index.html">Home</a>
+        <a href="profile.html">Profile</a>
+        <a href="stats.html">Stats</a>
+        <a href="messages.html">Messages</a>
+        <a href="rules.html">Game Rules</a>
+        <a href="legal.html">Terms &amp; Privacy</a>
+      </div>
+    </div>
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
+  </div>
+  <div id="accountHeader" hidden>
+    <div id="notifBell">
+      <button id="notifBtn" title="Notifications"><img class="bellIcon" src="assets/misc/gothic_bell.png" alt=""><span id="notifBadge" hidden>0</span></button>
+      <div id="notifDropdown" hidden></div>
+    </div>
+    <div id="avatarMenu">
+      <span id="headerUserLabel"></span>
+      <button id="avatarMenuBtn" title="Account">
+        <img id="headerAvatarImg" alt="Avatar" hidden>
+        <canvas id="headerAvatarCanvas" width="28" height="28" hidden></canvas>
+      </button>
+      <div id="avatarMenuDropdown" hidden>
+        <a href="profile.html">Profile</a>
+        <button id="headerLogOutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<p id="signedOutMessage" hidden>Please sign in on the <a href="index.html">Home page</a> first.</p>
+
+<main id="messagesPage" hidden>
+  <div id="friendsColumn">
+    <div id="addFriendBox">
+      <input id="addFriendInput" type="text" placeholder="Add a friend by username...">
+      <button id="addFriendBtn">Send Friend Request</button>
+    </div>
+    <p id="addFriendStatus"></p>
+
+    <div id="friendRequestsSection">
+      <div id="incomingFriendRequests"></div>
+      <div id="outgoingFriendRequests"></div>
+    </div>
+
+    <h3>Friends</h3>
+    <div id="friendsList"></div>
+  </div>
+
+  <div id="threadColumn">
+    <h3 id="threadHeader">Select a friend to start messaging</h3>
+    <div id="threadMessages"></div>
+    <div id="threadInputRow" hidden>
+      <input id="threadInput" type="text" placeholder="Type a message..." maxlength="500">
+      <button id="threadSendBtn">Send</button>
+    </div>
+  </div>
+</main>
+
+<script type="module" src="js/header.js"></script>
+<script type="module" src="js/messages.js"></script>
+</body>
+</html>

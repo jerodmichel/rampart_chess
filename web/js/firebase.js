@@ -8,7 +8,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    onAuthStateChanged, signOut,
+    onAuthStateChanged, signOut, sendEmailVerification, sendPasswordResetEmail,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import {
     getStorage, ref as storageRef, uploadBytes, getDownloadURL,
@@ -41,6 +41,22 @@ export function logInWithEmail(email, password) {
 
 export function logOut() {
     return signOut(auth);
+}
+
+// Soft nudge, not a gate - nothing in server/ checks email_verified, so
+// this only ever drives a UI reminder (see the banner in main.js). Firebase
+// itself has no way to check verification status for anyone but the
+// currently signed-in user, which is all a soft nudge needs anyway.
+export function sendVerificationEmail() {
+    return auth.currentUser ? sendEmailVerification(auth.currentUser) : Promise.resolve();
+}
+
+export function isEmailVerified() {
+    return Boolean(auth.currentUser && auth.currentUser.emailVerified);
+}
+
+export function resetPassword(email) {
+    return sendPasswordResetEmail(auth, email);
 }
 
 export function onAuthChange(callback) {

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Terms &amp; Privacy - RampartChess</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <div id="navMenu">
+      <button id="navMenuBtn" aria-label="Menu" title="Menu">&#9776;</button>
+      <div id="navMenuDropdown" hidden>
+        <a href="index.html">Home</a>
+        <a href="profile.html">Profile</a>
+        <a href="stats.html">Stats</a>
+        <a href="messages.html">Messages</a>
+        <a href="rules.html">Game Rules</a>
+        <a href="legal.html">Terms &amp; Privacy</a>
+      </div>
+    </div>
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
+  </div>
+  <div id="accountHeader" hidden>
+    <div id="notifBell">
+      <button id="notifBtn" title="Notifications"><img class="bellIcon" src="assets/misc/gothic_bell.png" alt=""><span id="notifBadge" hidden>0</span></button>
+      <div id="notifDropdown" hidden></div>
+    </div>
+    <div id="avatarMenu">
+      <span id="headerUserLabel"></span>
+      <button id="avatarMenuBtn" title="Account">
+        <img id="headerAvatarImg" alt="Avatar" hidden>
+        <canvas id="headerAvatarCanvas" width="28" height="28" hidden></canvas>
+      </button>
+      <div id="avatarMenuDropdown" hidden>
+        <a href="profile.html">Profile</a>
+        <button id="headerLogOutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="legalPage">
+  <p id="legalNotice">
+    <strong>This is a plain-language starter policy for a small hobby project, not a
+    lawyer-drafted legal document.</strong> It's meant to set honest expectations while
+    RampartChess is in early testing - it should get a real legal review before any
+    wide public launch.
+  </p>
+
+  <h2>Terms of Service</h2>
+
+  <h3>What this is</h3>
+  <p>
+    RampartChess is an independently-developed chess variant, currently in active
+    development and testing. Features, rules, and data may change or reset without
+    notice while it's in this state.
+  </p>
+
+  <h3>Accounts</h3>
+  <p>
+    An account requires a real email address (used only for sign-in and, optionally,
+    password recovery and email verification) and a username you choose. You're
+    responsible for keeping your login credentials to yourself. There's currently no
+    self-service account deletion - contact us (below) to request one.
+  </p>
+
+  <h3>Conduct</h3>
+  <p>
+    Game chat and any public profile text (bio, username) should stay respectful.
+    Harassment, hate speech, spam, cheating (including engine assistance in a
+    human-vs-human game), or attempting to disrupt the service for other players
+    is not allowed and may result in your account being suspended or removed.
+  </p>
+
+  <h3>No warranty</h3>
+  <p>
+    This service is provided "as is," with no guarantee of uptime, data
+    preservation, or fitness for any particular purpose. In-progress games and
+    other data may occasionally be lost during development (for example, a server
+    restart can interrupt a live game).
+  </p>
+
+  <h2>Privacy Policy</h2>
+
+  <h3>What we collect</h3>
+  <ul>
+    <li><strong>Account info:</strong> your email address and password are handled
+      entirely by Firebase Authentication (a Google Cloud service) - RampartChess's
+      own servers never see or store your password.</li>
+    <li><strong>Profile info:</strong> the username, bio, and avatar image you
+      choose to add.</li>
+    <li><strong>Gameplay data:</strong> move history, chat messages sent in a game,
+      ratings, and match results, for players in a human-vs-human game.</li>
+    <li><strong>Social data:</strong> your friend connections (who you're friends
+      with) and any direct messages you send to a friend. Direct messages are only
+      ever readable by the two people in that conversation.</li>
+  </ul>
+
+  <h3>How it's used</h3>
+  <p>
+    Solely to run the game itself: authenticating you, displaying your profile and
+    match history to other players (your username, bio, avatar, rating, and public
+    game history are visible to anyone), matching you with opponents, and keeping
+    a record of games played. Nothing is sold or shared with advertisers.
+  </p>
+
+  <h3>Where it's stored</h3>
+  <p>
+    All data is stored using Google Firebase (Authentication, Realtime Database,
+    and Storage) on Google Cloud infrastructure. No other third-party services
+    currently have access to your data.
+  </p>
+
+  <h3>Children's privacy</h3>
+  <p>
+    RampartChess is not directed at children under 13, and we don't knowingly
+    collect information from them.
+  </p>
+
+  <h3>Changes</h3>
+  <p>
+    This policy may change as the project develops. Continued use after a change
+    means you accept the updated terms.
+  </p>
+
+  <h3>Contact</h3>
+  <p>
+    Questions, requests, or account-deletion requests: <em>[contact email goes here]</em>.
+  </p>
+</main>
+
+<script type="module" src="js/header.js"></script>
+<script type="module">
+  import { initNavMenu } from './js/nav.js';
+  initNavMenu();
+</script>
+</body>
+</html>

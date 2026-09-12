@@ -83,6 +83,26 @@ def get_game_record(game_id: str):
     return db.reference(f"game_records/{game_id}").get()
 
 
+def delete_game_record(game_id: str, white_uid: str = None, black_uid: str = None) -> None:
+    """Reverses save_game_record's very first write for a game that's being
+    aborted (see app.py's /abort) before a single move was made - new_game/
+    accept_challenge already call save_game_record at creation time, so a
+    signed-in player's zero-move game has a record sitting here the moment
+    it exists. Removes it and its user_games fan-out so the game leaves no
+    trace in either player's ledger, matching "disposed of, not saved".
+
+    Takes raw uids rather than a GameSession on purpose - app.py's /abort
+    also uses this for a game whose live session was lost to a server
+    restart, where all that's left to go on is the persisted record."""
+    if white_uid is None and black_uid is None:
+        return  # fully anonymous - nothing was ever written
+    db.reference(f"game_records/{game_id}").delete()
+    if white_uid:
+        db.reference(f"user_games/{white_uid}/{game_id}").delete()
+    if black_uid:
+        db.reference(f"user_games/{black_uid}/{game_id}").delete()
+
+
 def list_games_for_uid(uid: str) -> list:
     game_ids = db.reference(f"user_games/{uid}").get() or {}
     records = []

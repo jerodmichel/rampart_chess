@@ -1,2 +1,4 @@
 [22:30:24] [ILLEGAL MOVE] black raider (1,2)->(1,2)
   Valid moves: [(2, 3), (1, 3), (0, 3)]
+[18:06:34] [ILLEGAL MOVE] white raider (6,3)->(6,4)
+  Valid moves: [(7, 2), (6, 2), (5, 4), (5, 3), (5, 2)]

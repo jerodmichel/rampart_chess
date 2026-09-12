@@ -6,3 +6,4 @@ numpy==2.4.4
 # uses pygame), but it still has to be importable for board.py to load.
 pygame==2.6.1
 firebase-admin==6.7.0
+slowapi==0.1.10
