@@ -233,7 +233,8 @@ def get_player_rank(username: str):
 def get_player_badges(username: str):
     """{badge_id: {unlocked_at}} for every badge this account has earned -
     see badges.py for what's checked and when. Phase 1: Ladder Trophies,
-    Tenure Badges, Giant Slayer, Kingslayer, Blitzkrieg."""
+    Tenure Badges (+ The Grind), Giant Slayer, Kingslayer, Nemesis,
+    Unbreakable, Blitzkrieg, First Blood, The Trap (mate by capture)."""
     return badges.get_badges(accounts.lookup_uid(username))
 
 
@@ -305,6 +306,13 @@ class NormalMoveRequest(BaseModel):
     from_row: int
     to_col: int
     to_row: int
+    # Only meaningful when this move sends a raider into the enemy queen's
+    # house while the mover's own queen is dead - rulebook 6.1.3's "same
+    # turn" queen placement, atomic with the move itself rather than a
+    # separate cast move (see GameSession.apply_normal_move). Omitted for
+    # every other move.
+    queen_col: Optional[int] = None
+    queen_row: Optional[int] = None
 
 
 class CastMoveRequest(BaseModel):
@@ -452,7 +460,8 @@ def make_move(game_id: str, req: NormalMoveRequest, uid: Optional[str] = Depends
     session = get_session(game_id)
     _authorize_mover(session, uid)
     try:
-        notation = session.apply_normal_move(req.from_col, req.from_row, req.to_col, req.to_row)
+        notation = session.apply_normal_move(req.from_col, req.from_row, req.to_col, req.to_row,
+                                              queen_col=req.queen_col, queen_row=req.queen_row)
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
     game_records.save_game_record(session)

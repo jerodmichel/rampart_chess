@@ -84,7 +84,7 @@ header h1 {
 }
 
 .bellIcon {
-    height: 1.5em;
+    height: 1.2em;
     width: auto;
     vertical-align: -0.3em;
     display: inline-block;
@@ -157,7 +157,7 @@ header h1 {
 }
 
 #headerUserLabel {
-    font-size: 0.9em;
+    font-size: 1.1em;
     color: var(--muted);
     white-space: nowrap;
 }
@@ -510,7 +510,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .playerSlot {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
 }
 
 .playerNameLink {
@@ -535,6 +537,31 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .playerNameText {
     font-size: 0.95em;
+}
+
+.playerTrophyRow {
+    display: flex;
+    gap: 4px;
+    padding-left: 30px; /* lines up under the name text, past the 24px avatar + gap */
+}
+
+/* Sits inline in the top nav's account area (#avatarMenu already has its
+   own gap between headerUserLabel/this/avatarMenuBtn), not stacked under
+   a name - the 30px offset above is for the board's inline-avatar layout
+   and doesn't apply here. */
+#headerTrophyRow {
+    padding-left: 0;
+}
+
+#headerTrophyRow .playerTrophyIcon {
+    width: 24px;
+    height: 24px;
+}
+
+.playerTrophyIcon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
 }
 
 #clocks {
@@ -1278,6 +1305,12 @@ a.ledgerOpponent:hover {
 .badgeIcon {
     font-size: 2em;
     line-height: 1;
+}
+
+.badgeIcon img {
+    width: 1.6em;
+    height: 1.6em;
+    object-fit: contain;
 }
 
 .badgeName {

@@ -9,6 +9,7 @@ import { getIdToken, onAuthChange, logOut, getAvatarUrl } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
 import { setupDropdown } from './nav.js';
 import { flagNode } from './extinctStates.js';
+import { highestPerCategory } from './badges.js';
 
 setTokenProvider(getIdToken); // harmless if the page's own script already did this
 
@@ -17,6 +18,7 @@ const notifBtn = document.getElementById('notifBtn');
 const notifBadge = document.getElementById('notifBadge');
 const notifDropdown = document.getElementById('notifDropdown');
 const headerUserLabel = document.getElementById('headerUserLabel');
+const headerTrophyRow = document.getElementById('headerTrophyRow');
 const avatarMenuBtn = document.getElementById('avatarMenuBtn');
 const avatarMenuDropdown = document.getElementById('avatarMenuDropdown');
 const headerAvatarImg = document.getElementById('headerAvatarImg');
@@ -101,6 +103,30 @@ if (accountHeader) {
         headerUserLabel.append(`${profile.username} (${profile.rating ?? 1200})`);
         await loadAvatar(profile.uid);
         await renderNotifications();
+        await renderHeaderTrophies(profile.username);
+    }
+
+    // One icon per category (whichever badge in it was earned most
+    // recently - see badges.js's highestPerCategory), in the top nav's
+    // account area right next to your own name - purely decorative, so a
+    // lookup failure just means no trophy row, never a broken header.
+    async function renderHeaderTrophies(username) {
+        headerTrophyRow.innerHTML = '';
+        try {
+            const earned = await api.playerBadges(username);
+            for (const badge of highestPerCategory(earned)) {
+                const iconEl = badge.image ? document.createElement('img') : document.createElement('span');
+                iconEl.className = 'playerTrophyIcon';
+                iconEl.title = badge.name;
+                if (badge.image) {
+                    iconEl.src = badge.image;
+                    iconEl.alt = badge.name;
+                } else {
+                    iconEl.textContent = badge.icon;
+                }
+                headerTrophyRow.appendChild(iconEl);
+            }
+        } catch (e) { /* decorative only - see comment above */ }
     }
 
     onAuthChange(initAccountHeader);

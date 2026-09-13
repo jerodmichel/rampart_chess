@@ -51,10 +51,16 @@ export const api = {
         return request(`/games/${gameId}/legal_moves?col=${col}&row=${row}`);
     },
 
-    move(gameId, fromCol, fromRow, toCol, toRow) {
+    // queenCol/queenRow are only needed when this move sends a raider into
+    // the enemy queen's house while the mover's own queen is dead (see
+    // main.js's pendingQueenMove) - omitted for every other move.
+    move(gameId, fromCol, fromRow, toCol, toRow, queenCol, queenRow) {
         return request(`/games/${gameId}/move`, {
             method: 'POST',
-            body: JSON.stringify({ from_col: fromCol, from_row: fromRow, to_col: toCol, to_row: toRow }),
+            body: JSON.stringify({
+                from_col: fromCol, from_row: fromRow, to_col: toCol, to_row: toRow,
+                queen_col: queenCol ?? null, queen_row: queenRow ?? null,
+            }),
         });
     },
 

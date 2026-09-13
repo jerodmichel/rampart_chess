@@ -323,8 +323,9 @@ function resultLabel(result, mine) {
 // Shows every phase-1 badge, grouped the same way the design was pitched -
 // earned ones full-color with an unlock date, unearned ones dimmed with a
 // lock, so the whole roster is visible as something to work toward even on
-// a fresh account. Icons are plain emoji placeholders (see badges.js) until
-// real trophy/medal art replaces them.
+// a fresh account. Most icons are still plain emoji placeholders (see
+// badges.js); a few now have real image art instead, rendered as an <img>
+// below rather than emoji text.
 function renderBadges(earned) {
     badgesGrid.innerHTML = '';
     for (const category of BADGE_CATEGORIES) {
@@ -349,7 +350,14 @@ function renderBadges(earned) {
                 : `${badge.name} (locked) - ${badge.description}`;
             const icon = document.createElement('span');
             icon.className = 'badgeIcon';
-            icon.textContent = badge.icon;
+            if (badge.image) {
+                const img = document.createElement('img');
+                img.src = badge.image;
+                img.alt = '';
+                icon.appendChild(img);
+            } else {
+                icon.textContent = badge.icon;
+            }
             const name = document.createElement('span');
             name.className = 'badgeName';
             name.textContent = badge.name;

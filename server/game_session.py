@@ -87,6 +87,22 @@ class GameSession:
         self.white_username = white_username
         self.black_username = black_username
         self.resigned_by = None  # 'white' | 'black' | None
+        # True iff self.board.king_mated was set via "mate by capture" (see
+        # apply_normal_move) rather than the ordinary no-legal-moves route
+        # (board._king_mated) - both set the same board flag, so this is
+        # the only place that remembers which one actually happened, for
+        # result()'s reason field.
+        self.mate_by_capture = False
+        # Which of the three distinct board.king_stalemated causes actually
+        # happened - board.py only ever flips one shared boolean, so (like
+        # mate_by_capture above) this is the only place that remembers
+        # which, for result()'s reason field and to match the desktop
+        # client's own three separate messages ('<Color> stalemated',
+        # 'Draw by repetition', 'Draw by insufficient material' - see
+        # game.py's set_repetition_prompt/set_mated_prompt and
+        # board.is_draw_by_insufficient_material's own caller in main.py).
+        self.draw_reason = None  # 'stalemate' | 'repetition' | 'insufficient_material' | None
+        self.stalemated_color = None  # only set when draw_reason == 'stalemate'
         self.draw_agreed = False
         self.draw_offered_by = None  # 'white' | 'black' | None - most recent offer
         self.ai_engine = NegamaxEngine()
@@ -121,6 +137,13 @@ class GameSession:
         return self.board.players[0] if self.board.players[0].color == color \
             else self.board.players[1]
 
+    @staticmethod
+    def _player_for(board, color):
+        """Same lookup as _player, but for a throwaway replay board that
+        isn't self.board (see state_at's historical replay)."""
+        return board.players[0] if board.players[0].color == color \
+            else board.players[1]
+
     def _record_repetition(self):
         temp_bb = RampartBitboard()
         temp_bb.sync_from_board(self.board)
@@ -153,15 +176,23 @@ class GameSession:
         rival_player = self._player(rival_color)
 
         self.board._king_mated(rival_player)
-        if self.board.king_mated or self.board.king_stalemated:
+        if self.board.king_mated:
+            return
+        if self.board.king_stalemated:
+            # genuine no-legal-moves stalemate, just detected above -
+            # rival_color is who ran out of moves.
+            self.draw_reason = "stalemate"
+            self.stalemated_color = rival_color
             return
 
         record_now = self.ai_color is None or mover_color == self.ai_color
         if record_now and self._record_repetition():
+            self.draw_reason = "repetition"
             return
 
         if self.board.is_draw_by_insufficient_material():
             self.board.king_stalemated = True
+            self.draw_reason = "insufficient_material"
             return
 
         self.next_player = rival_color
@@ -242,7 +273,8 @@ class GameSession:
             # _post_move only advances next_player when the game ISN'T
             # over, so next_player here is still the side that delivered
             # mate - i.e. the winner.
-            return {"winner": self.next_player, "reason": "checkmate"}
+            reason = "mate_by_capture" if self.mate_by_capture else "checkmate"
+            return {"winner": self.next_player, "reason": reason}
         if self.resigned_by:
             winner = "black" if self.resigned_by == "white" else "white"
             return {"winner": winner, "reason": "resignation"}
@@ -252,7 +284,15 @@ class GameSession:
             winner = "black" if self.timed_out_color == "white" else "white"
             return {"winner": winner, "reason": "timeout"}
         if self.board.king_stalemated:
-            return {"winner": None, "reason": "stalemate"}
+            # draw_reason distinguishes which of the three distinct
+            # board.king_stalemated causes this was (see _post_move) -
+            # None only for a persisted game recorded before this field
+            # existed, where "stalemate" is the safest fallback label.
+            reason = self.draw_reason or "stalemate"
+            result = {"winner": None, "reason": reason}
+            if reason == "stalemate":
+                result["stalemated_color"] = self.stalemated_color
+            return result
         return None
 
     def resign(self, color):
@@ -291,7 +331,20 @@ class GameSession:
         self.board.calc_moves(piece, col, row, bool=True)
         return [(mv.final.col, mv.final.row) for mv in piece.moves]
 
-    def apply_normal_move(self, from_col, from_row, to_col, to_row):
+    def _queen_spawn_squares(self, color):
+        """Empty squares eligible for the rulebook 6.1.3 "same turn" queen
+        placement - the same raise-a-raider zone rows used everywhere else
+        in this codebase for spawning a piece back onto the board (see
+        RampartCastGenerator.get_cast_moves's spawn_zone_mask and
+        ai_engine.py's enter_queen_house branch on the AI side, and
+        io_src_dev/main.py's queen_house_raided hover handling - which
+        computes this exact same `range(3,5) if white else range(1,3)` -
+        on the desktop human side)."""
+        rows = range(3, 5) if color == 'white' else range(1, 3)
+        return {(col, row) for col in range(10) for row in rows
+                if not self.board.squares[col][row].has_piece()}
+
+    def apply_normal_move(self, from_col, from_row, to_col, to_row, queen_col=None, queen_row=None):
         self._check_timeout()
         if self.is_game_over():
             raise IllegalMoveError("the game is already over")
@@ -307,11 +360,59 @@ class GameSession:
         if not self.board.valid_move(piece, game_move):
             raise IllegalMoveError(f"{from_col},{from_row} -> {to_col},{to_row} is not legal")
 
+        # Rulebook 6.1.3: a raider landing on the enemy queen's house places
+        # the queen back on the board in the SAME turn, no cards involved -
+        # see request_ai_move's "enter_queen_house" branch for the AI side
+        # of this same mechanic. Validated (and, on success, resolved to a
+        # concrete spawn square) BEFORE any board mutation below, so a
+        # missing/invalid queen_col/queen_row fails cleanly with the board
+        # untouched, rather than leaving the raider's move half-applied.
+        spawn_col = spawn_row = None
+        if (piece.name == "raider"
+                and self.board.squares[to_col][to_row].is_enemy_queen_house(piece.color)
+                and self.board._queen_isdead(piece.color)):
+            valid_spawns = self._queen_spawn_squares(piece.color)
+            # No prerequisite for this branch requires a spawn square to
+            # actually be free - the rare case where every square in the
+            # zone is occupied just means the raider still moves in (still
+            # a fully legal move on its own) with no queen placed this
+            # turn, matching the AI engine's own fallback for the same
+            # edge case (ai_engine.py's get_legal_moves, "rare case: no
+            # space to spawn queen").
+            if valid_spawns:
+                if (queen_col, queen_row) not in valid_spawns:
+                    raise IllegalMoveError(
+                        "moving into the queen's house raises your queen this turn - "
+                        "queen_col/queen_row must name one of the empty squares in your own territory")
+                spawn_col, spawn_row = queen_col, queen_row
+
         if final_piece and final_piece.name in ("raider", "queen"):
             self.board._send_to_grave(final_piece)
 
         notation = self.board.move(piece, game_move)
+
+        if spawn_col is not None:
+            spawn_card = self.board.squares[spawn_col][spawn_row].card
+            self.board._raise_queen(spawn_col, spawn_row, piece.color, spawn_card)
+            spawn_dst = f"{spawn_col + 1}{Square.get_alpharow(5 - spawn_row)}"
+            notation = f"{notation}/Q@{spawn_dst}"
+
         self.move_log.append(notation)
+
+        # "mate by capture": landing on the enemy's king house while their
+        # king is off a card square is an immediate win, independent of
+        # ordinary check/checkmate - ported from io_src_dev_ai/main.py's
+        # human- and AI-move handlers, which both already do this; this
+        # server wrapper had no equivalent at all before. Purely additive:
+        # only ever flips king_mated from False to True (board._king_mated,
+        # called next inside _post_move, never resets it back to False -
+        # see its own logic), so this can't interfere with the ordinary
+        # checkmate/stalemate detection path.
+        if self.board.squares[to_col][to_row].is_enemy_king_house(piece.color) and \
+                self.board._opponent_king_on_noncard(piece.color):
+            self.board.king_mated = True
+            self.mate_by_capture = True
+
         self._post_move(piece.color)
         return notation
 
@@ -568,6 +669,37 @@ class GameSession:
             to_col, to_row = engine_move.to_sq % 10, engine_move.to_sq // 10
             return self.apply_normal_move(from_col, from_row, to_col, to_row)
 
+        if engine_move.move_type == "enter_queen_house":
+            # Rulebook 6.1.3 (see io_src_dev/main.py's queen_house_raided
+            # flow): moving a raider into the enemy queen's house places
+            # the queen back on the board in the SAME turn - a single
+            # atomic action with no cards involved, unlike an ordinary
+            # raise. ai_engine.py's own get_legal_moves/apply_move already
+            # model this correctly (EngineMove.move_type ==
+            # "enter_queen_house", carrying a `spawn_sq` alongside from_sq/
+            # to_sq) - this branch was simply missing here, so this move
+            # type fell through to the cast-move handling below by default
+            # and got executed as a bogus "raise a raider" cast with zero
+            # cards, aimed at the queen's house square itself: the raider
+            # at from_sq never actually moved, a brand-new raider was
+            # conjured directly onto the house square, and the queen -
+            # whose only case is this branch - was never touched.
+            from_col, from_row = engine_move.from_sq % 10, engine_move.from_sq // 10
+            to_col, to_row = engine_move.to_sq % 10, engine_move.to_sq // 10
+            spawn_col, spawn_row = engine_move.spawn_sq % 10, engine_move.spawn_sq // 10
+
+            piece = self.board.squares[from_col][from_row].piece
+            move_notation = self.board.move(piece, Move(Square(from_col, from_row), Square(to_col, to_row)))
+
+            spawn_card = self.board.squares[spawn_col][spawn_row].card
+            self.board._raise_queen(spawn_col, spawn_row, self.ai_color, spawn_card)
+
+            spawn_dst = f"{spawn_col + 1}{Square.get_alpharow(5 - spawn_row)}"
+            notation = f"{move_notation}/Q@{spawn_dst}"
+            self.move_log.append(notation)
+            self._post_move(self.ai_color)
+            return notation
+
         # cast move: translate the engine's move back into a real Cast_move
         t_col, t_row = engine_move.to_sq % 10, engine_move.to_sq // 10
         target_sq = self.board.squares[t_col][t_row]
@@ -619,6 +751,13 @@ class GameSession:
         self._check_timeout()
         out = self._serialize_board(self.board)
         white_ms, black_ms = self._live_remaining_ms()
+        # Only meaningful while the game is still live - a mated/stalemated
+        # position isn't "in check" for prompt purposes, it's just over
+        # (matches the desktop client's in-check prompt, which the AI/human
+        # move handlers only ever set before checking for mate).
+        in_check = None
+        if not self.is_game_over() and self.board.king_in_check(self._player(self.next_player)):
+            in_check = self.next_player
         out.update({
             "id": self.id,
             "next_player": self.next_player,
@@ -631,6 +770,7 @@ class GameSession:
             "history": self.move_log,
             "king_mated": bool(self.board.king_mated),
             "king_stalemated": bool(self.board.king_stalemated),
+            "in_check": in_check,
             "draw_offered_by": self.draw_offered_by,
             "time_control": self.time_control,
             "white_time_ms": white_ms,
@@ -743,6 +883,16 @@ class GameSession:
         is_live = index == len(self.move_log)
         white_ms, black_ms = self._live_remaining_ms() if is_live else (None, None)
 
+        if is_live:
+            in_check = None
+            if not self.is_game_over() and self.board.king_in_check(self._player(next_player)):
+                in_check = next_player
+        else:
+            # An earlier index is never itself a mated/stalemated position
+            # (see the comment above) so no is_game_over() gate is needed
+            # here - just ask the replay board directly.
+            in_check = next_player if replay.king_in_check(self._player_for(replay, next_player)) else None
+
         out = self._serialize_board(replay)
         out.update({
             "id": self.id,
@@ -756,6 +906,7 @@ class GameSession:
             "history": self.move_log,
             "king_mated": bool(self.board.king_mated) if is_live else False,
             "king_stalemated": bool(self.board.king_stalemated) if is_live else False,
+            "in_check": in_check,
             "draw_offered_by": self.draw_offered_by if is_live else None,
             "time_control": self.time_control,
             "white_time_ms": white_ms,
@@ -825,6 +976,13 @@ class ReplayOnlyGame:
             next_player = GameSession._apply_notation(replay, notation, next_player)
 
         is_live = index == len(self.move_log)
+        # Same reasoning as king_mated/king_stalemated below: the live index
+        # of a persisted record is always a finished game (that's what got
+        # it persisted), so "in check" doesn't apply there - only to an
+        # earlier, still-in-progress index being replayed.
+        in_check = None
+        if not is_live and replay.king_in_check(GameSession._player_for(replay, next_player)):
+            in_check = next_player
         out = GameSession._serialize_board(replay)
         out.update({
             "id": self.id,
@@ -842,6 +1000,7 @@ class ReplayOnlyGame:
             # is the only game-over signal this can offer.
             "king_mated": False,
             "king_stalemated": False,
+            "in_check": in_check,
             "draw_offered_by": None,
             "white_time_ms": None,
             "black_time_ms": None,

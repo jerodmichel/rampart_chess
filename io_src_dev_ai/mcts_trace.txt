@@ -5190,3 +5190,43 @@
 [13:01:53] [AI EXEC] Moving from (4,4) to (5,5)
 [20:53:10] === MAIN.PY LOADED ===
 [00:54:42] === MAIN.PY LOADED ===
+[01:26:48] === MAIN.PY LOADED ===
+[01:26:52] [ILLEGAL MOVE] white raider (6,3)->(6,3)
+  Valid moves: [(7, 2), (6, 2), (5, 4), (5, 3), (5, 2)]
+[01:26:59] [AI EXEC] Moving from (3,2) to (4,2)
+[01:27:01] [ILLEGAL MOVE] white knight (7,4)->(7,4)
+  Valid moves: [(8, 2), (5, 3), (6, 2)]
+[01:27:08] [AI EXEC] Moving from (1,2) to (2,3)
+[01:27:16] [AI EXEC] Moving from (0,2) to (1,3)
+[01:27:25] [AI EXEC] Moving from (3,1) to (3,2)
+[01:27:38] [AI EXEC] Moving from (4,2) to (5,3)
+[01:27:40] [ILLEGAL MOVE] white rook (6,4)->(6,4)
+  Valid moves: [(5, 4), (4, 4), (3, 4), (2, 4), (1, 4), (0, 4), (7, 4)]
+[01:27:48] [AI EXEC] Moving from (2,1) to (4,2)
+[01:27:53] [ILLEGAL MOVE] white raider (6,3)->(6,3)
+  Valid moves: [(7, 2), (6, 4), (5, 4), (5, 2)]
+[01:27:58] [AI EXEC] Moving from (4,2) to (6,3)
+[01:28:14] [AI EXEC] Moving from (3,2) to (4,2)
+[01:28:25] [AI EXEC] Moving from (1,2) to (2,3)
+[01:28:33] [AI EXEC] Moving from (0,2) to (1,3)
+[01:28:40] [AI EXEC] Moving from (3,1) to (3,2)
+[01:28:53] [AI EXEC] Moving from (4,2) to (5,3)
+[01:29:02] [AI EXEC] Moving from (5,3) to (4,4)
+[01:29:12] [AI EXEC] Moving from (4,4) to (5,5)
+[01:29:22] [ILLEGAL MOVE] white knight (6,2)->(6,2)
+  Valid moves: [(8, 1), (7, 4), (5, 4), (4, 3), (4, 1)]
+[01:29:31] [AI EXEC] Moving from (1,3) to (1,4)
+[01:29:38] [ILLEGAL MOVE] white raider (6,3)->(6,3)
+  Valid moves: [(7, 3), (7, 4), (6, 4), (5, 4), (5, 3), (5, 2)]
+[01:30:03] [AI EXEC] Moving from (1,1) to (2,2)
+[01:30:11] [ILLEGAL MOVE] white raider (7,2)->(7,2)
+  Valid moves: [(8, 1), (8, 2), (6, 2), (6, 1)]
+[01:30:26] [AI EXEC] Moving from (3,2) to (3,1)
+[01:30:38] [AI EXEC] Moving from (2,2) to (3,1)
+[01:30:49] [AI EXEC] Moving from (2,3) to (3,4)
+[01:31:40] [AI EXEC] Moving from (2,1) to (3,3)
+[01:31:50] [AI EXEC] Moving from (4,2) to (5,1)
+[01:32:05] [AI EXEC] Moving from (3,1) to (4,1)
+[01:33:01] [AI EXEC] Moving from (3,2) to (4,3)
+[01:33:24] [AI EXEC] Moving from (4,3) to (5,4)
+[01:33:36] [AI EXEC] Moving from (5,4) to (6,5)

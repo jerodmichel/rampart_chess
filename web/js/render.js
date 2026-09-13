@@ -345,29 +345,61 @@ function drawDeckHover(ctx, ui) {
     ctx.strokeRect(x, y, CWIDTH, CHEIGHT - 1);
 }
 
+// Soft glow behind a highlight instead of a hard flat line, plus a gentle
+// breathing pulse (period/amplitude shared by every glowing highlight
+// below, so they all "breathe" in sync rather than looking busy) - the
+// main visual ask behind drawClickedDeckCards/drawClickedBoardCards below.
+// ctx.save()/restore() (rather than resetting shadowBlur back to 0 by hand
+// afterward) is what keeps this from bleeding shadow state into whatever
+// draws next.
+const PULSE_PERIOD_MS = 900;
+function pulsePhase() {
+    return 0.5 + 0.5 * Math.sin((2 * Math.PI * performance.now()) / PULSE_PERIOD_MS);
+}
+
+function strokeRoundedRect(ctx, x, y, w, h, radius) {
+    ctx.beginPath();
+    if (ctx.roundRect) {
+        ctx.roundRect(x, y, w, h, radius);
+    } else {
+        ctx.rect(x, y, w, h);
+    }
+    ctx.stroke();
+}
+
 function drawClickedDeckCards(ctx, ui) {
     // matches show_clicked_cards's teal highlight for deck cards in the
     // player's current combo selection.
     if (!ui.clickedCards) return;
+    const pulse = pulsePhase();
+    ctx.save();
     ctx.strokeStyle = 'rgb(100, 216, 220)';
-    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgb(100, 216, 220)';
+    ctx.shadowBlur = 5 + 4 * pulse;
+    ctx.lineWidth = 2.5;
     for (const card of ui.clickedCards) {
         if (card.source !== 'deck') continue;
         const { x, y } = deckSlotPos(card.color, card.rank);
-        ctx.strokeRect(x, y, CWIDTH, CHEIGHT - 1);
+        strokeRoundedRect(ctx, x, y, CWIDTH, CHEIGHT - 1, 5);
     }
+    ctx.restore();
 }
 
 function drawClickedBoardCards(ctx, ui) {
     // matches show_clicked_cards's teal highlight for board cards in the
     // player's current combo selection.
     if (!ui.clickedCards) return;
+    const pulse = pulsePhase();
+    ctx.save();
     ctx.strokeStyle = 'rgb(100, 216, 220)';
-    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgb(100, 216, 220)';
+    ctx.shadowBlur = 5 + 4 * pulse;
+    ctx.lineWidth = 2.5;
     for (const card of ui.clickedCards) {
         if (card.source !== 'board') continue;
-        ctx.strokeRect(boardColX(card.col), rowY(card.row), RWIDTH - 2, RHEIGHT - 2);
+        strokeRoundedRect(ctx, boardColX(card.col), rowY(card.row), RWIDTH - 2, RHEIGHT - 2, 5);
     }
+    ctx.restore();
 }
 
 // Also goes through screenSide() - see deckSlotPos.
@@ -560,11 +592,31 @@ function drawHourglass(ctx, cx, cy, size) {
     ctx.restore();
 }
 
+// Soft red radial glow behind an in-check king, so it peeks out around the
+// piece's (transparent-background) silhouette - ported from game.py's
+// _get_check_halo, using a canvas radial gradient instead of the per-pixel
+// pygame surface it builds and caches there (a gradient needs no cache
+// here, it's cheap to construct fresh every frame).
+function drawCheckHalo(ctx, cx, cy, size = 104) {
+    const r = size / 2;
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gradient.addColorStop(0, 'rgba(220, 30, 30, 0.55)');
+    gradient.addColorStop(0.5, 'rgba(220, 30, 30, 0.3)');
+    gradient.addColorStop(1, 'rgba(220, 30, 30, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+}
+
 function drawPieces(ctx, state) {
     for (const p of state.pieces) {
         const img = pieceImage(p.color, p.piece);
         const x = boardColX(p.col) + RWIDTH / 2;
         const y = rowY(p.row) + RHEIGHT / 2;
+        if (p.piece === 'king' && state.in_check === p.color) {
+            drawCheckHalo(ctx, x, y);
+        }
         drawImageWhenReady(ctx, img, x - 40, y - 40, 80, 80);
     }
 }

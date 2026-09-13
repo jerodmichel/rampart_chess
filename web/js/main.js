@@ -1,5 +1,6 @@
 import { api, setTokenProvider } from './api.js';
 import { flagNode } from './extinctStates.js';
+import { highestPerCategory } from './badges.js';
 import {
     signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl,
     sendVerificationEmail, isEmailVerified, resetPassword,
@@ -26,8 +27,66 @@ setupDropdown(document.getElementById('displaySettingsBtn'), document.getElement
 
 const canvas = document.getElementById('boardCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = DESIGN_WIDTH;
-canvas.height = DESIGN_HEIGHT;
+
+// Match the canvas's backing-store resolution to its actual on-page (CSS)
+// size times the screen's pixel density, instead of a fixed DESIGN_WIDTH/
+// DESIGN_HEIGHT. style.css controls the real displayed size responsively
+// (#boardCanvas is width:100%/height:auto with an aspect-ratio, inside
+// #boardWrap's width:1000px;max-width:100%) - a naive fix that hardcoded
+// canvas.style.width/height to DESIGN_WIDTH/DESIGN_HEIGHT px (tried
+// first, reverted) fought that: inline style always beats a stylesheet
+// rule, so the canvas stopped shrinking to fit a narrower window at all.
+// This instead reads the CSS-computed box size fresh (getBoundingClientRect)
+// and only sets the backing store (canvas.width/height attributes) and the
+// draw-context scale from it - never canvas.style.width/height - so
+// style.css keeps sole ownership of the responsive/visible size, exactly
+// as before this whole change.
+//
+// Every draw call in render.js still just uses DESIGN_WIDTH/DESIGN_HEIGHT
+// logical coordinates - ctx.setTransform() is what maps those onto
+// whatever the current backing-store resolution actually is.
+//
+// pageToCanvas() below (the mouse/touch hit-testing helper) had to be
+// updated for this: it used to derive its scale factor from
+// canvas.width/rect.width, which worked when canvas.width == DESIGN_WIDTH,
+// but now that canvas.width is a devicePixelRatio-scaled physical pixel
+// count, that formula silently mapped clicks into the wrong (backing-
+// store) coordinate space instead of the logical DESIGN_WIDTH/
+// DESIGN_HEIGHT one every hit-test helper actually works in - breaking
+// every click on any screen with devicePixelRatio != 1. Fixed to scale
+// against DESIGN_WIDTH/DESIGN_HEIGHT directly instead.
+function syncCanvasResolution() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const targetWidth = Math.round(rect.width * dpr);
+    const targetHeight = Math.round(rect.height * dpr);
+    if (canvas.width === targetWidth && canvas.height === targetHeight) {
+        return false;  // unchanged - skip the backing-store reset (it clears the canvas)
+    }
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    // Setting canvas.width/height (even to a same-valued no-op elsewhere)
+    // resets the whole 2D context state - transform, imageSmoothingQuality,
+    // everything - back to defaults, so both must be re-applied every time
+    // this branch runs, not just once at startup.
+    // targetWidth/DESIGN_WIDTH == targetHeight/DESIGN_HEIGHT (the CSS
+    // aspect-ratio keeps the box proportional to the design size), so one
+    // scale factor covers both axes.
+    const scale = targetWidth / DESIGN_WIDTH;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
+    return true;
+}
+syncCanvasResolution();
+
+// Re-sync (and repaint - changing canvas.width/height clears it) whenever
+// the canvas's actual CSS box size changes: a window resize, but also
+// anything else layout-driven (zoom, orientation change, a sidebar
+// appearing) that ResizeObserver catches and a plain 'resize' listener
+// wouldn't.
+new ResizeObserver(() => {
+    if (syncCanvasResolution()) drawCanvas();
+}).observe(canvas);
 
 const statusLine = document.getElementById('statusLine');
 const aiColorSelect = document.getElementById('aiColorSelect');
@@ -76,9 +135,22 @@ effectsToggle.addEventListener('change', () => {
 
 const strikeSound = new Audio('assets/sounds/thunder_strike.wav');
 const raiseSound = new Audio('assets/sounds/thunder_raise.mp3');
+// Matches game.py's play_sound(captured) - the plain move/capture click,
+// independent of (and gated by the same effectsEnabled toggle as) the
+// cast thunder above.
+const moveSound = new Audio('assets/sounds/move.wav');
+const captureSound = new Audio('assets/sounds/capture.wav');
 
 function playCastSound(kind) {
     const audio = kind === 'strike' ? strikeSound : raiseSound;
+    try {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+    } catch (_) { /* ignore */ }
+}
+
+function playMoveSound(captured) {
+    const audio = captured ? captureSound : moveSound;
     try {
         audio.currentTime = 0;
         audio.play().catch(() => {});
@@ -489,6 +561,14 @@ function castKindFromNotation(notation) {
     if (!notation) return null;
     if (notation.startsWith('++')) return 'raise';
     if (notation.startsWith('--')) return 'strike';
+    // Rulebook 6.1.3's "raider enters the queen's house, queen is raised
+    // in the same turn" move isn't a card-based cast move, but desktop
+    // fires the same raise thunder/lightning for it regardless (see
+    // main.py: both the AI's engine_move.spawn_sq branch and the human
+    // click-handler's queen_house_raided branch call play_raise_sound()/
+    // lightning.trigger() right after appending this exact
+    // "<move>/Q@<dst>" notation shape to the log).
+    if (notation.includes('/Q@')) return 'raise';
     return null;
 }
 
@@ -531,6 +611,16 @@ let busy = false;
 let hoverSquare = null;
 let hoverButton = null;
 let hoverDeckCard = null;
+
+// Set while a raider's move into the enemy queen's house is awaiting the
+// rulebook 6.1.3 "same turn" queen placement - {from: {col,row}, to:
+// {col,row}} once the raider's own destination click is captured, until
+// the player clicks one of queenSpawnDestinations to finish the move (or
+// clicks elsewhere to cancel, discarding both - the underlying move was
+// never actually submitted, matching how a committed cast can be walked
+// back before its destination click).
+let pendingQueenMove = null;
+let queenSpawnDestinations = [];
 
 // History-viewer state. viewIndex/viewState are null while live; browsing
 // is strictly read-only (no casting/moving) and never touches `state`,
@@ -587,6 +677,27 @@ function parseLastMoveSquares(notation) {
         return [src, dst].filter(Boolean);
     }
     return [];
+}
+
+// The piece's own destination square for a plain move ("R6c>4f") or the
+// move-part of a compound queen-placement notation ("R6c>4f/Q@3e",
+// ignoring the "/Q@" spawn suffix) - null for a card-based cast notation
+// ("++"/"--"), which has no such relocation at all.
+function moveDestinationFromNotation(notation) {
+    if (!notation || notation.startsWith('++') || notation.startsWith('--')) return null;
+    const movePart = notation.split('/')[0];
+    if (!movePart.includes('>')) return null;
+    return parseSquareToken(movePart.slice(1).split('>')[1]);
+}
+
+// undefined (not a relocation at all) unless notation actually moved a
+// piece - matches afterStateUpdate's captured===undefined "skip the
+// move/capture sound entirely" gate for a pure cast move.
+function capturedByNotation(priorPieces, notation) {
+    const dst = moveDestinationFromNotation(notation);
+    if (!dst) return undefined;
+    const [col, row] = dst;
+    return priorPieces.some((p) => p.col === col && p.row === row);
 }
 
 // ---- history viewer -------------------------------------------------------
@@ -682,6 +793,30 @@ function jackHouseOccupiedBy(s, color) {
     return Boolean(piece && piece.color === color);
 }
 
+// Matches Square.is_enemy_queen_house(color) in square.py.
+function queenHouseSquare(color) {
+    return color === 'white' ? { col: 3, row: 0 } : { col: 6, row: 5 };
+}
+
+function queenIsDead(s, color) {
+    const grave = color === 'white' ? s.white_grave : s.black_grave;
+    return grave.includes('queen');
+}
+
+// Matches GameSession._queen_spawn_squares(color) - the same raise-a-
+// raider zone rows used everywhere else for spawning a piece back onto
+// the board.
+function queenSpawnDestinationsFor(s, color) {
+    const rows = color === 'white' ? [3, 4] : [1, 2];
+    const dests = [];
+    for (let col = 0; col < 10; col++) {
+        for (const row of rows) {
+            if (!s.pieces.some((p) => p.col === col && p.row === row)) dests.push([col, row]);
+        }
+    }
+    return dests;
+}
+
 // Blackjack-style sum with ace flexibility, matching clicker.py's
 // has_sum_21 (ace counts as 1, or the whole hand as 11 instead of 21 if an
 // ace is present).
@@ -727,6 +862,8 @@ function cancelCasting() {
     clickedCards = [];
     committedButton = null;
     castDestinations = [];
+    pendingQueenMove = null;
+    queenSpawnDestinations = [];
     transientMessage = null;
     drawCanvas();
 }
@@ -784,12 +921,29 @@ function computeStatus(s) {
     if (s.result) {
         const { winner, reason } = s.result;
         switch (reason) {
-            case 'checkmate': return `${cap(winner)} wins by checkmate!`;
+            // Matches game.py's set_mated_prompt wording exactly - it
+            // never distinguishes an ordinary checkmate from a mate by
+            // capture, so neither does this.
+            case 'checkmate':
+            case 'mate_by_capture':
+                return `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}`;
             case 'resignation': return `${cap(winner === 'white' ? 'black' : 'white')} resigned - ${cap(winner)} wins!`;
             case 'draw_agreement': return 'Draw by agreement.';
             case 'timeout': return `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!`;
-            case 'stalemate': default: return 'Draw (stalemate, repetition, or insufficient material).';
+            // Matches game.py's set_repetition_prompt/is_draw_by_
+            // insufficient_material wording exactly.
+            case 'repetition': return 'Draw by repetition';
+            case 'insufficient_material': return 'Draw by insufficient material';
+            // Matches game.py's set_mated_prompt('stale-mated', ...)
+            // wording exactly - stalemated_color is missing only for a
+            // persisted game recorded before the server tracked it.
+            case 'stalemate':
+            default:
+                return s.result.stalemated_color ? `${cap(s.result.stalemated_color)} stalemated` : 'Stalemate.';
         }
+    }
+    if (s.in_check) {
+        return `${cap(s.in_check)}'s king is in check -- `;
     }
     if (s.draw_offered_by && s.draw_offered_by !== humanColor()) {
         return `${cap(s.draw_offered_by)} has offered a draw.`;
@@ -799,6 +953,9 @@ function computeStatus(s) {
     }
     if (transientMessage) {
         return transientMessage;
+    }
+    if (pendingQueenMove) {
+        return 'Choose a tile where you want to place the queen.';
     }
     if (committedButton === 'strike') {
         return 'Choose a raider to send to the grave.';
@@ -825,8 +982,18 @@ function computeStatus(s) {
 
 function pageToCanvas(evt) {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    // Maps into the fixed logical DESIGN_WIDTH/DESIGN_HEIGHT space that
+    // every hit-testing helper (colRowFromPoint, buttonAt, deckCardAt - all
+    // built on RWIDTH/RHEIGHT etc. from constants.js) actually works in -
+    // NOT canvas.width/height, which since the devicePixelRatio fix above
+    // is a physical backing-store pixel count that no longer equals
+    // DESIGN_WIDTH/DESIGN_HEIGHT. Using canvas.width/rect.width here (the
+    // original, pre-DPR-fix formula) silently broke every click on any
+    // screen with devicePixelRatio != 1 - it mapped clicks into backing-
+    // store space instead of logical space, so colRowFromPoint always
+    // computed the wrong square (or none at all).
+    const scaleX = DESIGN_WIDTH / rect.width;
+    const scaleY = DESIGN_HEIGHT / rect.height;
     return {
         x: (evt.clientX - rect.left) * scaleX,
         y: (evt.clientY - rect.top) * scaleY,
@@ -844,24 +1011,61 @@ function drawCanvas() {
         legalDestinations: browsing ? [] : legalDestinations,
         lastMoveSquares: browsing ? historyLastMoveSquares(viewIndex) : lastMoveSquares,
         committedButton: browsing ? null : committedButton,
-        castDestinations: browsing ? [] : castDestinations,
+        // Reuses the same cast-destination dot styling for the queen-
+        // placement picker (step 2.5 in the click handler) - visually the
+        // same "choose where to place a piece" action as a raise, and
+        // castDestinations/pendingQueenMove are never both active at once.
+        castDestinations: browsing ? [] : (pendingQueenMove
+            ? queenSpawnDestinations.map(([col, row]) => ({ col, row, category: 'raise' }))
+            : castDestinations),
         hoverSquare: browsing ? null : hoverSquare,
         hoverButton: browsing ? null : hoverButton,
         hoverDeckCard: browsing ? null : hoverDeckCard,
         clickedCards: browsing ? [] : clickedCards,
         aiThinking: !browsing && aiThinking,
         promptText: computeStatus(s),
+        // matches game.py's in-check prompt, rendered in red instead of
+        // the default white - only while it's actually the live reason
+        // for the prompt (not overridden by a higher-priority message
+        // computeStatus already returns first, e.g. game-over/draw-offer).
+        promptColor: (!browsing && !s.result && s.in_check) ? 'rgb(255, 0, 0)' : undefined,
     });
+    // The capture-ring/move-dot/clicked-card highlights (render.js) now
+    // breathe with a wall-clock pulse - keep the rAF loop below alive
+    // while any of them are actually on screen, or they'd freeze at
+    // whatever phase they happened to be drawn at instead of animating.
+    if (!browsing && (selected || legalDestinations.length || castDestinations.length || clickedCards.length || queenSpawnDestinations.length)) {
+        ensureAnimationLoop();
+    }
 }
 
-// Lightning/hourglass animate off wall-clock time (see render.js), so they
-// need their own redraw loop independent of the click/hover-driven
-// drawCanvas() calls above; idles (no rAF churn) whenever neither is active.
+// Lightning/hourglass animate off wall-clock time (see render.js), and the
+// highlight pulse above does too, so all three need this redraw loop
+// independent of the click/hover-driven drawCanvas() calls above; idles
+// (no rAF churn) whenever none of them are active.
 let animationLoopRunning = false;
 
-function animationTick() {
-    if (isLightningActive() || isHourglassActive()) {
-        drawCanvas();
+// Unlike lightning (a couple hundred ms) or the hourglass (only during the
+// AI's own think time), a selected piece or an in-progress cast combo can
+// sit on screen indefinitely - as long as a human is thinking. Redrawing
+// the whole board at full, uncapped display refresh rate (60Hz, sometimes
+// 120Hz+) the entire time just to animate a slow 900ms breathing pulse
+// would burn far more CPU/battery than the effect is worth, so that case
+// (only that case - lightning/hourglass keep redrawing every frame) is
+// capped to a much lower rate that still reads as smooth for something
+// this slow.
+const PULSE_FRAME_INTERVAL_MS = 1000 / 24;
+let lastPulseFrameTime = 0;
+
+function animationTick(now) {
+    const pulsingHighlights = !isBrowsingHistory()
+        && (selected || legalDestinations.length || castDestinations.length || clickedCards.length);
+    const activeEffect = isLightningActive() || isHourglassActive();
+    if (activeEffect || pulsingHighlights) {
+        if (activeEffect || now - lastPulseFrameTime >= PULSE_FRAME_INTERVAL_MS) {
+            drawCanvas();
+            lastPulseFrameTime = now;
+        }
         requestAnimationFrame(animationTick);
     } else {
         animationLoopRunning = false;
@@ -1094,6 +1298,36 @@ async function buildPlayerEntry(slot, username, isAiSide, difficulty) {
     link.appendChild(textSpan);
 
     slot.appendChild(link);
+
+    // One trophy per category - whichever badge in that category was
+    // earned most recently (see badges.js's highestPerCategory) - shown
+    // in a row beneath the name. Purely decorative, so a lookup failure
+    // (e.g. no account behind this username) just means no trophy row,
+    // never a broken player label.
+    if (profile) {
+        try {
+            const earned = await api.playerBadges(username);
+            const trophies = highestPerCategory(earned);
+            if (trophies.length) {
+                const row = document.createElement('span');
+                row.className = 'playerTrophyRow';
+                for (const badge of trophies) {
+                    const iconEl = badge.image ? document.createElement('img') : document.createElement('span');
+                    iconEl.className = 'playerTrophyIcon';
+                    iconEl.title = badge.name;
+                    if (badge.image) {
+                        iconEl.src = badge.image;
+                        iconEl.alt = badge.name;
+                    } else {
+                        iconEl.textContent = badge.icon;
+                    }
+                    row.appendChild(iconEl);
+                }
+                slot.appendChild(row);
+            }
+        } catch (e) { /* decorative only - see comment above */ }
+    }
+
     return true;
 }
 
@@ -1123,13 +1357,22 @@ function renderAll() {
 
 // ---- game flow --------------------------------------------------------
 
-async function afterStateUpdate(notation, casterColor) {
+async function afterStateUpdate(notation, casterColor, captured) {
     if (notation !== undefined) lastMoveSquares = parseLastMoveSquares(notation);
     const castKind = castKindFromNotation(notation);
     if (castKind && casterColor && effectsEnabled) {
         triggerLightning(casterColor);
         playCastSound(castKind);
         ensureAnimationLoop();
+    }
+    // Matches game.py's play_sound(captured) - fires for the underlying
+    // piece relocation itself, independent of the raise effect above: a
+    // queen-house-entry move (castKind 'raise' via its "/Q@" notation)
+    // still moved a real raider onto an empty square first, exactly like
+    // _execute_normal_move's unconditional play_sound(captured) call
+    // before main.py's separate queen-spawn/lightning branch even runs.
+    if (captured !== undefined && effectsEnabled) {
+        playMoveSound(captured);
     }
     clickedCards = [];
     committedButton = null;
@@ -1150,12 +1393,13 @@ async function triggerAiMove() {
     ensureAnimationLoop();
     setBusy(true);
     drawCanvas();
+    const priorPieces = state.pieces;
     try {
         const result = await api.aiMove(gameId);
         state = result;
         aiThinking = false;
         stopHourglass();
-        await afterStateUpdate(result.notation, state.ai_color);
+        await afterStateUpdate(result.notation, state.ai_color, capturedByNotation(priorPieces, result.notation));
     } catch (e) {
         aiThinking = false;
         stopHourglass();
@@ -1266,6 +1510,41 @@ canvas.addEventListener('click', async (evt) => {
     if (!cr) return;
     const { col, row } = cr;
 
+    // 2.5. awaiting a queen placement - a highlighted spawn square finishes
+    // the move that's already been provisionally chosen (see step 5 below);
+    // anything else cancels back to idle without ever having submitted
+    // anything (the underlying raider move was never sent to the server).
+    if (pendingQueenMove) {
+        const dest = queenSpawnDestinations.find(([c, r]) => c === col && r === row);
+        if (dest) {
+            const { from, to } = pendingQueenMove;
+            const casterColor = state.pieces.find((p) => p.col === from.col && p.row === from.row)?.color;
+            setBusy(true);
+            try {
+                const result = await api.move(gameId, from.col, from.row, to.col, to.row, col, row);
+                state = result;
+                pendingQueenMove = null;
+                queenSpawnDestinations = [];
+                // false, not derived from state: the queen's-house target
+                // square is always empty (only one raider can ever occupy
+                // it, permanently, per the raider-in-a-house rule), so this
+                // relocation is guaranteed a plain move, never a capture -
+                // matches _execute_normal_move's unconditional play_sound()
+                // for this exact event on desktop.
+                await afterStateUpdate(result.notation, casterColor, false);
+            } catch (e) {
+                setStatus(`Error: ${e.message}`);
+            } finally {
+                setBusy(false);
+            }
+        } else {
+            pendingQueenMove = null;
+            queenSpawnDestinations = [];
+            drawCanvas();
+        }
+        return;
+    }
+
     // 3. board card - only ever completes a combo already started with a
     // deck card, matching the desktop client exactly.
     if (clickedCards.length > 0 && isBoardCardSquare(col, row)) {
@@ -1305,13 +1584,40 @@ canvas.addEventListener('click', async (evt) => {
         const isDest = legalDestinations.some(([c, r]) => c === col && r === row);
         if (isDest) {
             const from = selected;
+
+            // Rulebook 6.1.3: a raider landing on the enemy queen's house
+            // raises the queen in the same turn - pause here for the
+            // player to pick where, instead of submitting the move yet
+            // (see step 2.5 above, and GameSession.apply_normal_move on
+            // the server, which requires that placement atomically with
+            // this exact move). Skipped if there's nowhere to place her
+            // (every spawn-zone square occupied) - the move just goes
+            // through as an ordinary one, matching the AI engine's own
+            // fallback for that same rare edge case.
+            const movingPiece = state.pieces.find((p) => p.col === from.col && p.row === from.row);
+            const qHouse = movingPiece && queenHouseSquare(movingPiece.color);
+            if (movingPiece && movingPiece.piece === 'raider' && qHouse
+                    && qHouse.col === col && qHouse.row === row
+                    && queenIsDead(state, movingPiece.color)) {
+                const spawns = queenSpawnDestinationsFor(state, movingPiece.color);
+                if (spawns.length) {
+                    pendingQueenMove = { from, to: { col, row } };
+                    queenSpawnDestinations = spawns;
+                    selected = null;
+                    legalDestinations = [];
+                    drawCanvas();
+                    return;
+                }
+            }
+
+            const captured = state.pieces.some((p) => p.col === col && p.row === row);
             setBusy(true);
             try {
                 const result = await api.move(gameId, from.col, from.row, col, row);
                 state = result;
                 selected = null;
                 legalDestinations = [];
-                await afterStateUpdate(result.notation);
+                await afterStateUpdate(result.notation, undefined, captured);
             } catch (e) {
                 setStatus(`Error: ${e.message}`);
             } finally {
@@ -1459,8 +1765,9 @@ async function pollActiveGame() {
 
     const newNotation = hasNewMove ? fresh.history[fresh.history.length - 1] : undefined;
     const moverColor = state.next_player; // whoever's turn it was before this catch-up
+    const captured = newNotation !== undefined ? capturedByNotation(state.pieces, newNotation) : undefined;
     state = fresh;
-    await afterStateUpdate(newNotation, moverColor);
+    await afterStateUpdate(newNotation, moverColor, captured);
 }
 
 setInterval(() => { if (currentProfile) refreshChallenges(); }, 5000);

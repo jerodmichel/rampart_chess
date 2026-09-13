@@ -68,6 +68,11 @@ class Square:
             (self.col == 5 and self.row == 5 and color == 'black'):
             return True
         
+    def is_enemy_queen_house(self, color):
+        if (self.col == 3 and self.row == 0 and color == 'white') or \
+            (self.col == 6 and self.row == 5 and color == 'black'):
+            return True
+
     def is_enemy_king_house(self, color):
         if (self.col == 2 and self.row == 0 and color == 'white') or \
             (self.col == 7 and self.row == 5 and color == 'black'):
