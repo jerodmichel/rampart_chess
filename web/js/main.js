@@ -608,6 +608,14 @@ let legalDestinations = [];
 let lastMoveSquares = [];
 let aiThinking = false;
 let busy = false;
+
+// Set once pollActiveGame has failed several times in a row (see
+// registerPollFailure/clearPollFailures below) - surfaces the same kind of
+// stall that used to freeze the board silently (see the web/js/api.js
+// request timeout) as an actual on-screen message instead.
+let reconnecting = false;
+let pollFailureStreak = 0;
+const RECONNECTING_AFTER_FAILURES = 2;
 let hoverSquare = null;
 let hoverButton = null;
 let hoverDeckCard = null;
@@ -921,12 +929,19 @@ function computeStatus(s) {
     if (s.result) {
         const { winner, reason } = s.result;
         switch (reason) {
-            // Matches game.py's set_mated_prompt wording exactly - it
-            // never distinguishes an ordinary checkmate from a mate by
-            // capture, so neither does this.
+            // Wording matches game.py's set_mated_prompt exactly (it never
+            // distinguishes an ordinary checkmate from a mate by capture,
+            // so neither does this) - but with a trailing period added:
+            // desktop's own render of this is two blits, "White mated
+            // Black" immediately followed by "-- Press "r" key to start
+            // new game." on the same line, so the *combined* sentence
+            // already ends in a period there. The web client never renders
+            // that second half (there's no keyboard shortcut to restart),
+            // so without this it was left as a permanently unterminated
+            // fragment - not an intentional style match.
             case 'checkmate':
             case 'mate_by_capture':
-                return `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}`;
+                return `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`;
             case 'resignation': return `${cap(winner === 'white' ? 'black' : 'white')} resigned - ${cap(winner)} wins!`;
             case 'draw_agreement': return 'Draw by agreement.';
             case 'timeout': return `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!`;
@@ -944,6 +959,12 @@ function computeStatus(s) {
     }
     if (s.in_check) {
         return `${cap(s.in_check)}'s king is in check -- `;
+    }
+    // Below result/in_check (a known, correctly-synced fact always wins)
+    // but above everything else, since a stalled poll makes every one of
+    // those messages potentially stale too.
+    if (reconnecting) {
+        return 'Reconnecting...';
     }
     if (s.draw_offered_by && s.draw_offered_by !== humanColor()) {
         return `${cap(s.draw_offered_by)} has offered a draw.`;
@@ -1738,6 +1759,21 @@ declineDrawBtn.addEventListener('click', () => respondToDraw(false));
 // already updates its own local `state` synchronously after every move, so
 // there's nothing for this to catch there.
 
+function registerPollFailure() {
+    pollFailureStreak += 1;
+    if (pollFailureStreak >= RECONNECTING_AFTER_FAILURES && !reconnecting) {
+        reconnecting = true;
+        drawCanvas();
+    }
+}
+
+function clearPollFailures() {
+    const wasReconnecting = reconnecting;
+    pollFailureStreak = 0;
+    reconnecting = false;
+    return wasReconnecting;
+}
+
 async function pollActiveGame() {
     if (!gameId || !state || busy || isBrowsingHistory()) return;
     if (state.ai_color !== null || isGameOver(state)) return;
@@ -1749,19 +1785,26 @@ async function pollActiveGame() {
     try {
         fresh = await api.getGame(pollingGameId);
     } catch (e) {
+        registerPollFailure();
         return; // transient - next tick retries
     }
     // Re-check everything after the await, not just before it - loadGame()
     // (new game / accepted challenge / joined game) may have run while this
     // request was in flight, and a stale response must never clobber it.
     if (gameId !== pollingGameId || !state || busy || isBrowsingHistory()) return;
+    const wasReconnecting = clearPollFailures();
 
     const hasNewMove = fresh.history.length > state.history.length;
     // Resignation/draw-agreement never append to history, so they'd
     // otherwise never be noticed here at all.
     const hasNewResult = Boolean(fresh.result) && !state.result;
     const hasNewDrawOffer = fresh.draw_offered_by !== state.draw_offered_by;
-    if (!hasNewMove && !hasNewResult && !hasNewDrawOffer) return;
+    if (!hasNewMove && !hasNewResult && !hasNewDrawOffer) {
+        // Nothing changed in the game itself, but if we were showing
+        // "Reconnecting..." until just now, that alone needs a redraw.
+        if (wasReconnecting) drawCanvas();
+        return;
+    }
 
     const newNotation = hasNewMove ? fresh.history[fresh.history.length - 1] : undefined;
     const moverColor = state.next_player; // whoever's turn it was before this catch-up
@@ -1776,6 +1819,17 @@ setInterval(pollChat, 3000);
 refreshLiveGames();
 setInterval(refreshLiveGames, 8000);
 setInterval(updateClocks, 250); // smooth countdown between the poll's 3s syncs
+
+// Backgrounded tabs get their setInterval calls throttled by the browser
+// (sometimes to once a minute or less), so a player who alt-tabs away while
+// waiting for their opponent's move can miss several 3s poll ticks in a
+// row. Firing an immediate poll the moment the tab becomes visible again
+// closes that gap without changing the steady-state polling behavior at all.
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    pollActiveGame();
+    pollChat();
+});
 
 // ---- opening a game linked from the Profile page's ledger ----------------
 

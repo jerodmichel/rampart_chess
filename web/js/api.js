@@ -16,14 +16,47 @@ export function setTokenProvider(fn) {
     tokenProvider = fn;
 }
 
+// Bounds both the token wait and the fetch itself. Without this, a stalled
+// token refresh or a dropped connection (seen in practice between two
+// machines on flaky wifi) leaves the returned promise neither resolved nor
+// rejected forever - callers like pollActiveGame's 3s loop already have a
+// "transient failure, retry next tick" catch, but that catch is unreachable
+// if the promise never settles at all. 10s is generous for a same-LAN
+// dev server round trip while still being far shorter than a human's
+// patience for "did my move go through".
+const REQUEST_TIMEOUT_MS = 10000;
+
+function withTimeout(promise, ms, message) {
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
 async function request(path, options) {
     const headers = { 'Content-Type': 'application/json' };
-    const token = await tokenProvider();
+    const token = await withTimeout(
+        tokenProvider(),
+        REQUEST_TIMEOUT_MS,
+        'timed out waiting for auth token',
+    );
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${BASE_URL}${path}`, {
-        headers,
-        ...options,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let res;
+    try {
+        res = await fetch(`${BASE_URL}${path}`, {
+            headers,
+            ...options,
+            signal: controller.signal,
+        });
+    } catch (e) {
+        if (e.name === 'AbortError') throw new Error(`${path} timed out`);
+        throw e;
+    } finally {
+        clearTimeout(timeoutId);
+    }
     if (!res.ok) {
         let detail = res.statusText;
         try {

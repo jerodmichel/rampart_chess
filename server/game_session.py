@@ -917,6 +917,149 @@ class GameSession:
         })
         return out
 
+    # -- resuming across a server restart --------------------------------
+
+    @staticmethod
+    def _card_specs_from_cards_part(cards_part, deck_suit):
+        """Inverse of Board.cast_move()'s card_str construction (the
+        "(...)" part of a cast notation, e.g. "K,5♦"): a label
+        carrying one of SUITS' literal symbols is a board card (that
+        symbol names its suit); a bare rank label is a deck card (suit is
+        always the mover's own deck, since cast_move() never labels a
+        deck card with a suit at all). Returns the same {rank, suit} spec
+        shape _resolve_card already expects."""
+        specs = []
+        for label in cards_part.split(','):
+            suit = None
+            rank_label = label
+            for i, symbol in enumerate(SUITS):
+                if symbol in label:
+                    suit = i
+                    rank_label = label.replace(symbol, '')
+                    break
+            if suit is None:
+                suit = deck_suit
+            specs.append({"rank": RANKS.index(rank_label), "suit": suit})
+        return specs
+
+    def _replay_notation(self, notation):
+        """Re-executes one already-played move by decoding `notation`
+        back into the same structured parameters a live client would
+        have sent, then driving it through the real, fully-validated
+        methods (apply_normal_move / legal_cast_destinations_for_combo +
+        _execute_cast_move) instead of _apply_notation's board-only poke.
+        That means mate/stalemate/repetition/clock bookkeeping all get
+        correctly re-derived as an ordinary side effect - the whole point
+        when rebuilding a live, resumable session (see rehydrate()),
+        unlike _apply_notation's display-only replay for state_at/
+        ReplayOnlyGame, which only needs the board to look right.
+
+        Mirrors _apply_notation's exact branch order/parsing (a plain
+        move, a move+same-turn-queen-spawn, then a cast move) since
+        that's already the proven-correct decoding of this format - only
+        WHAT each branch does differs.
+
+        Asserts the freshly-generated notation exactly matches the one
+        being replayed: a strong self-check that decoding was faithful.
+        A mismatch means either a bug in this decoding or a genuine
+        engine inconsistency, and either way rehydration must fail
+        loudly here rather than silently resume from a wrong position."""
+        mover_color = self.next_player
+
+        if ">" in notation and "/" not in notation:
+            src_str, dst_str = notation[1:].split(">")
+            f_col, f_row = self._parse_square_token(src_str)
+            t_col, t_row = self._parse_square_token(dst_str)
+            produced = self.apply_normal_move(f_col, f_row, t_col, t_row)
+
+        elif "++" in notation or "--" in notation:
+            is_raise = "++" in notation
+            target_part = notation.split('@')[1].split('(')[0]
+            t_col, t_row = self._parse_square_token(target_part)
+            p_char = notation[2]
+            cards_part = notation.split('(')[1].split(')')[0]
+            deck_suit = 1 if mover_color == "white" else 0
+            card_specs = self._card_specs_from_cards_part(cards_part, deck_suit)
+
+            if is_raise:
+                category = "raise_raider" if p_char == "R" else "raise_queen"
+                piece_type = "raider" if p_char == "R" else "queen"
+                destinations = self.legal_cast_destinations_for_combo(card_specs, "raise")
+            else:
+                category = "strike"
+                piece_type = None
+                destinations = self.legal_cast_destinations_for_combo(card_specs, "strike")
+
+            match = next((m for m in destinations[category]
+                          if m.final.col == t_col and m.final.row == t_row), None)
+            if match is None:
+                raise IllegalMoveError(f"replay: no {category} destination reproduces {notation!r}")
+            produced = self._execute_cast_move(match, piece_type)
+
+        elif "/" in notation:
+            move_part, spawn_part = notation.split("/")
+            src_str, dst_str = move_part[1:].split(">")
+            f_col, f_row = self._parse_square_token(src_str)
+            t_col, t_row = self._parse_square_token(dst_str)
+            q_target = spawn_part.split('@')[1]
+            q_col, q_row = self._parse_square_token(q_target)
+            produced = self.apply_normal_move(f_col, f_row, t_col, t_row, queen_col=q_col, queen_row=q_row)
+
+        else:
+            raise IllegalMoveError(f"replay: unrecognized notation {notation!r}")
+
+        if produced != notation:
+            raise IllegalMoveError(
+                f"replay produced {produced!r}, expected {notation!r} - refusing to rehydrate")
+
+    @classmethod
+    def rehydrate(cls, record):
+        """Rebuilds a live, resumable GameSession from a persisted
+        game_records entry whose in-memory GameSession was lost (a
+        server restart) - unlike ReplayOnlyGame (read-only, board-poke
+        replay only), this replays record["history"] through
+        _replay_notation, so mate/stalemate/repetition are correctly
+        re-derived rather than needing to be persisted separately. Only
+        ever appropriate for a still-in-progress human-vs-human game
+        (ai_color is None, result is None) - app.py is responsible for
+        using ReplayOnlyGame instead once a game is actually over.
+
+        Clock state is deliberately NOT left to fall out of replay:
+        replay runs in a tight loop with no real elapsed time between
+        moves, so _tick_clock's wall-clock math during it is meaningless
+        for every move except correctly resetting a per-move control
+        back to its full period each time (harmless - that's exactly
+        what should happen anyway). Once replay finishes, clock_running_
+        since_ms is overwritten with the persisted last_move_at instead,
+        so the already-existing, unchanged _check_timeout/
+        _live_remaining_ms (both pure wall-clock math off that field)
+        correctly pick up real elapsed time since the actual last move -
+        exactly as if this process had been running the whole time.
+
+        Only correct for a "per_move" time control today (see
+        game_records.save_game_record's last_move_at comment) - a pool
+        control (30min/1hour) would need its actual banked
+        white_remaining_ms/black_remaining_ms persisted too, which
+        nothing currently does."""
+        session = cls(
+            ai_color=None,
+            white_uid=record.get("white_uid"),
+            black_uid=record.get("black_uid"),
+            time_control=record.get("time_control"),
+            white_username=record.get("white_username"),
+            black_username=record.get("black_username"),
+        )
+        session.id = record["id"]
+        for notation in record.get("history", []):
+            session._replay_notation(notation)
+
+        last_move_at = record.get("last_move_at")
+        if session.time_control is not None and last_move_at is not None:
+            session.clock_running_since_ms = last_move_at
+
+        session.draw_offered_by = record.get("draw_offered_by")
+        return session
+
 
 class ReplayOnlyGame:
     """A read-only stand-in for a GameSession that's been evicted from

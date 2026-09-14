@@ -5,6 +5,7 @@ JS/rendering work happens. In-memory game storage only for now (fine for
 local testing; a real deployment would move this to Firestore so state
 survives across Cloud Run instances/restarts)."""
 
+import logging
 import os
 from typing import Optional
 
@@ -26,6 +27,8 @@ import messages
 import ratings
 from firebase_auth import get_current_uid, get_optional_uid
 from game_session import GameSession, IllegalMoveError, ReplayOnlyGame
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Rampart API")
 
@@ -60,14 +63,60 @@ app.add_middleware(SlowAPIMiddleware)
 GAMES: dict[str, GameSession] = {}
 
 
+def _rehydrate_eligible(record: dict) -> bool:
+    """A restart-evicted game can only be rebuilt into a live, resumable
+    session for a still-in-progress real human-vs-human game -
+    GameSession.rehydrate always builds with ai_color=None (a vs-AI
+    game's negamax/search state can't be resumed this way), and an
+    already-finished game has nothing left to resume (ReplayOnlyGame
+    already covers viewing that case, and there's no reason to rebuild
+    a live session just to have it immediately refuse every move via
+    is_game_over())."""
+    return (record.get("white_uid") is not None
+            and record.get("black_uid") is not None
+            and record.get("result") is None)
+
+
+def _live_session_or_rehydrate(game_id: str) -> Optional[GameSession]:
+    """A live GameSession for game_id if one is already in memory, else
+    one rebuilt via GameSession.rehydrate (and cached into GAMES, same
+    as any other live session from here on) if this game's live session
+    was lost to a server restart but is eligible per
+    _rehydrate_eligible. None if there's no live session and none can be
+    rebuilt - callers decide what that means for them (get_session's
+    409, or get_view's ReplayOnlyGame fallback).
+
+    Rehydration failing unexpectedly (a bug in replay, or a genuinely
+    corrupt record) degrades to that same "can't resume" fallback rather
+    than a raw 500 - this is new, non-trivial replay logic touching
+    every in-progress game's reload path, so a mistake here should never
+    make things worse than the old, always-safe "not resumable" behavior
+    it's replacing. Logged rather than silently swallowed, since a solo
+    dev needs to know if this is ever actually happening."""
+    session = GAMES.get(game_id)
+    if session is not None:
+        return session
+    record = game_records.get_game_record(game_id)
+    if record is None or not _rehydrate_eligible(record):
+        return None
+    try:
+        session = GameSession.rehydrate(record)
+    except Exception:
+        logger.exception("failed to rehydrate game %s after a restart", game_id)
+        return None
+    GAMES[game_id] = session
+    return session
+
+
 def get_session(game_id: str) -> GameSession:
     """For endpoints that MUTATE a game - only ever a live, in-memory
-    GameSession, never the read-only ReplayOnlyGame get_view can return.
-    A game whose id is only in the persisted record (its live GameSession
-    was lost to a server restart) gets a clearer error than a bare 404,
-    since that's a meaningfully different situation from an id that never
-    existed at all."""
-    session = GAMES.get(game_id)
+    GameSession (rebuilding one first via _live_session_or_rehydrate
+    when eligible), never the read-only ReplayOnlyGame get_view can
+    return. A game whose id is only in the persisted record and isn't
+    (or couldn't be) rehydrated gets a clearer error than a bare 404,
+    since that's a meaningfully different situation from an id that
+    never existed at all."""
+    session = _live_session_or_rehydrate(game_id)
     if session is not None:
         return session
     if game_records.get_game_record(game_id) is not None:
@@ -80,10 +129,13 @@ def get_session(game_id: str) -> GameSession:
 
 
 def get_view(game_id: str):
-    """For read-only endpoints - a live GameSession if one exists, else a
-    ReplayOnlyGame reconstructed from its persisted record if it has one.
-    Both support to_dict()/state_at(), which is all these endpoints need."""
-    session = GAMES.get(game_id)
+    """For read-only endpoints - a live GameSession if one exists or can
+    be rehydrated (see _live_session_or_rehydrate - a read should see
+    exactly the same resumed state a move would use), else a
+    ReplayOnlyGame reconstructed from its persisted record if it has
+    one. Both support to_dict()/state_at(), which is all these
+    endpoints need."""
+    session = _live_session_or_rehydrate(game_id)
     if session is not None:
         return session
     record = game_records.get_game_record(game_id)

@@ -56,6 +56,18 @@ def save_game_record(session, white_username: str = None, black_username: str = 
         # ["result"], or an in-progress game raises KeyError.
         "result": session.result(),
         "updated_at": {".sv": "timestamp"},
+        # Lets a rehydrated GameSession (see GameSession.rehydrate, used
+        # when a still-in-progress game's live session was lost to a
+        # server restart) resume its clock correctly: this is exactly
+        # session.clock_running_since_ms, the server's own wall-clock
+        # timestamp of the current mover's turn starting - restoring it
+        # verbatim (rather than resetting to "now") lets the existing,
+        # unchanged _check_timeout/_live_remaining_ms correctly measure
+        # real elapsed time since the actual last move, restart or not.
+        # None (no time control, or the game's first move hasn't been
+        # made yet) omits the key entirely, same as "result" above.
+        "last_move_at": session.clock_running_since_ms,
+        "draw_offered_by": session.draw_offered_by,
     }
     if ref.get() is None:
         record["created_at"] = {".sv": "timestamp"}

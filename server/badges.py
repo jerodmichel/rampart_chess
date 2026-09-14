@@ -69,16 +69,32 @@ GRIND_COUNT = 5
 GRIND_WINDOW_HOURS = 24
 
 
-def _decisive_history_vs(uid: str, opponent_uid: str) -> list:
-    """['win'|'loss', ...] in chronological order, from uid's perspective,
-    for finished DECISIVE (checkmate/resignation/timeout - never a draw or
-    a still-in-progress game) rated games between uid and opponent_uid.
+def _is_rated_record(record: dict) -> bool:
+    """A rated game is exactly a human-vs-human one - both sides have a
+    real uid attached (see game_records.py's save_game_record: a vs-AI
+    game only ever tags the human's own side, leaving the AI's uid unset).
+    Every check below walks a uid's FULL persisted history, which also
+    includes their vs-AI games whenever they were signed in for one - so
+    each one needs this filter to avoid counting those toward a threshold
+    that's only ever meant to track rated play."""
+    return bool(record.get("white_uid")) and bool(record.get("black_uid"))
+
+
+def _history_vs(uid: str, opponent_uid: str) -> list:
+    """['win'|'loss'|'draw', ...] in chronological order, from uid's
+    perspective, for every finished rated game between uid and
+    opponent_uid. Draws are kept as their own outcome (not dropped) since
+    Nemesis/Unbreakable are about streaks of consecutive encounters - a
+    draw sitting between two wins means you did NOT beat them 3x in a
+    row, and must break the streak rather than silently vanish from it.
     Includes the just-finished game itself: save_game_record already ran
     before check_and_award (see app.py's _finalize_if_needed), so this
     game's own record is already in game_records/user_games by the time
     Nemesis/Unbreakable are checked below."""
     dated = []
     for record in game_records.list_games_for_uid(uid):
+        if not _is_rated_record(record):
+            continue
         if record.get("white_uid") == uid and record.get("black_uid") == opponent_uid:
             my_color = "white"
         elif record.get("black_uid") == uid and record.get("white_uid") == opponent_uid:
@@ -86,21 +102,23 @@ def _decisive_history_vs(uid: str, opponent_uid: str) -> list:
         else:
             continue  # a game against a different opponent
         result = record.get("result")
-        if not result or result.get("winner") not in ("white", "black"):
-            continue  # still in progress, or a draw
+        if not result:
+            continue  # still in progress
+        winner = result.get("winner")
+        outcome = "draw" if winner is None else ("win" if winner == my_color else "loss")
         timestamp = record.get("created_at") or record.get("updated_at") or 0
-        dated.append((timestamp, "win" if result["winner"] == my_color else "loss"))
+        dated.append((timestamp, outcome))
     dated.sort(key=lambda pair: pair[0])
     return [outcome for _, outcome in dated]
 
 
 def _check_nemesis(winner_uid: str, loser_uid: str) -> bool:
-    history = _decisive_history_vs(winner_uid, loser_uid)
+    history = _history_vs(winner_uid, loser_uid)
     return len(history) >= NEMESIS_STREAK and all(o == "win" for o in history[-NEMESIS_STREAK:])
 
 
 def _check_unbreakable(winner_uid: str, loser_uid: str) -> bool:
-    history = _decisive_history_vs(winner_uid, loser_uid)
+    history = _history_vs(winner_uid, loser_uid)
     if len(history) < UNBREAKABLE_LOOKBACK + 1 or history[-1] != "win":
         return False
     prior_encounters = history[-(UNBREAKABLE_LOOKBACK + 1):-1]
@@ -111,7 +129,7 @@ def _check_grind(uid: str) -> bool:
     """5 rated matches completed inside any rolling 24-hour window."""
     timestamps = sorted(
         record["updated_at"] for record in game_records.list_games_for_uid(uid)
-        if record.get("result") and record.get("updated_at")
+        if _is_rated_record(record) and record.get("result") and record.get("updated_at")
     )
     window_ms = GRIND_WINDOW_HOURS * 3600 * 1000
     for i in range(len(timestamps) - GRIND_COUNT + 1):
