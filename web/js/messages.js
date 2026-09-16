@@ -23,6 +23,7 @@ let signedIn = false;
 let currentFriends = []; // last-fetched friends list, kept so openThread can re-highlight without a refetch
 let activeFriend = null; // username of the friend whose thread is open, or null
 let activeThreadMessages = [];
+let myUid = null; // this player's own uid, for telling their messages apart from the friend's (renderThreadMessages)
 
 function formatTimestamp(ms) {
     if (!ms) return '';
@@ -163,7 +164,7 @@ function renderThreadMessages() {
     threadMessages.innerHTML = '';
     for (const m of activeThreadMessages) {
         const row = document.createElement('div');
-        row.className = 'threadMsg';
+        row.className = 'threadMsg ' + (m.from_uid === myUid ? 'threadMsgOwn' : 'threadMsgFriend');
         const meta = document.createElement('div');
         meta.className = 'threadMsgMeta';
         meta.textContent = formatTimestamp(m.timestamp);
@@ -237,6 +238,7 @@ async function loadMessagesPage() {
     signedOutMessage.hidden = signedIn;
     messagesPage.hidden = !signedIn;
     if (!signedIn) return;
+    myUid = (await api.me()).uid;
     await refreshFriends();
 
     // Supports the "Message" link on a friend's profile page

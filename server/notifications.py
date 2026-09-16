@@ -19,6 +19,7 @@ import html as html_lib
 import logging
 import os
 from typing import Optional
+from urllib.parse import quote
 
 import resend
 from firebase_admin import auth as firebase_auth_sdk
@@ -103,6 +104,21 @@ def _button_html(url: str, label: str) -> str:
     If the button doesn't work, copy this link into your browser:<br>
     <a href="{safe_url}" style="color: #9f2b68;">{safe_url}</a>
   </p>"""
+
+
+def notify_message(to_uid: str, from_username: str) -> None:
+    # messages.html?user=X jumps straight into that thread (see
+    # messages.js's own "Message" deep-link handling) rather than just the
+    # bare inbox, so the recipient doesn't have to go find the sender again.
+    url = f"{_SITE_BASE_URL}/messages.html?user={quote(from_username)}"
+    subject = "You have a new message on RampartChess"
+    body_text = (
+        f"You have a new message from {from_username} on RampartChess.\n\n"
+        f"Read it here: {url}"
+    )
+    heading = "You have a new message."
+    body_html = _email_layout(heading, _button_html(url, "View Message"))
+    notify_user(to_uid, subject, body_text, body_html)
 
 
 def notify_challenge(to_uid: str, from_username: str, time_control: str) -> None:

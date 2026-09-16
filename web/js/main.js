@@ -915,7 +915,11 @@ function updateHistoryButtons() {
     const currentIndex = viewIndex === null ? total : viewIndex;
     historyPrevBtn.disabled = busy || currentIndex <= 0;
     historyNextBtn.disabled = busy || currentIndex >= total;
-    historyLiveBtn.disabled = busy || viewIndex === null;
+    // Once a game is over there's no "live" position distinct from the
+    // final one in its history - Next already gets you back to the same
+    // place - so this is disabled outright rather than staying clickable
+    // while browsing a finished game's history.
+    historyLiveBtn.disabled = busy || viewIndex === null || isGameOver(state);
 }
 
 async function goToHistory(index) {

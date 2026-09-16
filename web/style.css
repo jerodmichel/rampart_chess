@@ -895,7 +895,19 @@ button:disabled { opacity: 0.5; cursor: default; }
     border-radius: 6px;
     padding: 6px 10px;
     max-width: 80%;
+}
+
+/* Staggered like an ordinary chat UI: the friend's messages stay left
+   (the plain default look above), this player's own float right with a
+   distinct accent background so a glance at the thread shows who said
+   what without reading the timestamp/metadata. */
+.threadMsgFriend {
     align-self: flex-start;
+}
+
+.threadMsgOwn {
+    align-self: flex-end;
+    background: rgb(90, 35, 60);
 }
 
 .threadMsgText {
@@ -919,6 +931,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 #threadInput {
     flex: 1;
+    /* Text inputs have their own default min-width:auto floor (like the
+       min-width:auto flex-item issue elsewhere in this file) - without
+       this it wouldn't actually shrink to fit a narrow mobile row,
+       pushing the Send button past the container's edge by however much
+       narrower the screen is than the input's own intrinsic minimum. */
+    min-width: 0;
 }
 
 #legalPage {

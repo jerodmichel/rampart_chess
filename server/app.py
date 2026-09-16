@@ -795,9 +795,15 @@ class DirectMessageBody(BaseModel):
 @app.post("/messages/{username}")
 @limiter.limit("20/minute")
 def send_direct_message(request: Request, username: str, req: DirectMessageBody,
+                         background_tasks: BackgroundTasks,
                          uid: str = Depends(get_current_uid)):
     profile = accounts.get_profile(uid)
-    return messages.send_message(uid, profile["username"], username, req.text)
+    record = messages.send_message(uid, profile["username"], username, req.text)
+    # Same "fire after the response, best-effort" pattern as challenges -
+    # see notifications.py's own never-raises contract.
+    background_tasks.add_task(
+        notifications.notify_message, accounts.lookup_uid(username), profile["username"])
+    return record
 
 
 @app.get("/messages/{username}")
