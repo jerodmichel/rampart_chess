@@ -35,6 +35,17 @@ export function setTheme(index) {
     cardBackIdx = clamped % CARD_BACK_PRESETS.length;
 }
 
+// So render-mobile.js's own board-square/highlight drawing can match
+// whichever theme/piece-set the player picked in Display Settings, instead
+// of hardcoding one the way the old mobile/ prototype did.
+export function getActiveTheme() {
+    return THEME;
+}
+
+export function getActivePieceSetKey() {
+    return pieceSetKey;
+}
+
 export const STRIKE_RECT = { x: 102, y: 802 + RAMPART_HEIGHT, w: 100, h: 35 };
 export const RAISE_RECT = { x: 205, y: 802 + RAMPART_HEIGHT, w: 83, h: 35 };
 
@@ -69,7 +80,9 @@ export function setPieceSet(key) {
     pieceSetKey = PIECE_SET_NAMES.some((s) => s.key === key) ? key : 'default';
 }
 
-function pieceImage(color, name) {
+// Exported so render-mobile.js can draw pieces without duplicating the
+// image cache/bishop-override logic.
+export function pieceImage(color, name) {
     const set = (name === 'bishop') ? 'default' : pieceSetKey;
     return loadImage(`assets/piece_sets/${set}/${color}_${name}.png`);
 }
@@ -79,7 +92,18 @@ function deadPieceImage(color, name) {
     return loadImage(`assets/piece_sets/${set}/dead_${color}_${name}.png`);
 }
 
-const rampartImage = loadImage('assets/misc/rampart.png');
+// Same path formula as deadPieceImage above, but returning the URL string
+// rather than a canvas-cache Image object - for the mobile graveyard
+// panels (mobile-panels.js), which are plain <img> elements the browser
+// already loads/caches on its own.
+export function deadPieceImageSrc(color, name) {
+    const set = (name === 'bishop') ? 'default' : pieceSetKey;
+    return `assets/piece_sets/${set}/dead_${color}_${name}.png`;
+}
+
+// Exported so render-mobile.js can draw the real rampart art too, instead
+// of a flat color fill standing in for it.
+export const rampartImage = loadImage('assets/misc/rampart.png');
 
 // Card-back and emblem art ride along with the theme, exactly like desktop's
 // K_t handler: pressing "T" there always calls change_theme() +
@@ -106,11 +130,27 @@ function cardBackImage() {
     return loadImage(CARD_BACK_PRESETS[cardBackIdx]);
 }
 
+// Same card-back art the desktop canvas draws over a used deck slot
+// (drawDecks below), as a URL string rather than a canvas-cache Image
+// object - for the mobile deck list's plain <img> elements.
+export function getActiveCardBackSrc() {
+    return CARD_BACK_PRESETS[cardBackIdx];
+}
+
 function emblemImage() {
     return loadImage(EMBLEM_PRESETS[emblemIdx]);
 }
 
-function drawImageWhenReady(ctx, img, x, y, w, h) {
+// Same emblem the desktop canvas draws (drawEmblems below), as a URL string
+// rather than a canvas-cache Image object - for the mobile side panels'
+// plain <img> elements (mobile-panels.js).
+export function getActiveEmblemSrc() {
+    return EMBLEM_PRESETS[emblemIdx];
+}
+
+// Exported so render-mobile.js can draw rampartImage without duplicating
+// this "wait for it to finish loading" logic.
+export function drawImageWhenReady(ctx, img, x, y, w, h) {
     if (img.complete && img.naturalWidth > 0) {
         ctx.drawImage(img, x, y, w, h);
     } else {

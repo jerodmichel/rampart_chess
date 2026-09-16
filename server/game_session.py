@@ -56,6 +56,23 @@ class GameSession:
         "Hard": {"max_depth": 7, "time_limit": 15.0},
     }
 
+    # Piece letters for the human-readable "Moves" list (see
+    # _apply_notation_with_display/_build_display_history below) - the
+    # standard chess SAN letters (King/Queen/Rook/Bishop/kNight), with
+    # Raider filling the blank slot SAN leaves a pawn - it plays that
+    # same role here (one square, diagonal captures). Purely a display
+    # concern: never used by the engine's own move_log notation, which
+    # is a completely separate, purely mechanical format cast_in_check/
+    # replay/rehydrate all depend on and this must never touch.
+    DISPLAY_PIECE_LETTER = {
+        "raider": "",
+        "rook": "R",
+        "bishop": "B",
+        "knight": "N",
+        "queen": "Q",
+        "king": "K",
+    }
+
     def __init__(self, ai_color="black", ai_difficulty="Medium", white_uid=None, black_uid=None,
                  time_control=None, white_username=None, black_username=None):
         """ai_color=None means a real two-human game (see challenges.py) -
@@ -747,6 +764,16 @@ class GameSession:
             "black_grave": serialize_grave(board.graves[0]),
         }
 
+    def display_history(self):
+        """Human-readable move list for the "Moves" panel - see
+        _build_display_history. Deliberately NOT part of to_dict() (that
+        gets polled every few seconds; this replays the whole game from
+        scratch every call, cheap for this project's game lengths but
+        pointless work to redo on every poll tick when only a new move
+        actually changes it) - served from its own endpoint instead,
+        fetched only when the panel is open."""
+        return self._build_display_history(self.move_log, self.result())
+
     def to_dict(self):
         self._check_timeout()
         out = self._serialize_board(self.board)
@@ -857,6 +884,105 @@ class GameSession:
             board._raise_queen(q_col, q_row, next_player, board.squares[q_col][q_row].card)
 
         return "black" if next_player == "white" else "white"
+
+    @staticmethod
+    def _apply_notation_with_display(board, notation, next_player):
+        """Same parsing/replay as _apply_notation above, but a fully
+        separate implementation on purpose (not sharing code with it):
+        that function is what state_at/ReplayOnlyGame/rehydrate's own
+        correctness depends on for every history lookup and cast-move
+        replay-verification, and this display-only variant - new, and
+        only ever used to build the human-readable "Moves" list text -
+        should never risk touching that path.
+
+        Returns (next_player, label) - label is a human-readable move
+        string ("R8b-9b", "Raise →1c", "Strike x1c", ...). Check/
+        mate suffixes ("+"/"#") are added by the caller (see
+        _build_display_history), which has the whole-game context (the
+        final result) this per-move function doesn't."""
+        if ">" in notation and "/" not in notation:
+            src_str, dst_str = notation[1:].split(">")
+            f_col, f_row = GameSession._parse_square_token(src_str)
+            t_col, t_row = GameSession._parse_square_token(dst_str)
+            piece = board.squares[f_col][f_row].piece
+            label = "?"
+            if piece is not None:
+                captured = board.squares[t_col][t_row].piece
+                if captured is not None and captured.name in ("raider", "queen"):
+                    board._send_to_grave(captured)
+                move = Move(Square(f_col, f_row), Square(t_col, t_row))
+                board.move(piece, move)
+                letter = GameSession.DISPLAY_PIECE_LETTER.get(piece.name, "")
+                sep = "x" if captured is not None else "-"
+                label = f"{letter}{src_str}{sep}{dst_str}"
+            return ("black" if next_player == "white" else "white"), label
+
+        if "++" in notation or "--" in notation:
+            is_raise = "++" in notation
+            target_part = notation.split('@')[1].split('(')[0]
+            t_col, t_row = GameSession._parse_square_token(target_part)
+            target_sq = board.squares[t_col][t_row]
+            p_char = notation[2]
+
+            if is_raise:
+                if p_char == 'R':
+                    board._raise_raider(t_col, t_row, next_player, target_sq.card)
+                    label = f"Raise →{target_part}"
+                else:
+                    board._raise_queen(t_col, t_row, next_player, target_sq.card)
+                    label = f"Raise Q→{target_part}"
+            else:
+                board._send_to_grave(target_sq.piece)
+                target_sq.piece = None
+                label = f"Strike x{target_part}"
+
+            cards_part = notation.split('(')[1].split(')')[0]
+            deck_suit = 1 if next_player == "white" else 0
+            for card_label in cards_part.split(','):
+                if not any(s in card_label for s in SUITS):
+                    rank_idx = RANKS.index(card_label)
+                    board.cards[deck_suit][rank_idx].cast = True
+
+            return ("black" if next_player == "white" else "white"), label
+
+        if "/" in notation:
+            move_part, spawn_part = notation.split("/")
+            _, move_label = GameSession._apply_notation_with_display(board, move_part, next_player)
+            q_target = spawn_part.split('@')[1]
+            q_col, q_row = GameSession._parse_square_token(q_target)
+            board._raise_queen(q_col, q_row, next_player, board.squares[q_col][q_row].card)
+            label = f"{move_label} (Q→{q_target})"
+            return ("black" if next_player == "white" else "white"), label
+
+        return ("black" if next_player == "white" else "white"), "?"
+
+    @staticmethod
+    def _build_display_history(history, result):
+        """['<human-readable move 1>', ...], one entry per move_log
+        entry - replays `history` from scratch onto a throwaway board
+        purely to build display text, exactly the way state_at/
+        ReplayOnlyGame already replay for position lookups, just with
+        _apply_notation_with_display instead of _apply_notation.
+
+        `result` (this game's already-known result() dict, or None
+        while still in progress) is only ever consulted for the LAST
+        move, to tell a "+"-worthy check there apart from actual
+        checkmate - an earlier move can never itself be a checkmate
+        (the game would have ended right there instead of continuing),
+        so this never needs full mate detection mid-replay, only a
+        plain king_in_check call after each move."""
+        board = Board(False)
+        next_player = "white"
+        labels = []
+        for i, notation in enumerate(history):
+            next_player, label = GameSession._apply_notation_with_display(board, notation, next_player)
+            mover_now_facing = GameSession._player_for(board, next_player)
+            if board.king_in_check(mover_now_facing):
+                is_last = i == len(history) - 1
+                mated = is_last and bool(result) and result.get("reason") in ("checkmate", "mate_by_capture")
+                label += "#" if mated else "+"
+            labels.append(label)
+        return labels
 
     def state_at(self, index):
         """Read-only snapshot of the position after `index` half-moves of
@@ -1036,11 +1162,13 @@ class GameSession:
         correctly pick up real elapsed time since the actual last move -
         exactly as if this process had been running the whole time.
 
-        Only correct for a "per_move" time control today (see
-        game_records.save_game_record's last_move_at comment) - a pool
-        control (30min/1hour) would need its actual banked
-        white_remaining_ms/black_remaining_ms persisted too, which
-        nothing currently does."""
+        white_remaining_ms/black_remaining_ms are restored the same way,
+        for the same reason - replay's own bookkeeping resets a "per_move"
+        control back to its full period each time regardless (matching
+        what should happen anyway, so restoring it here is a no-op for
+        that kind), but a "pool" control (30min/1hour) genuinely
+        accumulates/depletes across moves, and replay has no way to
+        reconstruct that on its own - only the persisted amount can."""
         session = cls(
             ai_color=None,
             white_uid=record.get("white_uid"),
@@ -1053,9 +1181,16 @@ class GameSession:
         for notation in record.get("history", []):
             session._replay_notation(notation)
 
-        last_move_at = record.get("last_move_at")
-        if session.time_control is not None and last_move_at is not None:
-            session.clock_running_since_ms = last_move_at
+        if session.time_control is not None:
+            last_move_at = record.get("last_move_at")
+            if last_move_at is not None:
+                session.clock_running_since_ms = last_move_at
+            white_remaining_ms = record.get("white_remaining_ms")
+            if white_remaining_ms is not None:
+                session.white_remaining_ms = white_remaining_ms
+            black_remaining_ms = record.get("black_remaining_ms")
+            if black_remaining_ms is not None:
+                session.black_remaining_ms = black_remaining_ms
 
         session.draw_offered_by = record.get("draw_offered_by")
         return session
@@ -1105,6 +1240,11 @@ class ReplayOnlyGame:
         self.time_control = record.get("time_control")
         self.move_log = record.get("history", [])
         self._result = record.get("result")
+
+    def display_history(self):
+        """See GameSession.display_history - same idea, replaying the
+        persisted record's history instead of a live board."""
+        return GameSession._build_display_history(self.move_log, self._result)
 
     def to_dict(self):
         return self.state_at(len(self.move_log))

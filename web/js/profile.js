@@ -1,4 +1,4 @@
-import { api, setTokenProvider } from './api.js';
+import { api, setTokenProvider, apiErrorDetail } from './api.js';
 import { getIdToken, onAuthChange, uploadAvatar, getAvatarUrl, auth } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
 import { initNavMenu } from './nav.js';
@@ -39,6 +39,7 @@ const profileFriendsList = document.getElementById('profileFriendsList');
 const playerSearchInput = document.getElementById('playerSearchInput');
 const playerSearchBtn = document.getElementById('playerSearchBtn');
 const addFriendRow = document.getElementById('addFriendRow');
+const messageFriendBtn = document.getElementById('messageFriendBtn');
 const addFriendBtn = document.getElementById('addFriendBtn');
 const acceptIncomingFriendBtn = document.getElementById('acceptIncomingFriendBtn');
 const declineIncomingFriendBtn = document.getElementById('declineIncomingFriendBtn');
@@ -51,7 +52,7 @@ addFriendBtn.addEventListener('click', async () => {
         addFriendStatus.textContent = result.status === 'accepted' ? 'You are now friends!' : 'Friend request sent!';
         addFriendBtn.hidden = true;
     } catch (e) {
-        addFriendStatus.textContent = e.message;
+        addFriendStatus.textContent = apiErrorDetail(e);
         addFriendBtn.disabled = false;
     }
 });
@@ -100,6 +101,7 @@ async function refreshFriendStatus() {
     addFriendBtn.disabled = false;
     acceptIncomingFriendBtn.hidden = true;
     declineIncomingFriendBtn.hidden = true;
+    messageFriendBtn.hidden = true;
     addFriendStatus.textContent = '';
     incomingRequestFromViewedPlayer = null;
 
@@ -110,6 +112,10 @@ async function refreshFriendStatus() {
     if (currentFriends.some((f) => f.username === myProfile.username)) {
         addFriendBtn.hidden = true;
         addFriendStatus.textContent = 'You are friends';
+        // DMs are friends-only server-side (server/messages.py), so this
+        // link only ever appears once that's actually true.
+        messageFriendBtn.href = `messages.html?user=${encodeURIComponent(myProfile.username)}`;
+        messageFriendBtn.hidden = false;
         return;
     }
 
@@ -319,6 +325,20 @@ function resultLabel(result, mine) {
         : { text: 'Loss', cls: 'ledgerLoss' };
 }
 
+// Raw stored keys (server/challenges.py TIME_CONTROLS) -> short display
+// labels. .ledgerTimeControl below reserves enough width for the longest
+// of these ("1 day/move") so AI games (no time control at all) still line
+// up with human games under any of the three current options.
+const TIME_CONTROL_LABELS = {
+    '30min': '30 min',
+    '1hour': '1 hour',
+    '1day_per_move': '1 day/move',
+};
+
+function formatTimeControl(tc) {
+    return tc ? (TIME_CONTROL_LABELS[tc] || tc) : '';
+}
+
 // `earned` is the {badge_id: {unlocked_at}} map api.playerBadges() returns.
 // Shows every phase-1 badge, grouped the same way the design was pitched -
 // earned ones full-color with an unlock date, unearned ones dimmed with a
@@ -369,6 +389,117 @@ function renderBadges(earned) {
     }
 }
 
+function makeLedgerRow(g) {
+    const mine = g.white_uid === myProfile.uid ? 'white' : 'black';
+    // A vs-AI game has no account (hence no username) on the AI's
+    // side at all - fall back to a "Computer (difficulty)" label
+    // rather than an empty/uid-shaped name.
+    const aiLabel = g.ai_difficulty ? `Computer (${g.ai_difficulty})` : 'Computer';
+    const opponentUsername = mine === 'white' ? g.black_username : g.white_username;
+    const { text, cls } = resultLabel(g.result, mine);
+
+    const row = document.createElement('div');
+    row.className = 'ledgerRow';
+
+    // Two SEPARATE links, not one row-wide anchor - the opponent's
+    // name should open THEIR profile, while the rest of the row opens
+    // the game itself. An AI opponent has no profile to link to.
+    const opponent = document.createElement(opponentUsername ? 'a' : 'span');
+    opponent.className = 'ledgerOpponent';
+    opponent.textContent = `vs ${opponentUsername || aiLabel}`;
+    if (opponentUsername) opponent.href = `profile.html?user=${encodeURIComponent(opponentUsername)}`;
+
+    const gameLink = document.createElement('a');
+    gameLink.className = 'ledgerGameLink';
+    gameLink.href = `index.html?game=${encodeURIComponent(g.id)}`;
+
+    const color = document.createElement('span');
+    color.className = 'ledgerColor';
+    color.textContent = mine === 'white' ? 'White' : 'Black';
+
+    const resultEl = document.createElement('span');
+    resultEl.className = `ledgerResult ${cls}`;
+    resultEl.textContent = text;
+
+    const timeControl = document.createElement('span');
+    timeControl.className = 'ledgerTimeControl';
+    timeControl.textContent = formatTimeControl(g.time_control);
+
+    const date = document.createElement('span');
+    date.className = 'ledgerDate';
+    date.textContent = formatDate(g.updated_at);
+
+    gameLink.append(color, resultEl, timeControl, date);
+    row.append(opponent, gameLink);
+    return row;
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Collapsed by default; the caller fills in `.body`. Used for both the
+// year and (nested inside it) month sections below.
+function makeLedgerSection(label, className) {
+    const section = document.createElement('div');
+    section.className = className;
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'ledgerSectionToggle';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    const labelEl = document.createElement('span');
+    labelEl.textContent = label;
+    const arrow = document.createElement('span');
+    arrow.className = 'ledgerSectionArrow';
+    arrow.innerHTML = '&#9662;';
+    toggleBtn.append(labelEl, arrow);
+
+    const body = document.createElement('div');
+    body.className = 'ledgerSectionBody';
+    body.hidden = true;
+
+    toggleBtn.addEventListener('click', () => {
+        body.hidden = !body.hidden;
+        toggleBtn.setAttribute('aria-expanded', String(!body.hidden));
+    });
+
+    section.append(toggleBtn, body);
+    return { section, body };
+}
+
+// Beyond the most-recent RECENT_GAMES_SHOWN (always shown flat, expanded),
+// older games get "filed" into collapsed year -> month sections so the
+// ledger doesn't turn into an endless scroll once someone has played a
+// lot of games. Only years/months that actually have a game get a section.
+const RECENT_GAMES_SHOWN = 25;
+
+function renderFiledGames(games) {
+    const container = document.createElement('div');
+    container.className = 'ledgerFiled';
+
+    const years = new Map(); // year -> Map(month -> games[]), insertion order preserved
+    for (const g of games) {
+        const d = new Date(g.updated_at);
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        if (!years.has(year)) years.set(year, new Map());
+        const months = years.get(year);
+        if (!months.has(month)) months.set(month, []);
+        months.get(month).push(g);
+    }
+
+    for (const [year, months] of years) {
+        const yearSection = makeLedgerSection(String(year), 'ledgerYearSection');
+        for (const [month, monthGames] of months) {
+            const monthSection = makeLedgerSection(MONTH_NAMES[month], 'ledgerMonthSection');
+            for (const g of monthGames) monthSection.body.appendChild(makeLedgerRow(g));
+            yearSection.body.appendChild(monthSection.section);
+        }
+        container.appendChild(yearSection.section);
+    }
+    return container;
+}
+
 function renderLedger(games) {
     gamesLedger.innerHTML = '';
     if (games.length === 0) {
@@ -377,50 +508,12 @@ function renderLedger(games) {
         gamesLedger.appendChild(empty);
         return;
     }
-    for (const g of games) {
-        const mine = g.white_uid === myProfile.uid ? 'white' : 'black';
-        // A vs-AI game has no account (hence no username) on the AI's
-        // side at all - fall back to a "Computer (difficulty)" label
-        // rather than an empty/uid-shaped name.
-        const aiLabel = g.ai_difficulty ? `Computer (${g.ai_difficulty})` : 'Computer';
-        const opponentUsername = mine === 'white' ? g.black_username : g.white_username;
-        const { text, cls } = resultLabel(g.result, mine);
+    // `games` arrives newest-first from the server.
+    const recent = games.slice(0, RECENT_GAMES_SHOWN);
+    const filed = games.slice(RECENT_GAMES_SHOWN);
 
-        const row = document.createElement('div');
-        row.className = 'ledgerRow';
-
-        // Two SEPARATE links, not one row-wide anchor - the opponent's
-        // name should open THEIR profile, while the rest of the row opens
-        // the game itself. An AI opponent has no profile to link to.
-        const opponent = document.createElement(opponentUsername ? 'a' : 'span');
-        opponent.className = 'ledgerOpponent';
-        opponent.textContent = `vs ${opponentUsername || aiLabel}`;
-        if (opponentUsername) opponent.href = `profile.html?user=${encodeURIComponent(opponentUsername)}`;
-
-        const gameLink = document.createElement('a');
-        gameLink.className = 'ledgerGameLink';
-        gameLink.href = `index.html?game=${encodeURIComponent(g.id)}`;
-
-        const color = document.createElement('span');
-        color.className = 'ledgerColor';
-        color.textContent = mine === 'white' ? 'White' : 'Black';
-
-        const resultEl = document.createElement('span');
-        resultEl.className = `ledgerResult ${cls}`;
-        resultEl.textContent = text;
-
-        const timeControl = document.createElement('span');
-        timeControl.className = 'ledgerTimeControl';
-        timeControl.textContent = g.time_control || '';
-
-        const date = document.createElement('span');
-        date.className = 'ledgerDate';
-        date.textContent = formatDate(g.updated_at);
-
-        gameLink.append(color, resultEl, timeControl, date);
-        row.append(opponent, gameLink);
-        gamesLedger.appendChild(row);
-    }
+    for (const g of recent) gamesLedger.appendChild(makeLedgerRow(g));
+    if (filed.length > 0) gamesLedger.appendChild(renderFiledGames(filed));
 }
 
 function renderProfileFriends(friendsList) {
@@ -502,7 +595,14 @@ async function loadProfile() {
     if (!addFriendRow.hidden) {
         try {
             await refreshFriendStatus();
-        } catch (e) { /* not fatal - worst case the button shows and errors informatively on click */ }
+        } catch (e) {
+            // Not fatal - worst case the button shows and errors
+            // informatively on click - but silent otherwise made this
+            // exact failure mode (fetching friend status fails -> the
+            // button wrongly shows for an already-added friend) invisible
+            // to diagnose, so at least log it.
+            console.error('refreshFriendStatus failed:', e);
+        }
     }
 
     renderProfileUsername();

@@ -7,8 +7,14 @@ import {
 } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
 import { initNavMenu, setupDropdown } from './nav.js';
+import { enterMobileFullscreen, exitMobileFullscreen, onLayoutModeChange, isMobileBoardActive } from './mobile.js';
 import {
-    CARD_VAL, CARD_SQUARES, ROWS,
+    computeCellSize, boardSize, drawBoardMobile, colRowFromPointMobile, cellRect,
+    triggerLightningMobile, isLightningActiveMobile,
+} from './render-mobile.js';
+import { renderMobilePanels, setDeckCardTapHandler } from './mobile-panels.js';
+import {
+    CARD_VAL, CARD_SQUARES, ROWS, COLS,
     DECK_SUIT_INDEX, boardCardSuitIndex, boardCardRankIndex,
 } from './constants.js';
 import {
@@ -25,8 +31,27 @@ setTokenProvider(getIdToken);
 initNavMenu();
 setupDropdown(document.getElementById('displaySettingsBtn'), document.getElementById('displaySettingsDropdown'));
 
+// On touch devices, Display Settings moves into the hamburger menu instead
+// of sitting in #belowBoard - that row is already tight with Flip/Resign/
+// history arrows on a narrow screen, and unlike those, Display Settings
+// isn't something a player needs mid-move. Reparenting the existing node
+// (rather than building a second one) keeps the setupDropdown wiring above
+// working unchanged - it's keyed to these same element IDs regardless of
+// which parent they end up under.
+//
+// (Mobile #navMenu/#displaySettings reparenting now lives in nav.js's
+// initNavMenu(), called above, so it applies on every page - not just
+// this one.)
+
 const canvas = document.getElementById('boardCanvas');
 const ctx = canvas.getContext('2d');
+// Declared up here (rather than with the rest of the game-UI elements
+// further down) because syncMobileCanvasResolution() below needs to size
+// these to match the board's own width - moved early enough that they're
+// already initialized by the time that function's body actually runs.
+const clocksBar = document.getElementById('clocks');
+const playerNamesBar = document.getElementById('playerNames');
+const mobileBoardRow = document.getElementById('mobileBoardRow');
 
 // Match the canvas's backing-store resolution to its actual on-page (CSS)
 // size times the screen's pixel density, instead of a fixed DESIGN_WIDTH/
@@ -56,6 +81,21 @@ const ctx = canvas.getContext('2d');
 // every click on any screen with devicePixelRatio != 1. Fixed to scale
 // against DESIGN_WIDTH/DESIGN_HEIGHT directly instead.
 function syncCanvasResolution() {
+    // Clears any inline pixel size (and the deck-panel-alignment offset
+    // below) syncMobileCanvasResolution() may have set the last time
+    // mobile board mode was active, so style.css's own width:100%/
+    // aspect-ratio rule regains sole ownership here, exactly as before
+    // mobile mode existed.
+    canvas.style.width = '';
+    canvas.style.height = '';
+    canvas.style.position = '';
+    canvas.style.top = '';
+    playerNamesBar.style.width = '';
+    playerNamesBar.style.position = '';
+    playerNamesBar.style.top = '';
+    clocksBar.style.width = '';
+    clocksBar.style.position = '';
+    clocksBar.style.top = '';
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const targetWidth = Math.round(rect.width * dpr);
@@ -77,7 +117,88 @@ function syncCanvasResolution() {
     ctx.imageSmoothingQuality = 'high';
     return true;
 }
-syncCanvasResolution();
+
+// The mobile square-cell board (render-mobile.js) has no fixed aspect ratio
+// to hand off to CSS the way desktop's DESIGN_WIDTH/DESIGN_HEIGHT box does -
+// its whole point is filling whatever space is actually available, which
+// depends on the live viewport, not a stylesheet rule. So this sets
+// canvas.style.width/height directly (in real CSS px, not %) rather than
+// deferring to style.css, unlike syncCanvasResolution() above.
+let mobileCell = 0;
+
+function syncMobileCanvasResolution() {
+    // Reset any downward offset a previous call may have applied (see
+    // bottom of this function) before measuring - otherwise
+    // spaceAboveCanvas below would be measuring a position that already
+    // includes last call's own adjustment, feeding into itself.
+    canvas.style.top = '';
+    playerNamesBar.style.top = '';
+    clocksBar.style.top = '';
+
+    // How much vertical space player-names/clocks (still their own row
+    // above the canvas at this stage - see the approved mobile plan's later
+    // phases for folding them into the board itself) already take up,
+    // measured before this function changes the canvas's own size, so it
+    // isn't measuring something that depends on the very thing being
+    // computed.
+    const spaceAboveCanvas = canvas.getBoundingClientRect().top;
+    const availableWidth = window.innerWidth;
+    const availableHeight = Math.max(100, window.innerHeight - spaceAboveCanvas);
+    const cell = computeCellSize(availableWidth, availableHeight);
+    const { width, height } = boardSize(cell);
+    const dpr = window.devicePixelRatio || 1;
+    const targetWidth = Math.round(width * dpr);
+    const targetHeight = Math.round(height * dpr);
+
+    mobileCell = cell;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    // Matches the names/clock bars to the board's own width rather than
+    // the full screen - #boardWrap:fullscreen's align-items:center already
+    // shrinks these to content width by default, which pulled both names
+    // together near the middle; style.css's own width:100% (used for
+    // #belowBoard/#chatPanel/etc.) would swing too far the other way here,
+    // stretching them across the *whole* screen including the side panels,
+    // not just above the board itself where they visually belong.
+    playerNamesBar.style.width = `${width}px`;
+    clocksBar.style.width = `${width}px`;
+
+    // The deck/grave side panels (the canvas's siblings in #mobileBoardRow)
+    // size themselves from their own content (13 stacked deck cards), which
+    // can end up taller than the canvas's own height computed above -
+    // #mobileBoardRow's align-items:stretch only stretches items with an
+    // auto cross-size, and the canvas has an explicit one (set just above),
+    // so it doesn't grow to match a taller row; it was instead left sitting
+    // at the row's top with unused space below it (device-dependent - only
+    // shows up when the real screen's proportions don't happen to make
+    // these two heights already match). Shifting the canvas - and the
+    // names/clocks bars above it, as one unit - down by that same gap via
+    // position:relative (not a size or flow change) closes it without
+    // moving the side panels at all, and without disturbing next call's
+    // spaceAboveCanvas measurement above (already reset before this runs).
+    const rowHeight = mobileBoardRow ? mobileBoardRow.getBoundingClientRect().height : 0;
+    const gap = Math.max(0, rowHeight - height - 10);
+    canvas.style.position = 'relative';
+    canvas.style.top = `${gap}px`;
+    playerNamesBar.style.position = 'relative';
+    playerNamesBar.style.top = `${gap}px`;
+    clocksBar.style.position = 'relative';
+    clocksBar.style.top = `${gap}px`;
+
+    if (canvas.width === targetWidth && canvas.height === targetHeight) {
+        return false;
+    }
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
+    return true;
+}
+
+function syncActiveCanvasResolution() {
+    return isMobileBoardActive() ? syncMobileCanvasResolution() : syncCanvasResolution();
+}
+syncActiveCanvasResolution();
 
 // Re-sync (and repaint - changing canvas.width/height clears it) whenever
 // the canvas's actual CSS box size changes: a window resize, but also
@@ -85,8 +206,24 @@ syncCanvasResolution();
 // appearing) that ResizeObserver catches and a plain 'resize' listener
 // wouldn't.
 new ResizeObserver(() => {
-    if (syncCanvasResolution()) drawCanvas();
+    if (syncActiveCanvasResolution()) drawCanvas();
 }).observe(canvas);
+
+// The mobile fullscreen button/exit button/rotate hint themselves are pure
+// CSS (see style.css's #boardWrap:fullscreen rules) - this just drives the
+// actual Fullscreen/Orientation-Lock API calls behind them.
+const mobileFullscreenBtn = document.getElementById('mobileFullscreenBtn');
+const mobileExitFullscreenBtn = document.getElementById('mobileExitFullscreenBtn');
+const boardWrap = document.getElementById('boardWrap');
+mobileFullscreenBtn.addEventListener('click', () => {
+    enterMobileFullscreen(boardWrap).catch(() => {});
+});
+mobileExitFullscreenBtn.addEventListener('click', () => {
+    exitMobileFullscreen().catch(() => {});
+});
+onLayoutModeChange(() => {
+    if (syncActiveCanvasResolution()) drawCanvas();
+});
 
 const statusLine = document.getElementById('statusLine');
 const aiColorSelect = document.getElementById('aiColorSelect');
@@ -106,16 +243,18 @@ const resignBtn = document.getElementById('resignBtn');
 const offerDrawBtn = document.getElementById('offerDrawBtn');
 const acceptDrawBtn = document.getElementById('acceptDrawBtn');
 const declineDrawBtn = document.getElementById('declineDrawBtn');
-const clocksBar = document.getElementById('clocks');
 const whiteClockEl = document.getElementById('whiteClock');
 const blackClockEl = document.getElementById('blackClock');
-const playerNamesBar = document.getElementById('playerNames');
 const whitePlayerSlot = document.getElementById('whitePlayerSlot');
 const blackPlayerSlot = document.getElementById('blackPlayerSlot');
 const chatPanel = document.getElementById('chatPanel');
 const chatMessagesEl = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
+const movesPanel = document.getElementById('movesPanel');
+const movesToggleBtn = document.getElementById('movesToggleBtn');
+const movesToggleArrow = document.getElementById('movesToggleArrow');
+const movesListEl = document.getElementById('movesList');
 
 // Thunder (sound) + lightning (animation) always fire together on desktop
 // (every cast trigger site calls both one line apart - see effects.py/
@@ -313,6 +452,15 @@ logInBtn.addEventListener('click', async () => {
     }
 });
 
+// Enter in either field logs in (not Sign Up - a plain login is the far
+// more common return-key expectation, and this is the same form both
+// buttons share, so Enter has to pick one).
+function loginOnEnter(evt) {
+    if (evt.key === 'Enter') logInBtn.click();
+}
+authEmail.addEventListener('keydown', loginOnEnter);
+authPassword.addEventListener('keydown', loginOnEnter);
+
 // Sign Out itself now lives in the header's avatar dropdown (header.js) -
 // it does a full navigation to index.html, so there's no in-place state
 // to reset here.
@@ -332,7 +480,28 @@ authUsername.addEventListener('keydown', async (evt) => {
     }
 });
 
-onAuthChange(refreshProfile);
+// One-time corrective re-check, not a delay - loadGameFromUrl further down
+// still fires its own api.getGame()/loadGame() immediately as before,
+// completely untouched, so a game still loads and renders exactly as
+// quickly as it did before this existed. The only thing added here is a
+// follow-up: humanColor() (used by loadGame() to decide which way to
+// flip the board) needs currentProfile, which Firebase's async session
+// restore doesn't guarantee is ready by the time that immediate call
+// runs - on a slow connection, a black player reopening a game link
+// could see it come back unflipped. Once the real profile is confirmed
+// (this fires the first time only - profileCheckedOnce guards it so it
+// can never later undo a manual Flip Board click), silently correct the
+// flip if a game is already showing and it doesn't match.
+let profileCheckedOnce = false;
+onAuthChange(async () => {
+    await refreshProfile();
+    if (profileCheckedOnce) return;
+    profileCheckedOnce = true;
+    if (state && humanColor()) {
+        setFlipped(humanColor() === 'black');
+        drawCanvas();
+    }
+});
 
 // ---- challenges (match invites) --------------------------------------
 //
@@ -347,6 +516,9 @@ const challengeUsernameInput = document.getElementById('challengeUsername');
 const challengeColorSelect = document.getElementById('challengeColorSelect');
 const challengeTimeControlSelect = document.getElementById('challengeTimeControlSelect');
 const sendChallengeBtn = document.getElementById('sendChallengeBtn');
+challengeUsernameInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Enter') sendChallengeBtn.click();
+});
 const incomingChallengesList = document.getElementById('incomingChallenges');
 const outgoingChallengesList = document.getElementById('outgoingChallenges');
 
@@ -636,6 +808,15 @@ let queenSpawnDestinations = [];
 let viewIndex = null;
 let viewState = null;
 
+// "Moves" dropdown state - moveLabels is the human-readable move list
+// (api.moves), fetched lazily (only while the dropdown is actually open,
+// not on every poll tick - see server/app.py's /moves endpoint comment)
+// and re-fetched only when state.history has actually grown since the
+// last fetch (moveLabelsForLength tracks that).
+let movesOpen = false;
+let moveLabels = null;
+let moveLabelsForLength = -1;
+
 // Casting state - mirrors clicker.py's clicked_cards/clicked_btn.
 let clickedCards = []; // {source:'deck', color, rank} | {source:'board', col, row, rank}
 let committedButton = null; // 'strike' | 'raise' | null
@@ -750,6 +931,7 @@ async function goToHistory(index) {
         viewState = await api.historyAt(gameId, clamped);
         viewIndex = clamped;
         drawCanvas();
+        renderMovesList(); // just re-highlights the now-active move, no fetch
     } catch (e) {
         setStatus(`Error: ${e.message}`);
     } finally {
@@ -761,6 +943,7 @@ function goLive() {
     viewState = null;
     viewIndex = null;
     drawCanvas();
+    renderMovesList();
 }
 
 // ---- small display helpers ----------------------------------------------
@@ -1003,6 +1186,18 @@ function computeStatus(s) {
 
 function pageToCanvas(evt) {
     const rect = canvas.getBoundingClientRect();
+    if (isMobileBoardActive()) {
+        // The mobile board's logical space IS its CSS pixel size
+        // (syncMobileCanvasResolution sets canvas.style.width/height to
+        // exactly boardSize(mobileCell)) - normally a 1:1 scale, but still
+        // computed rather than assumed so browser zoom/rounding can't drift
+        // clicks off the intended square.
+        const { width, height } = boardSize(mobileCell);
+        return {
+            x: (evt.clientX - rect.left) * (width / rect.width),
+            y: (evt.clientY - rect.top) * (height / rect.height),
+        };
+    }
     // Maps into the fixed logical DESIGN_WIDTH/DESIGN_HEIGHT space that
     // every hit-testing helper (colRowFromPoint, buttonAt, deckCardAt - all
     // built on RWIDTH/RHEIGHT etc. from constants.js) actually works in -
@@ -1021,13 +1216,28 @@ function pageToCanvas(evt) {
     };
 }
 
+// Dispatches to the active renderer's own hit-testing. buttonAt/deckCardAt
+// simply have no mobile equivalent yet (Strike/Raise and deck-card taps are
+// a later phase - see the approved mobile plan), so they're just inert on
+// a mobile board rather than a missing feature to route somewhere.
+function currentColRowFromPoint(x, y) {
+    return isMobileBoardActive() ? colRowFromPointMobile(x, y, mobileCell) : colRowFromPoint(x, y);
+}
+function currentButtonAt(x, y) {
+    return isMobileBoardActive() ? null : buttonAt(x, y);
+}
+function currentDeckCardAt(x, y) {
+    return isMobileBoardActive() ? null : deckCardAt(x, y);
+}
+
 // ---- rendering ------------------------------------------------------------
 
 function drawCanvas() {
     const s = activeState();
     if (!s) return;
+    updateNamesClocksOrder();
     const browsing = isBrowsingHistory();
-    drawScreen(ctx, s, {
+    const ui = {
         selected: browsing ? null : selected,
         legalDestinations: browsing ? [] : legalDestinations,
         lastMoveSquares: browsing ? historyLastMoveSquares(viewIndex) : lastMoveSquares,
@@ -1050,7 +1260,25 @@ function drawCanvas() {
         // for the prompt (not overridden by a higher-priority message
         // computeStatus already returns first, e.g. game-over/draw-offer).
         promptColor: (!browsing && !s.result && s.in_check) ? 'rgb(255, 0, 0)' : undefined,
-    });
+    };
+    // render-mobile.js only draws the board itself (no decks/graves - those
+    // are DOM, via renderMobilePanels below; Strike/Raise/the prompt are
+    // also DOM now, via positionMobileCastOverlay), so most of `ui` above
+    // is simply unused there for now; it still takes the same object so
+    // this call site doesn't need two different shapes.
+    if (isMobileBoardActive()) {
+        drawBoardMobile(ctx, s, ui, mobileCell);
+        renderMobilePanels(s, browsing ? [] : clickedCards);
+        positionMobileCastOverlay();
+        mobilePrompt.textContent = ui.promptText;
+        // Same idea as desktop's own committed-button styling (render.js's
+        // button-hover/pressed treatment) - shows which of the two is
+        // currently the active cast action, not just two static buttons.
+        mobileStrikeBtn.classList.toggle('active', ui.committedButton === 'strike');
+        mobileRaiseBtn.classList.toggle('active', ui.committedButton === 'raise');
+    } else {
+        drawScreen(ctx, s, ui);
+    }
     // The capture-ring/move-dot/clicked-card highlights (render.js) now
     // breathe with a wall-clock pulse - keep the rAF loop below alive
     // while any of them are actually on screen, or they'd freeze at
@@ -1081,7 +1309,7 @@ let lastPulseFrameTime = 0;
 function animationTick(now) {
     const pulsingHighlights = !isBrowsingHistory()
         && (selected || legalDestinations.length || castDestinations.length || clickedCards.length);
-    const activeEffect = isLightningActive() || isHourglassActive();
+    const activeEffect = isLightningActive() || isLightningActiveMobile() || isHourglassActive();
     if (activeEffect || pulsingHighlights) {
         if (activeEffect || now - lastPulseFrameTime >= PULSE_FRAME_INTERVAL_MS) {
             drawCanvas();
@@ -1131,9 +1359,11 @@ function updateGameActionButtons() {
     const isHumanVsHuman = state.ai_color === null;
 
     // An AI game never has Offer Draw competing for room (there's no one
-    // for the AI to negotiate with), so Resign lives in the quick row next
-    // to Abort there. Human-vs-human needs more horizontal space for the
-    // draw-offer UI, so Resign moves down into gameActions with it instead.
+    // for the AI to negotiate with), so Resign lives next to Abort in
+    // #quickActions there. Human-vs-human moves Resign into #gameActions
+    // instead, alongside the draw-offer buttons - both #quickActions and
+    // #gameActions sit in the same row of #belowBoard either way, this
+    // only changes which of the two groups Resign visually sits with.
     const resignHome = isHumanVsHuman ? gameActions : quickActions;
     if (resignBtn.parentElement !== resignHome) {
         resignHome.insertBefore(resignBtn, resignHome.firstChild);
@@ -1179,6 +1409,85 @@ function updateChatPanel() {
     const show = Boolean(state) && state.ai_color === null && Boolean(humanColor());
     chatPanel.hidden = !show;
 }
+
+// Unlike chat, the Moves list is useful for a vs-AI game too (reviewing
+// your own game against the AI is just as valid as reviewing a human-vs-
+// human one) - shown for any game the viewer is actually playing.
+function updateMovesPanel() {
+    const show = Boolean(state) && Boolean(humanColor());
+    movesPanel.hidden = !show;
+    if (!show) {
+        movesOpen = false;
+        movesListEl.hidden = true;
+        moveLabels = null;
+        moveLabelsForLength = -1;
+    }
+}
+
+function renderMovesList() {
+    movesListEl.innerHTML = '';
+    if (!moveLabels || moveLabels.length === 0) {
+        const empty = document.createElement('div');
+        empty.id = 'movesEmpty';
+        empty.textContent = 'No moves yet.';
+        movesListEl.appendChild(empty);
+        return;
+    }
+    // The ply currently on screen: whatever's being browsed (viewIndex),
+    // or the live position otherwise - matches goToHistory's own index
+    // convention (0 = start, history.length = live).
+    const currentPly = viewIndex === null ? (state ? state.history.length : moveLabels.length) : viewIndex;
+    for (let i = 0; i < moveLabels.length; i += 2) {
+        const numEl = document.createElement('span');
+        numEl.className = 'moveNum';
+        numEl.textContent = `${i / 2 + 1}.`;
+        movesListEl.appendChild(numEl);
+        movesListEl.appendChild(makeMoveCell(moveLabels[i], i + 1, currentPly));
+        if (i + 1 < moveLabels.length) {
+            movesListEl.appendChild(makeMoveCell(moveLabels[i + 1], i + 2, currentPly));
+        } else {
+            movesListEl.appendChild(document.createElement('span')); // black hasn't moved yet this pair
+        }
+    }
+}
+
+function makeMoveCell(label, plyAfterThisMove, currentPly) {
+    const el = document.createElement('span');
+    el.className = plyAfterThisMove === currentPly ? 'moveEntry active' : 'moveEntry';
+    el.textContent = label;
+    el.addEventListener('click', () => goToHistory(plyAfterThisMove));
+    return el;
+}
+
+// Only actually fetches while the dropdown is open (see server/app.py's
+// /moves endpoint comment - it replays the whole game on every call, so
+// there's no reason to pay for that on every few-second poll when the
+// panel is collapsed), and only when history has actually grown since
+// the last fetch.
+async function refreshMovesIfOpen() {
+    if (!movesOpen || !state || !gameId) return;
+    if (moveLabelsForLength === state.history.length) return;
+    const fetchingGameId = gameId;
+    const fetchingLength = state.history.length;
+    try {
+        const res = await api.moves(fetchingGameId);
+        if (gameId !== fetchingGameId) return; // a different game loaded meanwhile
+        moveLabels = res.moves;
+        moveLabelsForLength = fetchingLength;
+        renderMovesList();
+    } catch (e) {
+        // Non-critical - leave whatever was already shown rather than
+        // clobbering the main status line for a side panel's own fetch.
+    }
+}
+
+movesToggleBtn.addEventListener('click', () => {
+    movesOpen = !movesOpen;
+    movesListEl.hidden = !movesOpen;
+    movesToggleBtn.setAttribute('aria-expanded', String(movesOpen));
+    movesToggleArrow.textContent = movesOpen ? '▴' : '▾';
+    if (movesOpen) refreshMovesIfOpen();
+});
 
 async function sendChatMessage() {
     const text = chatInput.value.trim();
@@ -1231,6 +1540,21 @@ function formatClock(ms) {
     const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
     const seconds = String(totalSeconds % 60).padStart(2, '0');
     return hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+// Player names + clocks stay on the same physical side as that color's
+// graveyard (render.js's screenSide() convention: unflipped puts black's
+// stuff on the left, white's on the right) - checked on every draw (cheap
+// style writes) via drawCanvas() rather than only when the Flip Board
+// button is clicked, so it can never drift out of sync regardless of what
+// triggered the redraw.
+function updateNamesClocksOrder() {
+    const blackOrder = isFlipped() ? 2 : 1;
+    const whiteOrder = isFlipped() ? 1 : 2;
+    blackPlayerSlot.style.order = blackOrder;
+    whitePlayerSlot.style.order = whiteOrder;
+    blackClockEl.style.order = blackOrder;
+    whiteClockEl.style.order = whiteOrder;
 }
 
 function updateClocks() {
@@ -1368,6 +1692,8 @@ function renderAll() {
     updateHistoryButtons();
     updateGameActionButtons();
     updateChatPanel();
+    updateMovesPanel();
+    refreshMovesIfOpen(); // no-op unless the dropdown is open AND history actually grew
     updateClocks();
     if (gameId !== playerLabelsForGameId) {
         playerLabelsForGameId = gameId;
@@ -1383,6 +1709,7 @@ async function afterStateUpdate(notation, casterColor, captured) {
     const castKind = castKindFromNotation(notation);
     if (castKind && casterColor && effectsEnabled) {
         triggerLightning(casterColor);
+        triggerLightningMobile(casterColor, mobileCell);
         playCastSound(castKind);
         ensureAnimationLoop();
     }
@@ -1472,12 +1799,12 @@ async function startNewGame() {
 canvas.addEventListener('mousemove', (evt) => {
     if (!state || isBrowsingHistory()) return;
     const { x, y } = pageToCanvas(evt);
-    const newHoverButton = buttonAt(x, y);
-    let newHoverSquare = newHoverButton ? null : colRowFromPoint(x, y);
+    const newHoverButton = currentButtonAt(x, y);
+    let newHoverSquare = newHoverButton ? null : currentColRowFromPoint(x, y);
     if (newHoverSquare && !isPlayableSquare(newHoverSquare.col, newHoverSquare.row)) {
         newHoverSquare = null;
     }
-    const newHoverDeckCard = (newHoverButton || newHoverSquare) ? null : deckCardAt(x, y);
+    const newHoverDeckCard = (newHoverButton || newHoverSquare) ? null : currentDeckCardAt(x, y);
 
     if (newHoverButton !== hoverButton || !squaresEqual(newHoverSquare, hoverSquare) ||
         !deckCardsEqual(newHoverDeckCard, hoverDeckCard)) {
@@ -1497,37 +1824,128 @@ canvas.addEventListener('mouseleave', () => {
     }
 });
 
+// Shared by the canvas click handler's own STRIKE/RAISE hit-test (desktop)
+// and #mobileStrikeBtn/#mobileRaiseBtn (mobile - real DOM buttons instead
+// of a canvas hit-rect, since currentButtonAt() is deliberately a no-op in
+// mobile mode).
+async function handleCastButtonTap(button) {
+    if (!state || isBrowsingHistory()) return;
+    if (busy || isGameOver(state) || state.next_player !== humanColor()) return;
+    if (committedButton === button) {
+        cancelCasting();
+    } else {
+        await commitCastButton(button);
+    }
+}
+
+// Shared by the canvas click handler's own deck-card hit-test (desktop) and
+// each .mobileDeckCard's own click listener (mobile-panels.js, via
+// setDeckCardTapHandler below) - currentDeckCardAt() is deliberately a
+// no-op in mobile mode since the deck isn't drawn on the canvas there.
+function handleDeckCardTap(deckCard) {
+    if (!state || isBrowsingHistory()) return;
+    if (busy || isGameOver(state) || state.next_player !== humanColor()) return;
+    if (deckCard.color !== humanColor()) return; // not your deck
+    const deckArray = deckCard.color === 'black' ? state.black_deck : state.white_deck;
+    if (deckArray[deckCard.rank]) return; // already used
+    if (!jackHouseOccupiedBy(state, deckCard.color)) return; // not eligible to cast yet
+    toggleClickedCard({ source: 'deck', color: deckCard.color, rank: deckCard.rank });
+}
+setDeckCardTapHandler(handleDeckCardTap);
+
+const mobileStrikeBtn = document.getElementById('mobileStrikeBtn');
+const mobileRaiseBtn = document.getElementById('mobileRaiseBtn');
+const mobilePrompt = document.getElementById('mobilePrompt');
+mobileStrikeBtn.addEventListener('click', () => handleCastButtonTap('strike'));
+mobileRaiseBtn.addEventListener('click', () => handleCastButtonTap('raise'));
+
+// Strike/Raise/the prompt live over specific unplayable house-row squares -
+// bottom-left cluster (row ROWS-1) for casting, top-right cluster (row 0)
+// for the prompt - rather than desktop's on-canvas buttons/text, since
+// these need to be real tappable DOM here. Positioned in boardWrap-relative
+// pixels (canvas.offsetLeft/Top + cellRect()'s canvas-relative rect) so
+// they land exactly on top of those cells regardless of how wide the side
+// panels end up being on a given device.
+function positionMobileCastOverlay() {
+    const ox = canvas.offsetLeft;
+    const oy = canvas.offsetTop;
+    // Measured fresh from the canvas's own current rendered width, rather
+    // than trusting the mobileCell module variable - column-anchored
+    // pieces of this overlay (the prompt, at column 5) scale visibly with
+    // any mismatch between the two, while column-0-anchored ones (Strike/
+    // Raise) don't (multiplying by 0 hides it) - masking a stale-cell bug
+    // as "only the prompt is wrong" when it's really a shared value that's
+    // out of sync with what actually got drawn.
+    const cell = canvas.getBoundingClientRect().width / COLS;
+    // Deliberately NOT snapped to individual cell boundaries (cellRect()
+    // per-cell) - these treat the whole 5-cell cluster as one region and
+    // lay out a nicer rect within it (inset margin, a real gap between
+    // Strike/Raise, shorter than the full cell height), which reads much
+    // better than two edge-to-edge full-cell buttons ever did.
+    const inset = cell * 0.12;
+    const gap = cell * 0.15;
+
+    // Bottom-left cluster: row ROWS-1, cols 0-4.
+    const clusterBL = cellRect(0, ROWS - 1, cell);
+    const clusterWidth = cell * 5;
+    const btnHeight = cell * 0.55;
+    const btnTop = oy + clusterBL.y + (cell - btnHeight) / 2;
+    // Narrower than the full available half-width each (0.65x) - the pair,
+    // plus the gap between them, is then centered within the cluster
+    // rather than left-aligned, so shrinking them doesn't just leave dead
+    // space on the right.
+    const btnWidth = (clusterWidth - inset * 2 - gap) / 2 * 0.65;
+    const pairLeft = ox + clusterBL.x + inset + (clusterWidth - inset * 2 - (btnWidth * 2 + gap)) / 2;
+    const btnFontSize = Math.max(9, btnHeight * 0.45);
+    mobileStrikeBtn.style.left = `${pairLeft}px`;
+    mobileStrikeBtn.style.top = `${btnTop}px`;
+    mobileStrikeBtn.style.width = `${btnWidth}px`;
+    mobileStrikeBtn.style.height = `${btnHeight}px`;
+    mobileStrikeBtn.style.fontSize = `${btnFontSize}px`;
+    mobileRaiseBtn.style.left = `${pairLeft + btnWidth + gap}px`;
+    mobileRaiseBtn.style.top = `${btnTop}px`;
+    mobileRaiseBtn.style.width = `${btnWidth}px`;
+    mobileRaiseBtn.style.height = `${btnHeight}px`;
+    mobileRaiseBtn.style.fontSize = `${btnFontSize}px`;
+
+    // Top-right cluster: row 0, cols 5-9. Shifted right 30px and
+    // shortened 20px (net: right edge moves right 10px) per explicit ask.
+    const clusterTR = cellRect(5, 0, cell);
+    mobilePrompt.style.left = `${ox + clusterTR.x + inset + 28}px`;
+    mobilePrompt.style.top = `${oy + clusterTR.y + inset}px`;
+    mobilePrompt.style.width = `${clusterWidth - inset * 2 - 20}px`;
+    mobilePrompt.style.height = `${cell - inset * 2}px`;
+    // A fixed em size only ever happens to fit at one particular cell size
+    // - computeStatus() ranges from "White to move." up to a 62-character
+    // sentence, and this box is only ~5 cells wide, so the font has to
+    // scale with the actual available space (like render-mobile.js's own
+    // card-label text does) rather than assume one size fits every device.
+    // Tuned so the longest real message wraps onto 2 lines and fits both
+    // axes, not just picked to look right on one test screen.
+    mobilePrompt.style.fontSize = `${Math.max(9, cell * 0.28)}px`;
+}
+
 canvas.addEventListener('click', async (evt) => {
     if (!state || isBrowsingHistory()) return;
     const { x, y } = pageToCanvas(evt);
 
     // 1. STRIKE/RAISE button
-    const button = buttonAt(x, y);
+    const button = currentButtonAt(x, y);
     if (button) {
-        if (busy || isGameOver(state) || state.next_player !== humanColor()) return;
-        if (committedButton === button) {
-            cancelCasting();
-        } else {
-            await commitCastButton(button);
-        }
+        await handleCastButtonTap(button);
         return;
     }
 
     // 2. deck card - always the way a combo selection begins
-    const deckCard = deckCardAt(x, y);
+    const deckCard = currentDeckCardAt(x, y);
     if (deckCard) {
-        if (busy || isGameOver(state) || state.next_player !== humanColor()) return;
-        if (deckCard.color !== humanColor()) return; // not your deck
-        const deckArray = deckCard.color === 'black' ? state.black_deck : state.white_deck;
-        if (deckArray[deckCard.rank]) return; // already used
-        if (!jackHouseOccupiedBy(state, deckCard.color)) return; // not eligible to cast yet
-        toggleClickedCard({ source: 'deck', color: deckCard.color, rank: deckCard.rank });
+        handleDeckCardTap(deckCard);
         return;
     }
 
     if (busy || isGameOver(state) || state.next_player !== humanColor()) return;
 
-    const cr = colRowFromPoint(x, y);
+    const cr = currentColRowFromPoint(x, y);
     if (!cr) return;
     const { col, row } = cr;
 
@@ -1799,6 +2217,12 @@ async function pollActiveGame() {
     // otherwise never be noticed here at all.
     const hasNewResult = Boolean(fresh.result) && !state.result;
     const hasNewDrawOffer = fresh.draw_offered_by !== state.draw_offered_by;
+    // Specifically: I had a pending offer, and it's now cleared without the
+    // game ending in a draw - i.e. the opponent declined it (accepting
+    // instead ends the game via a 'draw_agreement' result, already surfaced
+    // by computeStatus's own s.result branch, which outranks any
+    // transientMessage anyway - see below).
+    const myOfferWasDeclined = state.draw_offered_by === humanColor() && !fresh.draw_offered_by && !fresh.result;
     if (!hasNewMove && !hasNewResult && !hasNewDrawOffer) {
         // Nothing changed in the game itself, but if we were showing
         // "Reconnecting..." until just now, that alone needs a redraw.
@@ -1811,6 +2235,15 @@ async function pollActiveGame() {
     const captured = newNotation !== undefined ? capturedByNotation(state.pieces, newNotation) : undefined;
     state = fresh;
     await afterStateUpdate(newNotation, moverColor, captured);
+    // afterStateUpdate() unconditionally clears transientMessage near its
+    // own start (matching its "cleared by the next real update" contract
+    // for the strike/raise "no eligible..." messages), so this has to be
+    // set after it returns, not before.
+    if (myOfferWasDeclined) {
+        const opponentColor = humanColor() === 'white' ? 'black' : 'white';
+        transientMessage = `${cap(opponentColor)} declined your draw offer.`;
+        drawCanvas();
+    }
 }
 
 setInterval(() => { if (currentProfile) refreshChallenges(); }, 5000);

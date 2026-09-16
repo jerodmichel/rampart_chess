@@ -18,6 +18,7 @@ const notifBtn = document.getElementById('notifBtn');
 const notifBadge = document.getElementById('notifBadge');
 const notifDropdown = document.getElementById('notifDropdown');
 const headerUserLabel = document.getElementById('headerUserLabel');
+const headerRatingText = document.getElementById('headerRatingText');
 const headerTrophyRow = document.getElementById('headerTrophyRow');
 const avatarMenuBtn = document.getElementById('avatarMenuBtn');
 const avatarMenuDropdown = document.getElementById('avatarMenuDropdown');
@@ -100,7 +101,12 @@ if (accountHeader) {
         headerUserLabel.textContent = '';
         const flag = flagNode(profile.country);
         if (flag) headerUserLabel.append(flag, ' ');
-        headerUserLabel.append(`${profile.username} (${profile.rating ?? 1200})`);
+        headerUserLabel.append(profile.username);
+        // Its own element (not just appended text) rather than part of
+        // headerUserLabel - on mobile this moves down to sit alongside
+        // the trophy row (see #headerMetaRow in index.html/style.css)
+        // instead of getting truncated away along with a long username.
+        headerRatingText.textContent = `(${profile.rating ?? 1200})`;
         await loadAvatar(profile.uid);
         await renderNotifications();
         await renderHeaderTrophies(profile.username);

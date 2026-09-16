@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Messages - RampartChess</title>
 <link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="style.css?v=37" />
 </head>
 <body>
 <header>
@@ -30,10 +30,18 @@
     </div>
     <div id="avatarMenu">
       <span id="headerUserLabel"></span>
-      <span id="headerTrophyRow" class="playerTrophyRow"></span>
+      <!-- Wrapper so rating+trophies can be repositioned as a unit on
+           mobile (see style.css) without affecting desktop, where this
+           stays `display:contents` - i.e. invisible as a grouping,
+           rating and trophy row behave exactly as if they were still
+           direct children of #avatarMenu. -->
+      <div id="headerMetaRow">
+        <span id="headerRatingText"></span>
+        <span id="headerTrophyRow" class="playerTrophyRow"></span>
+      </div>
       <button id="avatarMenuBtn" title="Account">
         <img id="headerAvatarImg" alt="Avatar" hidden>
-        <canvas id="headerAvatarCanvas" width="28" height="28" hidden></canvas>
+        <canvas id="headerAvatarCanvas" width="42" height="42" hidden></canvas>
       </button>
       <div id="avatarMenuDropdown" hidden>
         <a href="profile.html">Profile</a>

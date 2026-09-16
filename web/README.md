@@ -31,8 +31,15 @@ root, or you'll get a directory listing instead of the game):
 
 ```bash
 cd web
-python3 -m http.server 5500
+python3 serve_dev.py
 ```
+
+(a thin wrapper around `http.server` that adds `Cache-Control: no-store` to
+every response - plain `http.server` sends no cache header at all, which
+during mobile/real-device testing let the browser and/or Cloudflare cache a
+stale style.css or JS module for a long time after a real fix landed; use
+`python3 -m http.server 5500` directly only if you specifically need that
+default behavior back)
 
 Then open `http://localhost:5500` in a browser.
 

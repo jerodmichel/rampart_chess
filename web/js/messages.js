@@ -1,4 +1,4 @@
-import { api, setTokenProvider } from './api.js';
+import { api, setTokenProvider, apiErrorDetail } from './api.js';
 import { getIdToken, onAuthChange } from './firebase.js';
 import { initNavMenu } from './nav.js';
 
@@ -108,13 +108,21 @@ async function refreshFriends() {
 addFriendBtn.addEventListener('click', async () => {
     const username = addFriendInput.value.trim();
     if (!username) return;
+    // currentFriends is already loaded (refreshFriends() keeps it current) -
+    // checking it here catches the common case client-side with a clear
+    // message, rather than round-tripping to the server just to get back
+    // its 409 "you're already friends".
+    if (currentFriends.some((f) => f.username === username)) {
+        addFriendStatus.textContent = `You're already friends with ${username} - find them in the list below.`;
+        return;
+    }
     try {
         await api.sendFriendRequest(username);
         addFriendInput.value = '';
         addFriendStatus.textContent = '';
         await refreshFriends();
     } catch (e) {
-        addFriendStatus.textContent = e.message;
+        addFriendStatus.textContent = apiErrorDetail(e);
     }
 });
 addFriendInput.addEventListener('keydown', (evt) => {
@@ -126,7 +134,7 @@ async function respondToFriendRequest(requestId, accept) {
         await (accept ? api.acceptFriendRequest(requestId) : api.declineFriendRequest(requestId));
         await refreshFriends();
     } catch (e) {
-        addFriendStatus.textContent = e.message;
+        addFriendStatus.textContent = apiErrorDetail(e);
     }
 }
 
@@ -135,7 +143,7 @@ async function dismissFriendRequest(requestId) {
         await api.dismissFriendRequest(requestId);
         await refreshFriends();
     } catch (e) {
-        addFriendStatus.textContent = e.message;
+        addFriendStatus.textContent = apiErrorDetail(e);
     }
 }
 
@@ -145,7 +153,7 @@ async function removeFriend(username) {
         if (activeFriend === username) closeThread();
         await refreshFriends();
     } catch (e) {
-        addFriendStatus.textContent = e.message;
+        addFriendStatus.textContent = apiErrorDetail(e);
     }
 }
 
@@ -197,7 +205,7 @@ async function sendThreadMessage() {
         activeThreadMessages.push(await api.sendDirectMessage(activeFriend, text));
         renderThreadMessages();
     } catch (e) {
-        addFriendStatus.textContent = e.message;
+        addFriendStatus.textContent = apiErrorDetail(e);
     }
 }
 
@@ -228,7 +236,18 @@ async function loadMessagesPage() {
     signedIn = Boolean(token);
     signedOutMessage.hidden = signedIn;
     messagesPage.hidden = !signedIn;
-    if (signedIn) await refreshFriends();
+    if (!signedIn) return;
+    await refreshFriends();
+
+    // Supports the "Message" link on a friend's profile page
+    // (profile.html?user=X -> messages.html?user=X): jump straight into
+    // that thread instead of making them find the friend in the list
+    // again. Silently ignored if they're not actually a friend - the
+    // link is only ever shown once they are, but this stays safe either way.
+    const requestedUser = new URLSearchParams(window.location.search).get('user');
+    if (requestedUser && currentFriends.some((f) => f.username === requestedUser)) {
+        openThread(requestedUser);
+    }
 }
 
 onAuthChange(loadMessagesPage);

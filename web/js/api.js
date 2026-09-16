@@ -1,7 +1,27 @@
 // Thin wrapper around the server/ FastAPI backend. No game logic lives
 // here - every function is a direct call to one endpoint in server/app.py.
 
-const BASE_URL = window.RAMPART_API_BASE || 'http://localhost:8080';
+// Real-device testing (via the rampart-test Cloudflare Tunnel) serves the
+// page itself from test.rampartchess.com, where "localhost:8080" would mean
+// the TEST DEVICE's own loopback, not the dev machine actually running the
+// API - auto-detecting this hostname and pointing at the tunnel's separate
+// API subdomain avoids needing every test page to carry a manual
+// window.RAMPART_API_BASE override just for this one case.
+const BASE_URL = window.RAMPART_API_BASE || (
+    window.location.hostname === 'test.rampartchess.com'
+        ? 'https://test-api.rampartchess.com'
+        : 'http://localhost:8080'
+);
+
+// test-api.rampartchess.com is deliberately NOT behind Cloudflare Access
+// (unlike test.rampartchess.com) - it's a JSON API with nothing for a
+// search engine to meaningfully index, every sensitive endpoint already
+// requires a real Firebase auth token regardless, and gating it behind
+// Access broke CORS preflight (Access intercepted the browser's OPTIONS
+// preflight request and rejected it before this server's own CORSMiddleware
+// ever got a chance to handle it). The one residual concern (someone
+// finding this subdomain and viewing its API schema) is closed server-side
+// instead - see server/app.py's docs_url=None.
 
 // Registered once by main.js as firebase.js's getIdToken - called FRESH on
 // every request rather than caching a token string, since a Firebase ID
@@ -68,6 +88,16 @@ async function request(path, options) {
     return res.json();
 }
 
+// The above wraps every failure in a "PATH failed (status): <detail>"
+// string - callers that show e.message directly to the user (profile.js,
+// messages.js) want just <detail> instead of that request-shape boilerplate.
+// Lives here, not duplicated per-caller, since it's this module's own error
+// format being unwrapped.
+export function apiErrorDetail(e) {
+    const match = e.message.match(/^\/\S+ failed \(\d+\): (.+)$/);
+    return match ? match[1] : e.message;
+}
+
 export const api = {
     newGame(aiColor, aiDifficulty) {
         return request('/games', {
@@ -122,6 +152,14 @@ export const api = {
     // start, history.length = live) - never mutates the live game.
     historyAt(gameId, index) {
         return request(`/games/${gameId}/history/${index}`);
+    },
+
+    // The human-readable "Moves" list (server/game_session.py's
+    // display_history) - separate from getGame()/historyAt() since it's
+    // only needed while the Moves panel is actually open, not on every
+    // poll tick.
+    moves(gameId) {
+        return request(`/games/${gameId}/moves`);
     },
 
     // -- accounts (all require a signed-in user - see setTokenProvider) --

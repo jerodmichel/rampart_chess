@@ -31,18 +31,28 @@ TIME_CONTROLS = ("30min", "1hour", "1day_per_move")
 
 # How long a challenge can sit unanswered before it auto-expires, so
 # pending invites nobody responds to don't just pile up forever - the user
-# explicitly asked for a cap on this. 24 hours, independent of whatever
-# time_control the challenge itself proposes for the eventual game.
-CHALLENGE_EXPIRY_MS = 24 * 60 * 60 * 1000
+# explicitly asked for a cap on this. Originally a flat 24 hours regardless
+# of time_control; a 1day_per_move game is itself played at a pace of days,
+# so 24 hours to even ACCEPT the challenge was unreasonably tight compared
+# to the game's own tempo - that one now gets a week. 30min/1hour keep the
+# original 24 hours (a same-day answer is reasonable for a game that fast).
+CHALLENGE_EXPIRY_MS_BY_TIME_CONTROL = {
+    "30min": 24 * 60 * 60 * 1000,
+    "1hour": 24 * 60 * 60 * 1000,
+    "1day_per_move": 7 * 24 * 60 * 60 * 1000,
+}
+DEFAULT_CHALLENGE_EXPIRY_MS = 24 * 60 * 60 * 1000
 
 
 def _expire_if_stale(challenge_id: str, record: dict) -> dict:
-    """Lazily transitions a pending challenge past CHALLENGE_EXPIRY_MS to
-    'expired' - evaluated on read rather than a background job, same
-    lazy-eval pattern as GameSession._check_timeout for game clocks."""
+    """Lazily transitions a pending challenge past its expiry to 'expired' -
+    evaluated on read rather than a background job, same lazy-eval pattern
+    as GameSession._check_timeout for game clocks."""
     created_at = record.get("created_at")
+    expiry_ms = CHALLENGE_EXPIRY_MS_BY_TIME_CONTROL.get(
+        record.get("time_control"), DEFAULT_CHALLENGE_EXPIRY_MS)
     if (record.get("status") == "pending" and created_at is not None
-            and int(time.time() * 1000) - created_at > CHALLENGE_EXPIRY_MS):
+            and int(time.time() * 1000) - created_at > expiry_ms):
         db.reference(f"challenges/{challenge_id}").update({"status": "expired"})
         record = {**record, "status": "expired"}
     return record

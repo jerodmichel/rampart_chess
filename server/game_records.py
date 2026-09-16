@@ -29,7 +29,21 @@ interrupted game is still visible up to whatever point it reached, not
 silently lost.
 """
 
+import logging
+import time
+
 from firebase_admin import db
+
+logger = logging.getLogger(__name__)
+
+# A move has already succeeded and mutated the live in-memory GameSession
+# by the time save_game_record is ever called (see app.py's move
+# endpoints) - this is a best-effort durability step after the fact, not
+# part of validating or applying the move itself. So a transient failure
+# here (a network blip talking to Firebase) gets a few quick retries
+# rather than immediately giving up.
+_SAVE_RETRY_ATTEMPTS = 3
+_SAVE_RETRY_BACKOFF_SECONDS = 0.25  # doubles each retry: 0.25s, then 0.5s
 
 
 def save_game_record(session, white_username: str = None, black_username: str = None,
@@ -38,11 +52,19 @@ def save_game_record(session, white_username: str = None, black_username: str = 
     creation (app.py's accept_challenge/new_game already have them) and,
     like created_at, never overwritten on later calls - a profile's game
     ledger shows the name/difficulty from when the game was played, not a
-    live-updated one, matching how lichess/chess.com history works."""
+    live-updated one, matching how lichess/chess.com history works.
+
+    Never raises, even if every retry attempt fails: the caller's move
+    already succeeded in memory before this was ever called, so surfacing
+    a persistence hiccup as an exception would incorrectly turn a
+    successful move into a client-facing error. A final failure is
+    logged instead - the live game is completely unaffected, but that
+    move (and everything after it, if the server then restarts before a
+    LATER move's save succeeds) won't be recoverable via
+    GameSession.rehydrate until persistence catches up again."""
     if session.white_uid is None and session.black_uid is None:
         return  # fully anonymous - no account on either side to attach to
 
-    ref = db.reference(f"game_records/{session.id}")
     record = {
         "id": session.id,
         "white_uid": session.white_uid,
@@ -68,27 +90,52 @@ def save_game_record(session, white_username: str = None, black_username: str = 
         # made yet) omits the key entirely, same as "result" above.
         "last_move_at": session.clock_running_since_ms,
         "draw_offered_by": session.draw_offered_by,
+        # Needed on top of last_move_at for a "pool" time control
+        # (30min/1hour), which - unlike "per_move" - actually accumulates/
+        # depletes across moves rather than always resetting to the full
+        # period. GameSession.rehydrate's replay can't reconstruct this on
+        # its own (replay happens in a tight loop with no real elapsed
+        # time between moves), so the real banked amount as of the last
+        # move has to be persisted and restored directly instead.
+        # Harmless to also persist/restore for "per_move" or an untimed
+        # game - it's just always the fixed full period there already.
+        "white_remaining_ms": session.white_remaining_ms,
+        "black_remaining_ms": session.black_remaining_ms,
     }
-    if ref.get() is None:
-        record["created_at"] = {".sv": "timestamp"}
-        if white_username is not None:
-            record["white_username"] = white_username
-        if black_username is not None:
-            record["black_username"] = black_username
-        if ai_difficulty is not None:
-            record["ai_difficulty"] = ai_difficulty
-    # update() merges rather than replaces the node, so created_at/the
-    # usernames/difficulty (only ever included on the first save) are left
-    # untouched on later ones.
-    ref.update(record)
+    for attempt in range(_SAVE_RETRY_ATTEMPTS):
+        try:
+            ref = db.reference(f"game_records/{session.id}")
+            if ref.get() is None:
+                record["created_at"] = {".sv": "timestamp"}
+                if white_username is not None:
+                    record["white_username"] = white_username
+                if black_username is not None:
+                    record["black_username"] = black_username
+                if ai_difficulty is not None:
+                    record["ai_difficulty"] = ai_difficulty
+            # update() merges rather than replaces the node, so created_at/
+            # the usernames/difficulty (only ever included on the first
+            # save) are left untouched on later ones.
+            ref.update(record)
 
-    # Only fan out for a side that actually has an account - the AI's
-    # "color" in a vs-AI game has none, and there's no uid-less user_games
-    # bucket to write to.
-    if session.white_uid:
-        db.reference(f"user_games/{session.white_uid}/{session.id}").set(True)
-    if session.black_uid:
-        db.reference(f"user_games/{session.black_uid}/{session.id}").set(True)
+            # Only fan out for a side that actually has an account - the
+            # AI's "color" in a vs-AI game has none, and there's no
+            # uid-less user_games bucket to write to.
+            if session.white_uid:
+                db.reference(f"user_games/{session.white_uid}/{session.id}").set(True)
+            if session.black_uid:
+                db.reference(f"user_games/{session.black_uid}/{session.id}").set(True)
+            return
+        except Exception:
+            if attempt == _SAVE_RETRY_ATTEMPTS - 1:
+                logger.exception(
+                    "save_game_record failed after %d attempts for game %s - the "
+                    "move already succeeded in memory; this record will catch up "
+                    "on the next successful save",
+                    _SAVE_RETRY_ATTEMPTS, session.id,
+                )
+                return
+            time.sleep(_SAVE_RETRY_BACKOFF_SECONDS * (2 ** attempt))
 
 
 def get_game_record(game_id: str):

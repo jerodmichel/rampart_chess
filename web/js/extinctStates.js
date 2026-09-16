@@ -140,19 +140,29 @@ export const EXTINCT_STATES = [
 // (profile.js, main.js's board player labels) don't each re-implement the
 // "which list is this code from" check.
 
-// A flag as a DOM node - a text node for a real country (flagEmoji()'s
-// Unicode glyph) or an <img> for an extinct state. null if code is falsy
-// or unrecognized by either list.
+// A flag as a DOM node - a <span> carrying the Unicode glyph for a real
+// country (flagEmoji()) or an <img> for an extinct state - either way with
+// a `title` attribute so hovering it (mouse only, obviously - there's no
+// hover on a touch screen) shows the full state/country name, since the
+// flag alone doesn't always identify it at a glance. null if code is
+// falsy or unrecognized by either list.
 export function flagNode(code) {
     if (!code) return null;
     const emoji = flagEmoji(code);
-    if (emoji) return document.createTextNode(emoji);
+    if (emoji) {
+        const span = document.createElement('span');
+        span.className = 'flagIcon';
+        span.textContent = emoji;
+        span.title = stateName(code) ?? '';
+        return span;
+    }
     const extinct = EXTINCT_STATES.find((s) => s.code === code);
     if (!extinct) return null;
     const img = document.createElement('img');
     img.src = extinct.flag;
     img.alt = extinct.name;
-    img.className = 'extinctFlagIcon';
+    img.title = extinct.name;
+    img.className = 'extinctFlagIcon flagIcon';
     return img;
 }
 

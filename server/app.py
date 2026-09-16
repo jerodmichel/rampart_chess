@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -24,13 +24,27 @@ import challenges
 import friends
 import game_records
 import messages
+import notifications
 import ratings
 from firebase_auth import get_current_uid, get_optional_uid
 from game_session import GameSession, IllegalMoveError, ReplayOnlyGame
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Rampart API")
+# test-api.rampartchess.com (the rampart-test Cloudflare Tunnel, used for
+# real-device testing) is deliberately NOT behind Cloudflare Access - see
+# api.js's own comment for why (Access broke CORS preflight). Since this
+# same server process backs that public tunnel, its auto-generated API
+# docs (full schema of every endpoint) would otherwise be reachable by
+# anyone who finds the subdomain - closing that off with one env var rather
+# than losing the (genuinely useful for local dev) docs page permanently.
+_DOCS_DISABLED = os.environ.get("DISABLE_API_DOCS", "").lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="Rampart API",
+    docs_url=None if _DOCS_DISABLED else "/docs",
+    redoc_url=None if _DOCS_DISABLED else "/redoc",
+    openapi_url=None if _DOCS_DISABLED else "/openapi.json",
+)
 
 # Was allow_origins=["*"] - fine while this only ever talked to a
 # same-machine dev server, not once real strangers can reach it. No real
@@ -304,10 +318,20 @@ class ChallengeRequest(BaseModel):
 
 @app.post("/challenges")
 @limiter.limit("10/minute")
-def create_challenge(request: Request, req: ChallengeRequest, uid: str = Depends(get_current_uid)):
+def create_challenge(
+    request: Request, req: ChallengeRequest, background_tasks: BackgroundTasks,
+    uid: str = Depends(get_current_uid),
+):
     profile = accounts.get_profile(uid)
-    return challenges.create_challenge(
+    record = challenges.create_challenge(
         uid, profile["username"], req.to_username, req.color, req.time_control)
+    # BackgroundTasks: runs after the response is sent, so a slow/failed
+    # email send never delays the challenger's own request - see
+    # notifications.py's own best-effort/never-raises contract for what
+    # happens if it fails outright.
+    background_tasks.add_task(
+        notifications.notify_challenge, record["to_uid"], profile["username"], req.time_control)
+    return record
 
 
 @app.get("/challenges/incoming")
@@ -468,6 +492,18 @@ def history_at(game_id: str, index: int):
         return view.state_at(index)
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/games/{game_id}/moves")
+def moves(game_id: str):
+    """The human-readable "Moves" list (see GameSession.display_history) -
+    a deliberately separate endpoint from GET /games/{game_id}, not part
+    of to_dict(), since it's only needed when the Moves panel is actually
+    open, not on every few-second poll. Works the same whether the game
+    is still live in memory or only survives as a persisted record (see
+    get_view)."""
+    view = get_view(game_id)
+    return {"moves": view.display_history()}
 
 
 @app.get("/profile/games")
