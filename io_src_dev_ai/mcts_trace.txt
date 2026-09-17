@@ -5230,3 +5230,24 @@
 [01:33:01] [AI EXEC] Moving from (3,2) to (4,3)
 [01:33:24] [AI EXEC] Moving from (4,3) to (5,4)
 [01:33:36] [AI EXEC] Moving from (5,4) to (6,5)
+[01:06:57] === MAIN.PY LOADED ===
+[01:07:12] === MAIN.PY LOADED ===
+[01:07:12] [AI EXEC] Moving from (6,3) to (5,3)
+[01:07:21] === MAIN.PY LOADED ===
+[01:07:21] [AI EXEC] Moving from (6,6) to (5,6)
+[01:07:30] === MAIN.PY LOADED ===
+[01:07:30] [AI EXEC] Moving from (6,3) to (5,2)
+[01:08:04] === MAIN.PY LOADED ===
+[01:08:04] [AI EXEC] Moving from (6,3) to (5,2)
+[01:09:19] === MAIN.PY LOADED ===
+[01:09:19] [AI EXEC] Moving from (6,3) to (5,2)
+[01:09:19] [AI EXEC] Moving from (2,1) to (3,3)
+[01:17:48] === MAIN.PY LOADED ===
+[01:17:55] [ILLEGAL MOVE] white raider (6,3)->(6,3)
+  Valid moves: [(7, 2), (6, 2), (5, 4), (5, 3), (5, 2)]
+[01:17:58] [AI EXEC] Moving from (2,1) to (3,3)
+[01:18:01] [ILLEGAL MOVE] white raider (7,3)->(7,3)
+  Valid moves: [(8, 2), (7, 2), (6, 3), (6, 2)]
+[01:18:08] [AI EXEC] Moving from (3,2) to (4,3)
+[01:18:19] [AI EXEC] Moving from (4,3) to (5,3)
+[01:18:26] [AI EXEC] Moving from (2,2) to (2,3)

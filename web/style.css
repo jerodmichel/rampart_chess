@@ -593,6 +593,19 @@ button:disabled { opacity: 0.5; cursor: default; }
     font-size: 0.95em;
 }
 
+/* PC only (mouse + hover, not a touchscreen) - names/avatars were too small
+   to read comfortably here; leave phone's sizing above untouched. */
+@media (hover: hover) and (pointer: fine) {
+    .playerAvatarWrap img, .playerAvatarWrap canvas {
+        width: 32px;   /* radius 12px -> 16px */
+        height: 32px;
+    }
+
+    .playerNameText {
+        font-size: 1.1em;
+    }
+}
+
 .playerTrophyRow {
     display: flex;
     gap: 4px;
@@ -1600,13 +1613,17 @@ a.ledgerOpponent:hover {
         border: 1px solid var(--panel-border);
         color: var(--text);
     }
-
-    /* Already fullscreen - no need to offer the button again. */
-    #boardWrap:fullscreen #mobileFullscreenBtn {
+    /* Already fullscreen - no need to offer the button again. Matches
+       both real fullscreen and the .fakeFullscreen fallback (mobile.js)
+       used where the Fullscreen API itself isn't available at all
+       (notably iPhone Safari - it only ever supported this API for
+       <video>, on any iOS version - see mobile.js's own comment). */
+    #boardWrap:fullscreen #mobileFullscreenBtn,
+    #boardWrap.fakeFullscreen #mobileFullscreenBtn {
         display: none;
     }
-
-    #boardWrap:fullscreen #mobileExitFullscreenBtn {
+    #boardWrap:fullscreen #mobileExitFullscreenBtn,
+    #boardWrap.fakeFullscreen #mobileExitFullscreenBtn {
         display: flex;
         position: absolute;
         left: 12px;
@@ -1621,11 +1638,11 @@ a.ledgerOpponent:hover {
         border: 1px solid var(--panel-border);
         color: var(--text);
     }
-
     /* Small branding badge, top-right - the real header (with its full-
        size logo/title) isn't part of the fullscreen top-layer at all, so
        without this the board view would show no branding whatsoever. */
-    #boardWrap:fullscreen #mobileTitleBadge {
+    #boardWrap:fullscreen #mobileTitleBadge,
+    #boardWrap.fakeFullscreen #mobileTitleBadge {
         display: flex;
         position: absolute;
         right: 12px;
@@ -1637,11 +1654,11 @@ a.ledgerOpponent:hover {
         color: var(--text);
         font-family: 'Cinzel Web', Georgia, serif;
     }
-    #boardWrap:fullscreen #mobileTitleBadge img {
+    #boardWrap:fullscreen #mobileTitleBadge img,
+    #boardWrap.fakeFullscreen #mobileTitleBadge img {
         width: 18px;
         height: 18px;
     }
-
     /* Strike/Raise/prompt: main.js's positionMobileCastOverlay() sets the
        actual left/top/width/height on each of these directly (matching
        specific unplayable-square pixel rects from render-mobile.js's own
@@ -1653,8 +1670,11 @@ a.ledgerOpponent:hover {
        squares rather than snapped to individual cell boundaries - compare
        cellRect() usage elsewhere, which these deliberately don't use raw. */
     #boardWrap:fullscreen #mobileStrikeBtn,
+    #boardWrap.fakeFullscreen #mobileStrikeBtn,
     #boardWrap:fullscreen #mobileRaiseBtn,
-    #boardWrap:fullscreen #mobilePrompt {
+    #boardWrap.fakeFullscreen #mobileRaiseBtn,
+    #boardWrap:fullscreen #mobilePrompt,
+    #boardWrap.fakeFullscreen #mobilePrompt {
         display: flex;
         position: absolute;
         z-index: 40;
@@ -1663,11 +1683,26 @@ a.ledgerOpponent:hover {
         font-size: 0.95em;
         color: var(--text);
     }
+    /* A few px lower specifically on the .fakeFullscreen path (iPhone,
+       where the real Fullscreen API isn't available at all - see
+       mobile.js). A pure visual transform - unlike the plain JS offset
+       tried before (which somehow made the whole board balloon in size,
+       for a reason not yet understood), this can't feed back into any
+       canvas-size measurement since it never changes what
+       getBoundingClientRect() reports for layout purposes, only where the
+       element paints. Real fullscreen (Android) is untouched. */
+    #boardWrap.fakeFullscreen #mobileStrikeBtn,
+    #boardWrap.fakeFullscreen #mobileRaiseBtn,
+    #boardWrap.fakeFullscreen #mobilePrompt {
+        transform: translate(-7px, 7px);
+    }
     /* Strike/Raise keep their original rounded shape - lightened a step
        past var(--panel) (the same lighter olive used for ordinary
        dropdowns), and always kept lighter than #mobilePrompt below. */
     #boardWrap:fullscreen #mobileStrikeBtn,
-    #boardWrap:fullscreen #mobileRaiseBtn {
+    #boardWrap.fakeFullscreen #mobileStrikeBtn,
+    #boardWrap:fullscreen #mobileRaiseBtn,
+    #boardWrap.fakeFullscreen #mobileRaiseBtn {
         justify-content: center;
         text-align: center;
         white-space: nowrap;
@@ -1686,10 +1721,11 @@ a.ledgerOpponent:hover {
     /* Console-panel look: sharp corners, and left-justified text with a
        little padding after the left edge instead of centered. Lightened a
        step from its original near-black, but stays deliberately darker
-       than the Strike/Raise buttons above (rgb(58,60,48)) regardless of
+       than the Strike/Raise buttons above (rgb(88,91,73)) regardless of
        any further tweak to either - that contrast is the point of the
        "console" look. */
-    #boardWrap:fullscreen #mobilePrompt {
+    #boardWrap:fullscreen #mobilePrompt,
+    #boardWrap.fakeFullscreen #mobilePrompt {
         justify-content: flex-start;
         text-align: left;
         padding-left: 10px;
@@ -1702,7 +1738,9 @@ a.ledgerOpponent:hover {
        pressed/active button styling, so tapping Strike/Raise gives visible
        feedback instead of two buttons that always look identical. */
     #boardWrap:fullscreen #mobileStrikeBtn.active,
-    #boardWrap:fullscreen #mobileRaiseBtn.active {
+    #boardWrap.fakeFullscreen #mobileStrikeBtn.active,
+    #boardWrap:fullscreen #mobileRaiseBtn.active,
+    #boardWrap.fakeFullscreen #mobileRaiseBtn.active {
         background: rgb(159, 43, 104);
         border-color: rgb(159, 43, 104);
         color: #fff;
@@ -1716,7 +1754,8 @@ a.ledgerOpponent:hover {
        for the longest real message instead of a static em guess that
        would only happen to work at one particular cell size). overflow
        stays hidden as a last-resort clamp only. */
-    #boardWrap:fullscreen #mobilePrompt {
+    #boardWrap:fullscreen #mobilePrompt,
+    #boardWrap.fakeFullscreen #mobilePrompt {
         white-space: normal;
         line-height: 1.15;
         overflow: hidden;
@@ -1725,9 +1764,13 @@ a.ledgerOpponent:hover {
     /* Fullscreen was requested but the device is still portrait - only
        reachable on a platform without orientation-lock support (iOS
        Safari), since elsewhere the lock already forces landscape the
-       instant fullscreen is entered. */
+       instant fullscreen is entered. Applies to the .fakeFullscreen
+       fallback too - there's no orientation-lock attempt at all in that
+       path (mobile.js), so this rotate prompt is the PRIMARY way (not
+       just a rare edge case) a fake-fullscreen player gets into landscape. */
     @media (orientation: portrait) {
-        #boardWrap:fullscreen #mobileRotateOverlay {
+        #boardWrap:fullscreen #mobileRotateOverlay,
+        #boardWrap.fakeFullscreen #mobileRotateOverlay {
             display: flex;
             position: fixed;
             inset: 0;
@@ -2033,7 +2076,8 @@ a.ledgerOpponent:hover {
        inside the fullscreen view instead of being clipped or fighting the
        outer document for scroll. */
     @media (orientation: landscape) {
-        #boardWrap:fullscreen {
+        #boardWrap:fullscreen,
+        #boardWrap.fakeFullscreen {
             width: 100vw;
             max-width: 100vw;
             height: 100vh;
@@ -2043,7 +2087,27 @@ a.ledgerOpponent:hover {
             flex-direction: column;
             align-items: center;
         }
-
+        /* Real Fullscreen API elements are automatically pulled out of
+           normal document flow and pinned to the viewport by the browser
+           itself (the whole point of the "top layer" fullscreen puts an
+           element in) - .fakeFullscreen never gets that for free since
+           it's just an ordinary class, so without this #boardWrap would
+           still sit wherever it naturally falls in the page (below the
+           header, etc.) instead of at the true top of the screen, which
+           throws off everything positioned relative to it (Strike/Raise/
+           the console, all measured from the canvas's own on-page
+           offset). */
+        #boardWrap.fakeFullscreen {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            /* Real :fullscreen elements paint opaque by default (the "top
+               layer" replaces the rest of the page entirely) - this is
+               still an ordinary element in normal paint order, so without
+               an explicit background whatever sits behind it on the page
+               shows straight through. */
+            background: var(--bg);
+        }
         /* The canvas is a fixed pixel size (main.js sets it directly - see
            syncMobileCanvasResolution), so a plain block row would leave it
            hugging the left edge with the leftover width (the board is
@@ -2053,7 +2117,7 @@ a.ledgerOpponent:hover {
            centered as a natural side effect - no separate centering rule
            needed on the canvas itself. */
         /* align-items:stretch (the default - listed explicitly since it's
-           load-bearing) is what gives the side panels a real, DEFINITE
+           load-bearing) is what gives the side panels a real, definite
            height matching the canvas's own explicit pixel height. Without
            it (this used to be flex-start), .mobileGravePanel's own
            height:100% had no definite parent height to resolve against and
@@ -2061,7 +2125,8 @@ a.ledgerOpponent:hover {
            regardless of the canvas, which is why the deck list had no
            real height budget to divide 13 cards into and ran past the
            bottom of the screen instead of ever being constrained to fit. */
-        #boardWrap:fullscreen #mobileBoardRow {
+        #boardWrap:fullscreen #mobileBoardRow,
+        #boardWrap.fakeFullscreen #mobileBoardRow {
             display: flex;
             align-items: stretch;
             width: 100%;
@@ -2074,7 +2139,8 @@ a.ledgerOpponent:hover {
            "outermost" flips depending on which side of the board this is -
            row-reverse on the left panel is what achieves that without
            needing to actually reorder the DOM per side. */
-        #boardWrap:fullscreen .mobileGravePanel {
+        #boardWrap:fullscreen .mobileGravePanel,
+        #boardWrap.fakeFullscreen .mobileGravePanel {
             display: flex;
             flex: 1;
             align-items: center;
@@ -2084,13 +2150,16 @@ a.ledgerOpponent:hover {
             min-width: 0;
             overflow: hidden;
         }
-        #boardWrap:fullscreen #mobileSideLeft {
+        #boardWrap:fullscreen #mobileSideLeft,
+        #boardWrap.fakeFullscreen #mobileSideLeft {
             flex-direction: row-reverse;
         }
-        #boardWrap:fullscreen #mobileSideRight {
+        #boardWrap:fullscreen #mobileSideRight,
+        #boardWrap.fakeFullscreen #mobileSideRight {
             flex-direction: row;
         }
-        #boardWrap:fullscreen .mobileDeckList {
+        #boardWrap:fullscreen .mobileDeckList,
+        #boardWrap.fakeFullscreen .mobileDeckList {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -2118,7 +2187,8 @@ a.ledgerOpponent:hover {
            correctness for the theme most people will actually see by
            default against a theme most won't, rather than fitting neither
            particularly well. */
-        #boardWrap:fullscreen .mobileDeckCard {
+        #boardWrap:fullscreen .mobileDeckCard,
+        #boardWrap.fakeFullscreen .mobileDeckCard {
             flex: 1;
             min-height: 0;
             width: auto;
@@ -2130,7 +2200,8 @@ a.ledgerOpponent:hover {
            #mobileGraveBlack/White themselves since mobile-panels.js
            rebuilds THEIR innerHTML wholesale on every capture, which would
            wipe out an emblem placed directly inside them. */
-        #boardWrap:fullscreen .mobileGraveColumn {
+        #boardWrap:fullscreen .mobileGraveColumn,
+        #boardWrap.fakeFullscreen .mobileGraveColumn {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -2143,14 +2214,14 @@ a.ledgerOpponent:hover {
         /* Back to a plain vertical stack (not a wrapping grid) - now that
            it's a dedicated column beside (not sharing a row with) the
            deck, there's room for one straightforward file of slots. */
-        #boardWrap:fullscreen .mobileGraveGrid {
+        #boardWrap:fullscreen .mobileGraveGrid,
+        #boardWrap.fakeFullscreen .mobileGraveGrid {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 2px;
         }
-
-        /* #boardWrap:fullscreen's own align-items:center (above) sizes
+        /* This rule's own align-items:center (above) sizes
            EVERY direct child to its own content width by default, not the
            full 100vw. #playerNames/#clocks are deliberately NOT listed
            here - the board itself (not the full screen) is what they
@@ -2162,16 +2233,20 @@ a.ledgerOpponent:hover {
            reported broken yet, but they share the identical setup, so
            there's no reason to wait for each to surface separately. */
         #boardWrap:fullscreen #belowBoard,
+        #boardWrap.fakeFullscreen #belowBoard,
         #boardWrap:fullscreen #chatPanel,
+        #boardWrap.fakeFullscreen #chatPanel,
         #boardWrap:fullscreen #movesPanel,
-        #boardWrap:fullscreen #liveGamesPanel {
+        #boardWrap.fakeFullscreen #movesPanel,
+        #boardWrap:fullscreen #liveGamesPanel,
+        #boardWrap.fakeFullscreen #liveGamesPanel {
             width: 100%;
         }
     }
 }
 
-/* Hidden outside mobile board mode - see the #boardWrap:fullscreen rule
-   above for when these actually show. */
+/* Hidden outside mobile board mode - see the rules above for when these
+   actually show. */
 .mobileGravePanel {
     display: none;
 }

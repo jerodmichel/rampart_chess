@@ -5,6 +5,23 @@
 export const COLS = 10;
 export const ROWS = 6;
 
+// Flavor names for each AI difficulty level, shown as "Biff (Easy)" etc.
+// in place of a bare "Computer (Easy)" label wherever an AI opponent is
+// displayed.
+export const AI_OPPONENT_NAMES = { Easy: 'Biff', Medium: 'Cletus', Hard: 'Billy Ray' };
+export function aiOpponentName(difficulty) {
+    return AI_OPPONENT_NAMES[difficulty] || 'Computer';
+}
+
+export const AI_OPPONENT_AVATARS = {
+    Easy: 'assets/misc/biff.jpeg',
+    Medium: 'assets/misc/cletus.jpeg',
+    Hard: 'assets/misc/billy_ray.jpeg',
+};
+export function aiOpponentAvatar(difficulty) {
+    return AI_OPPONENT_AVATARS[difficulty] || null;
+}
+
 export const WIDTH = 800;   // board pixel width (matches const.py)
 export const HEIGHT = 800;  // board pixel height (matches const.py)
 

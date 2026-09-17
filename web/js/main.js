@@ -1,13 +1,14 @@
 import { api, setTokenProvider } from './api.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
+import { aiOpponentName, aiOpponentAvatar } from './constants.js';
 import {
     signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl,
     sendVerificationEmail, isEmailVerified, resetPassword,
 } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
 import { initNavMenu, setupDropdown } from './nav.js';
-import { enterMobileFullscreen, exitMobileFullscreen, onLayoutModeChange, isMobileBoardActive } from './mobile.js';
+import { enterMobileFullscreen, exitMobileFullscreen, onLayoutModeChange, isMobileBoardActive, isFakeFullscreenActive } from './mobile.js';
 import {
     computeCellSize, boardSize, drawBoardMobile, colRowFromPointMobile, cellRect,
     triggerLightningMobile, isLightningActiveMobile,
@@ -1601,10 +1602,31 @@ let playerLabelsForGameId = null;
 async function buildPlayerEntry(slot, username, isAiSide, difficulty) {
     slot.innerHTML = '';
     if (isAiSide) {
+        // Same row layout as the human side below (.playerNameLink's flex
+        // row) - just a <span>, not an <a>, since there's no profile to
+        // link to.
+        const row = document.createElement('span');
+        row.className = 'playerNameLink';
+
+        const avatarPath = aiOpponentAvatar(difficulty);
+        if (avatarPath) {
+            const avatarWrap = document.createElement('span');
+            avatarWrap.className = 'playerAvatarWrap';
+            const img = document.createElement('img');
+            img.src = avatarPath;
+            img.alt = '';
+            avatarWrap.appendChild(img);
+            row.appendChild(avatarWrap);
+        }
+
         const span = document.createElement('span');
         span.className = 'playerNameText';
-        span.textContent = difficulty ? `Computer (${difficulty})` : 'Computer';
-        slot.appendChild(span);
+        const flag = flagNode('US');
+        if (flag) span.append(flag, ' ');
+        span.append(difficulty ? `${aiOpponentName(difficulty)} (${difficulty})` : 'Computer');
+        row.appendChild(span);
+
+        slot.appendChild(row);
         return true;
     }
     if (!username) return false;

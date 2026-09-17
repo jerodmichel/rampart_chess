@@ -9,6 +9,7 @@ that main.py's Main class already has, minus anything UI-only.
 """
 
 import os
+import random
 import re
 import sys
 import time
@@ -24,12 +25,46 @@ from move import Move
 from cast_move import Cast_move
 from piece import Raider, Queen
 from rampartbitboard import RampartBitboard
-from ai_engine import NegamaxEngine
+from ai_engine import NegamaxEngine, RampartAttackGenerator
 from const import RANKS, SUITS
 
 
 class IllegalMoveError(Exception):
     pass
+
+
+# A few known-reasonable opening moves for the AI's very first move as
+# White ONLY (see request_ai_move) - the search itself (ai_engine.py) is
+# completely deterministic with no opening book of its own, so without
+# this the AI played the exact identical first move as White every single
+# game. Each tuple is (from_col, from_row, to_col, to_row), 0-indexed;
+# comments give the equivalent algebraic notation this repo already uses
+# elsewhere (Square.get_alpharow(5 - row) + str(col + 1), e.g. board.py's
+# own move-notation building) for anyone checking these against the board.
+AI_WHITE_OPENING_BOOK = [
+    (6, 3, 5, 2),  # 7c -> 6d
+    (7, 4, 6, 2),  # 8b -> 7d
+    (6, 3, 5, 3),  # 7c -> 6c
+    (7, 3, 7, 2),  # 8c -> 8d
+    (8, 3, 8, 2),  # 9c -> 9d
+]
+
+# Black's equivalent of the first 3 White book moves above, mirrored 180
+# degrees (col' = 9-col, row' = 5-row - a full rotation, not a simple
+# top/bottom flip; confirmed against board.py's own White/Black starting
+# layout, e.g. White's rook at (6,4) / Black's at (3,1) is exactly that
+# same transform). Only consulted for Black's first move, and only when
+# the mirrored destination isn't currently under attack (request_ai_move
+# checks this live via get_attack_map - the same function the real search
+# already relies on for every move - since NegamaxEngine's own
+# is_square_attacked() was cross-checked against get_attack_map() and
+# found to have real bugs, always erring on the "not attacked" side, i.e.
+# the one direction that would be unsafe to trust here).
+AI_BLACK_OPENING_BOOK = [
+    (3, 2, 4, 3),  # 4d -> 5c  (mirrors 7c -> 6d)
+    (2, 1, 3, 3),  # 3e -> 4c  (mirrors 8b -> 7d)
+    (3, 2, 4, 2),  # 4d -> 5d  (mirrors 7c -> 6c)
+]
 
 
 class GameSession:
@@ -674,6 +709,48 @@ class GameSession:
             raise IllegalMoveError("the game is already over")
         if self.next_player != self.ai_color:
             raise IllegalMoveError("it is not the AI's turn")
+
+        # First move only, for either color - see AI_WHITE_OPENING_BOOK /
+        # AI_BLACK_OPENING_BOOK above. White's first move is move_log == []
+        # (nothing played yet); Black's first move is move_log == [white's
+        # opening] (len 1) - move_log is one shared list for both colors,
+        # so "not self.move_log" for Black would never fire (White has
+        # always already moved once by the time it's Black's turn) - this
+        # was a real bug that meant Black's book never actually ran, caught
+        # while porting this feature to desktop. Every later move, for
+        # either color, falls through to the engine below completely
+        # unchanged. Goes through apply_normal_move exactly like an engine
+        # "normal" move already does a few lines down, so an entry that
+        # were ever wrong would raise IllegalMoveError there rather than
+        # silently corrupting anything.
+        if self.ai_color == "white" and not self.move_log:
+            # Hard only draws from the first 3 entries (the more
+            # conservative/solid ones) - the other two stay available for
+            # Easy/Medium.
+            book = AI_WHITE_OPENING_BOOK[:3] if self.ai_difficulty == "Hard" else AI_WHITE_OPENING_BOOK
+            from_col, from_row, to_col, to_row = random.choice(book)
+            return self.apply_normal_move(from_col, from_row, to_col, to_row)
+
+        if self.ai_color == "black" and len(self.move_log) == 1:
+            # Unlike White's guaranteed-fixed starting position, the board
+            # here already reflects whatever the human White player just
+            # opened with - a mirrored book move could in principle walk
+            # into a square that specific opening happens to attack, so
+            # each candidate is checked live (in random order) against the
+            # real current position, via get_attack_map (the same function
+            # the search itself already relies on for every move - see
+            # AI_BLACK_OPENING_BOOK's own comment for why NOT
+            # is_square_attacked). Falls through to the normal engine
+            # search below only in the unlikely case all 3 are unsafe.
+            candidates = list(AI_BLACK_OPENING_BOOK)
+            random.shuffle(candidates)
+            bb = RampartBitboard()
+            bb.sync_from_board(self.board)
+            white_attacks = RampartAttackGenerator().get_attack_map(bb, "white")
+            for from_col, from_row, to_col, to_row in candidates:
+                dest_sq = to_row * 10 + to_col
+                if not (white_attacks & (1 << dest_sq)):
+                    return self.apply_normal_move(from_col, from_row, to_col, to_row)
 
         engine_move = self.ai_engine.get_best_move(
             self.board, self.ai_color, self.state_history, debug=False)

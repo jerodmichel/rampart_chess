@@ -139,14 +139,23 @@ class RampartAttackGenerator:
                     v_mask = bb.get_king_valid_mask(attacker_color, occupied)
                     attacks |= self.gen.get_king_moves(from_sq, friendly_mask, v_mask & bb.TOTAL_PLAYABLE_BOARD)
                 elif p_type == 'raider':
+                    # a raider sitting in a house is immobilized and attacks
+                    # nothing (mirrors get_raider_moves' own check)
+                    if (1 << from_sq) & self.raider_gen.ALL_HOUSES:
+                        continue
                     v_mask = bb.get_raider_valid_mask(from_sq, attacker_color)
                     house_eligibility = bb._get_house_eligibility_mask(attacker_color)
-                    
+
                     all_houses_mask = (1 << 2) | (1 << 3) | (1 << 4) | (1 << 55) | (1 << 56) | (1 << 57)
                     v_mask &= ~all_houses_mask
                     v_mask |= house_eligibility
-                    enemy_mask = occupied ^ friendly_mask
-                    attacks |= self.raider_gen.get_raider_moves(from_sq, attacker_color, occupied, enemy_mask, v_mask)
+                    # raiders capture diagonally only - quiet orthogonal steps
+                    # are moves, not attacks (get_raider_moves OR's both
+                    # together, which is right for move generation but wrong
+                    # here: it was making get_attack_map treat a raider's
+                    # quiet-step squares as "attacked").
+                    diag_mask = self.raider_gen._get_diagonal_neighbors(from_sq)
+                    attacks |= diag_mask & v_mask & ~friendly_mask
         
         return attacks
     

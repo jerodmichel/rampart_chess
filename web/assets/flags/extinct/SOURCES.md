@@ -145,3 +145,44 @@ see project_rampart_extinct_flags memory for the full story.)
 - vien (Kingdom of Vientiane, independent 1707-1828) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Kingdom_of_Vientiane_(1707-1828).svg
 
 Note: the Commons Asia list also includes "Last Flag of the Ottoman Empire" (a different specific file than the one already used for the Europe `otto` entry) - skipped, since Ottoman Empire already has an entry from Europe and the "one flag per distinct state name" rule applies across regions, not just within one.
+
+## Europe, second batch (2026-09-17) - sourced from Wikimedia's broader
+## "historical flags of Europe" set, NOT the single "Flags of extinct
+## states" category the rest of this file uses. The user explicitly asked
+## for this batch by name/date-range (Southern Europe & Mediterranean,
+## Central & Western Europe, Eastern Europe & Baltics, the Balkans &
+## Anatolia) and pointed at this broader source directly - a deliberate,
+## one-time widening of scope, not an accident. Notably re-includes three
+## entities (Papal States, Kingdom of Prussia, Austro-Hungarian Empire)
+## that were DELIBERATELY DROPPED from this same file on 2026-09-13 for
+## being off the single-canonical-source policy at the time - see
+## project_rampart_extinct_flags memory. Six of the user's originally
+## requested names were skipped as duplicates of existing entries (already
+## covered): Byzantine Empire (`byz`), Austrian Empire (`auem`), East
+## Germany/GDR (`ddr`), Ottoman Empire (`otto`), Soviet Union/USSR
+## (`ussr`), and plain Yugoslavia (`yug` - that entry is the SFR/socialist
+## era with the red star; the user's "Kingdom of Yugoslavia" below is
+## correctly a separate, visually distinct pre-1941 tricolor without a
+## star). Prussia/Austria-Hungary/Russian Empire were fetched in their
+## small simplified-bicolor/tricolor forms rather than the much larger
+## (500KB-2MB+) ornate-emblem versions Commons also has, to keep icon load
+## weight reasonable in a picker showing many of these at once.
+
+- alba (Principality of Albania, 1914-1925) - https://commons.wikimedia.org/wiki/File:Flag_of_Albania_(1914-1920).svg
+- arag (Crown of Aragon, 1162-1716) - https://commons.wikimedia.org/wiki/File:Flag_of_Aragon.svg
+- auhu (Austro-Hungarian Empire, 1867-1918) - https://commons.wikimedia.org/wiki/File:Flag_of_Austria-Hungary_(1867%E2%80%931918).svg
+- cast (Kingdom of Castile, 1065-1715) - https://commons.wikimedia.org/wiki/File:Flag_of_Castile.svg
+- engl (Kingdom of England, 927-1707; pre-UK, St. George's Cross) - https://commons.wikimedia.org/wiki/File:Flag_of_England.svg
+- frbr (Kingdom of France, Bourbon Restoration, 1814-1830; the plain white royal banner) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Kingdom_of_France_(1814-1830).svg
+- geno (Republic of Genoa, 1005-1797) - https://commons.wikimedia.org/wiki/File:Flag_of_Genoa.svg
+- gerc (German Confederation, 1815-1866) - https://commons.wikimedia.org/wiki/File:Flag_of_Germany_(3-2).svg
+- napl (Kingdom of Naples, 1282-1816) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Kingdom_of_Naples.svg
+- paps (Papal States, 756-1870; 1808-1870 flag) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Papal_States_(1808-1870).svg
+- prus (Kingdom of Prussia, 1701-1918; simplified civil flag) - https://commons.wikimedia.org/wiki/File:Civil_flag_of_Prussia_1701-1935.svg
+- ruse (Russian Empire, 1721-1917; simplified black-yellow-white) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Russian_Empire_(black-yellow-white).svg
+- teut (State of the Teutonic Order, 1230-1525) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Teutonic_Order.svg
+- tsar (Tsardom of Russia, 1547-1721; late-era white-blue-red tricolor) - https://commons.wikimedia.org/wiki/File:Flag_of_Russia.svg
+- tsic (Kingdom of the Two Sicilies, 1816-1861; 1848 flag) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Kingdom_of_the_Two_Sicilies_(1848).svg
+- veni (Republic of Venice, 697-1797) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Republic_of_Venice.svg
+- weim (Weimar Republic / Germany, 1919-1933) - https://commons.wikimedia.org/wiki/File:Flag_of_Germany_(1919-1933).svg
+- yugk (Kingdom of Yugoslavia, 1918-1941) - https://commons.wikimedia.org/wiki/File:Flag_of_the_Kingdom_of_Yugoslavia.svg

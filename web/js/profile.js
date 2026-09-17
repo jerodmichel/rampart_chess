@@ -3,6 +3,7 @@ import { getIdToken, onAuthChange, uploadAvatar, getAvatarUrl, auth } from './fi
 import { drawIdenticon } from './identicon.js';
 import { initNavMenu } from './nav.js';
 import { COUNTRIES, flagEmoji } from './countries.js';
+import { aiOpponentName } from './constants.js';
 import { EXTINCT_STATES, flagNode, stateName } from './extinctStates.js';
 import { BADGE_CATEGORIES } from './badges.js';
 
@@ -394,7 +395,7 @@ function makeLedgerRow(g) {
     // A vs-AI game has no account (hence no username) on the AI's
     // side at all - fall back to a "Computer (difficulty)" label
     // rather than an empty/uid-shaped name.
-    const aiLabel = g.ai_difficulty ? `Computer (${g.ai_difficulty})` : 'Computer';
+    const aiLabel = g.ai_difficulty ? `${aiOpponentName(g.ai_difficulty)} (${g.ai_difficulty})` : 'Computer';
     const opponentUsername = mine === 'white' ? g.black_username : g.white_username;
     const { text, cls } = resultLabel(g.result, mine);
 

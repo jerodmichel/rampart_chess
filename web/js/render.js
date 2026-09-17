@@ -245,6 +245,7 @@ export function drawScreen(ctx, state, ui) {
     drawRampart(ctx);
     drawCardLabels(ctx);
     drawRowLetters(ctx);
+    drawColumnNumbers(ctx);
     drawDecks(ctx, state);
     drawDeckHover(ctx, ui);
     drawClickedDeckCards(ctx, ui);
@@ -318,6 +319,30 @@ function drawRowLetters(ctx) {
         // anchored to column 0's own screen position, not a fixed side, so
         // this naturally lands on the opposite edge when flipped.
         ctx.fillText(label, boardColX(0) + 5, y);
+    }
+}
+
+// Column numbers (1-10) along the board's bottom edge (game.py's own
+// "column numbers (horizontal labels)") - a separate feature from the row
+// letters above that never got ported to this file at all, not a bug in
+// existing code. Reuses boardColX/rowY the same way drawRowLetters does
+// (anchored to the board's actual logical edges - col 0..COLS-1, row
+// ROWS-1 - letting the flip transform carry them to whichever screen edge
+// that lands on) rather than game.py's own separately-coded flipped/
+// unflipped branches, matching this file's already-established approach
+// for row letters instead of duplicating game.py's more ad-hoc version.
+function drawColumnNumbers(ctx) {
+    ctx.font = 'bold 16px monospace';
+    for (let col = 0; col < COLS; col++) {
+        // matches game.py's column-number color rule exactly - based on
+        // the original (logical) bottom-row square, not whichever edge it
+        // visually lands on when flipped.
+        const isCardSquare = CARD_SQUARES.has(`${col},${ROWS - 1}`);
+        ctx.fillStyle = isCardSquare ? THEME.bgLight : THEME.bgDark;
+        const label = String(col + 1);
+        const x = boardColX(col) + RWIDTH - 25;
+        const y = rowY(ROWS - 1) + RHEIGHT - 25;
+        ctx.fillText(label, x, y);
     }
 }
 

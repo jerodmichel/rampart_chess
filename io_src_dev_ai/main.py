@@ -40,6 +40,7 @@ import os
 import time
 import threading
 import datetime
+import random
 
 import pygame
 
@@ -123,7 +124,7 @@ from piece import *
 from move import Move
 from cast_move import Cast_move
 from player import Player
-from ai_engine import NegamaxEngine
+from ai_engine import NegamaxEngine, RampartAttackGenerator, EngineMove
 from rampartbitboard import RampartBitboard
 
 class Main:
@@ -250,6 +251,23 @@ class Main:
     }
     AI_DIFFICULTY_NEXT = {'Easy': 'Medium', 'Medium': 'Hard', 'Hard': 'Easy'}
 
+    # First-move diversity, ported from server/game_session.py's web version
+    # (same moves, same Hard-restricts-to-first-3 rule, same
+    # destination-not-attacked safety check for Black using the now-fixed
+    # get_attack_map). Every entry is (from_col, from_row, to_col, to_row).
+    AI_WHITE_OPENING_BOOK = [
+        (6, 3, 5, 2),  # 7c -> 6d
+        (7, 4, 6, 2),  # 8b -> 7d
+        (6, 3, 5, 3),  # 7c -> 6c
+        (7, 3, 7, 2),  # 8c -> 8d
+        (8, 3, 8, 2),  # 9c -> 9d
+    ]
+    AI_BLACK_OPENING_BOOK = [
+        (3, 2, 4, 3),  # 4d -> 5c  (mirrors 7c -> 6d)
+        (2, 1, 3, 3),  # 3e -> 4c  (mirrors 8b -> 7d)
+        (3, 2, 4, 2),  # 4d -> 5d  (mirrors 7c -> 6c)
+    ]
+
     def _cycle_ai_difficulty(self):
         """Advance ai_difficulty Easy -> Medium -> Hard -> Easy, applying
         the matching search depth and time budget to the engine."""
@@ -322,10 +340,51 @@ class Main:
         # 3. SWITCH TURN
         print(f"Switching to {rival_color}'s turn (human)")
         self.game.next_turn()
-        
+
         return True
-        
-        
+
+    def _try_opening_book_move(self):
+        """Plays a book move for the AI's very first move of the game, for
+        first-move diversity, instead of always calling the search engine
+        (which was deterministic enough to always pick the exact same
+        opening every game). Ported from server/game_session.py's web
+        version - see AI_WHITE_OPENING_BOOK/AI_BLACK_OPENING_BOOK above.
+
+        Returns True if a book move was played (turn already switched, via
+        the same _apply_engine_move/_execute_normal_move path a real
+        engine move goes through), False if the book doesn't apply and the
+        normal search should run instead.
+        """
+        # move_log is one shared list for both colors, so White's first
+        # move is len == 0 and Black's first move is len == 1 (White has
+        # always already moved once by the time it's Black's turn) - NOT
+        # "not self.move_log" for both, which would make Black's book
+        # never fire (caught this exact bug live while writing this port,
+        # then found the same bug already shipped in
+        # server/game_session.py's web version - fixed there too).
+        if self.ai_color == 'white' and len(self.move_log) == 0:
+            book = self.AI_WHITE_OPENING_BOOK[:3] \
+                if self.game.ai_difficulty == 'Hard' else self.AI_WHITE_OPENING_BOOK
+            from_col, from_row, to_col, to_row = random.choice(book)
+            self._apply_engine_move(EngineMove(
+                from_row * 10 + from_col, to_row * 10 + to_col, 'rook', 'white'))
+            return True
+
+        if self.ai_color == 'black' and len(self.move_log) == 1:
+            candidates = list(self.AI_BLACK_OPENING_BOOK)
+            random.shuffle(candidates)
+            bb = RampartBitboard()
+            bb.sync_from_board(self.game.board)
+            white_attacks = RampartAttackGenerator().get_attack_map(bb, 'white')
+            for from_col, from_row, to_col, to_row in candidates:
+                dest_sq = to_row * 10 + to_col
+                if not (white_attacks & (1 << dest_sq)):
+                    self._apply_engine_move(EngineMove(
+                        from_row * 10 + from_col, dest_sq, 'rook', 'black'))
+                    return True
+
+        return False
+
     def ai_make_move(self):
         """AI using Negamax (Bitboards) to make moves.
 
@@ -340,6 +399,9 @@ class Main:
             not self.game.board.king_mated and
             not self.game.board.king_stalemated and
             not self.ai_thinking):
+
+            if self._try_opening_book_move():
+                return
 
             # quick sanity check
             from rampartbitboard import RampartBitboard
