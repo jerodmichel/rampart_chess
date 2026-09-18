@@ -1,0 +1,9 @@
+{
+  "appId": "com.rampartchess.app",
+  "appName": "Rampart Chess",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "android": {
+    "backgroundColor": "#000000"
+  }
+}

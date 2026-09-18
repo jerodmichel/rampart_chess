@@ -5251,3 +5251,5 @@
 [01:18:08] [AI EXEC] Moving from (3,2) to (4,3)
 [01:18:19] [AI EXEC] Moving from (4,3) to (5,3)
 [01:18:26] [AI EXEC] Moving from (2,2) to (2,3)
+[22:53:30] [ILLEGAL MOVE] white raider (9,2)->(9,3)
+  Valid moves: [(9, 1), (8, 2), (8, 1)]

@@ -53,7 +53,7 @@ app = FastAPI(
 # (python -m http.server / VS Code Live Server's usual picks); set
 # ALLOWED_ORIGINS (comma-separated) to override once there's a real one -
 # zero code changes needed at that point.
-_DEFAULT_ORIGINS = "http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080,http://127.0.0.1:8080"
+_DEFAULT_ORIGINS = "http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080,http://127.0.0.1:8080,https://test.rampartchess.com,https://localhost"
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()]
 
 app.add_middleware(

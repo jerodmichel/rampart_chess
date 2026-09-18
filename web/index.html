@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>RampartChess</title>
 <link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=48" />
+<link rel="stylesheet" href="style.css?v=53" />
 </head>
 <body>
 <header>
@@ -108,7 +108,7 @@
   </section>
 </div>
 
-<div id="statusLine">Start a new game.</div>
+<div id="statusLine"><span id="statusLineText">Start a new game.</span><span id="statusLineChatFlash" class="chatFlashIcon" hidden>&#128172;</span></div>
 
 <main id="boardWrap">
   <!-- Touch-only (see style.css's pointer/hover query) - tapping this
@@ -185,7 +185,7 @@
        style.css's #boardWrap:fullscreen rules for visibility. -->
   <button id="mobileStrikeBtn" class="mobileCastBtn">Strike</button>
   <button id="mobileRaiseBtn" class="mobileCastBtn">Raise</button>
-  <div id="mobilePrompt"></div>
+  <div id="mobilePrompt"><span id="mobilePromptText"></span><span id="mobileChatFlash" class="chatFlashIcon" hidden>&#128172;</span></div>
   <div id="belowBoard">
     <div id="displayPanel">
       <div id="displaySettings">

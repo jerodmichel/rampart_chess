@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>window.RAMPART_API_BASE="https://test-api.rampartchess.com";</script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RampartChess</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css?v=53" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <div id="navMenu">
+      <button id="navMenuBtn" aria-label="Menu" title="Menu">&#9776;</button>
+      <div id="navMenuDropdown" hidden>
+        <a href="index.html">Home</a>
+        <a href="profile.html">Profile</a>
+        <a href="stats.html">Stats</a>
+        <a href="messages.html">Messages</a>
+        <a href="rules.html">Game Rules</a>
+        <a href="legal.html">Terms &amp; Privacy</a>
+      </div>
+    </div>
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
+  </div>
+  <div id="authPanel">
+    <span id="authStatus"></span>
+    <input id="authEmail" type="email" placeholder="Email" size="16">
+    <input id="authPassword" type="password" placeholder="Password" size="12">
+    <input id="authUsername" type="text" placeholder="Username" hidden>
+    <button id="signUpBtn">Sign Up</button>
+    <button id="logInBtn">Log In</button>
+    <button id="forgotPasswordBtn" type="button">Forgot password?</button>
+  </div>
+  <div id="accountHeader" hidden>
+    <div id="notifBell">
+      <button id="notifBtn" title="Notifications"><img class="bellIcon" src="assets/misc/bell.png" alt=""><span id="notifBadge" hidden>0</span></button>
+      <div id="notifDropdown" hidden></div>
+    </div>
+    <div id="avatarMenu">
+      <span id="headerUserLabel"></span>
+      <!-- Wrapper so rating+trophies can be repositioned as a unit on
+           mobile (see style.css) without affecting desktop, where this
+           stays `display:contents` - i.e. invisible as a grouping,
+           rating and trophy row behave exactly as if they were still
+           direct children of #avatarMenu. -->
+      <div id="headerMetaRow">
+        <span id="headerRatingText"></span>
+        <span id="headerTrophyRow" class="playerTrophyRow"></span>
+      </div>
+      <button id="avatarMenuBtn" title="Account">
+        <img id="headerAvatarImg" alt="Avatar" hidden>
+        <canvas id="headerAvatarCanvas" width="42" height="42" hidden></canvas>
+      </button>
+      <div id="avatarMenuDropdown" hidden>
+        <a href="profile.html">Profile</a>
+        <button id="headerLogOutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div id="verifyEmailBanner" hidden>
+  Please verify your email address - check your inbox for a link.
+  <button id="resendVerificationBtn">Resend email</button>
+</div>
+
+<div id="playModes">
+  <section class="playModeBand">
+    <h2>Play vs Computer</h2>
+    <div id="newGamePanel">
+      <label>AI plays:
+        <select id="aiColorSelect">
+          <option value="black" selected>Black</option>
+          <option value="white">White</option>
+        </select>
+      </label>
+      <label>Difficulty:
+        <select id="aiDifficultySelect">
+          <option value="Easy">Easy</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Hard">Hard</option>
+        </select>
+      </label>
+      <button id="newGameBtn">New Game</button>
+    </div>
+  </section>
+  <section class="playModeBand">
+    <h2>Play vs Human</h2>
+    <div id="challengePanel" hidden>
+      <div id="challengeSend">
+        <input id="challengeUsername" type="text" placeholder="Username to challenge">
+        <select id="challengeColorSelect">
+          <option value="random" selected>Random color</option>
+          <option value="white">I play White</option>
+          <option value="black">I play Black</option>
+        </select>
+        <select id="challengeTimeControlSelect">
+          <option value="30min" selected>30 minutes</option>
+          <option value="1hour">1 hour</option>
+          <option value="1day_per_move">1 day per move</option>
+        </select>
+        <button id="sendChallengeBtn">Challenge</button>
+      </div>
+      <div id="incomingChallenges"></div>
+      <div id="outgoingChallenges"></div>
+    </div>
+  </section>
+</div>
+
+<div id="statusLine"><span id="statusLineText">Start a new game.</span><span id="statusLineChatFlash" class="chatFlashIcon" hidden>&#128172;</span></div>
+
+<main id="boardWrap">
+  <!-- Touch-only (see style.css's pointer/hover query) - tapping this
+       fullscreens #boardWrap and attempts a landscape orientation lock,
+       like YouTube's fullscreen button. Hidden again once fullscreen. -->
+  <button id="mobileFullscreenBtn" title="Fullscreen">&#x26F6;</button>
+  <!-- Shown only while #boardWrap IS the fullscreen element and the device
+       is still portrait (see the #boardWrap:fullscreen CSS rule) - i.e.
+       only on platforms without orientation-lock support (iOS Safari),
+       after the player has already tapped Fullscreen above. -->
+  <div id="mobileRotateOverlay">Rotate your device to landscape to play RampartChess.</div>
+  <!-- Shown only while #boardWrap is fullscreen - the explicit way back,
+       since relying solely on Esc/a system back-gesture isn't discoverable
+       on a phone. -->
+  <button id="mobileExitFullscreenBtn" title="Exit fullscreen">&#x2715;</button>
+  <!-- The real header (and its logo/title) lives outside #boardWrap, so it
+       disappears entirely once #boardWrap goes fullscreen - only ITS OWN
+       descendants render in the fullscreen top-layer. This is a small
+       standalone copy just for that view, not a shared/reparented node
+       (unlike #navMenu/#displaySettings elsewhere), since the real header
+       still needs its own full-size logo/title outside fullscreen. -->
+  <div id="mobileTitleBadge">
+    <img src="assets/misc/logo_crown.png" alt="">
+    <span>RampartChess</span>
+  </div>
+  <div id="playerNames" hidden>
+    <div id="blackPlayerSlot" class="playerSlot"></div>
+    <div id="whitePlayerSlot" class="playerSlot"></div>
+  </div>
+  <div id="clocks" hidden>
+    <span id="blackClock">Black: --:--</span>
+    <span id="whiteClock">White: --:--</span>
+  </div>
+  <!-- Only meaningfully a "row" in mobile board mode - see
+       style.css's #boardWrap:fullscreen #mobileBoardRow. On desktop this
+       is just a plain full-width wrapper around the canvas, same as if it
+       weren't here at all. -->
+  <div id="mobileBoardRow">
+    <!-- Populated by mobile-panels.js from state - each side pairs one
+         color's deck (top) with that color's graveyard (below), matching
+         the desktop board's own convention (black's deck+grave on the
+         left, white's on the right - see render.js's screenSide). Only
+         shown alongside the mobile board (see style.css), using the
+         leftover width beside the height-bound square board on a wide
+         landscape screen; flex:1 on both sides is also what keeps the
+         canvas itself centered between them. -->
+    <div id="mobileSideLeft" class="mobileGravePanel">
+      <div id="mobileDeckBlack" class="mobileDeckList"></div>
+      <!-- Emblem comes AFTER the grave slots here (bottom of this column),
+           matching desktop's own bottom-left emblem placement (render.js's
+           drawEmblems) - a separate element from #mobileGraveBlack itself
+           since that one's innerHTML gets fully rebuilt on every capture. -->
+      <div class="mobileGraveColumn">
+        <div id="mobileGraveBlack" class="mobileGraveGrid"></div>
+        <img id="mobileEmblemBottomLeft" class="mobileEmblem" alt="">
+      </div>
+    </div>
+    <canvas id="boardCanvas"></canvas>
+    <div id="mobileSideRight" class="mobileGravePanel">
+      <div id="mobileDeckWhite" class="mobileDeckList"></div>
+      <!-- Emblem comes BEFORE the grave slots here (top of this column),
+           matching desktop's own top-right emblem placement. -->
+      <div class="mobileGraveColumn">
+        <img id="mobileEmblemTopRight" class="mobileEmblem" alt="">
+        <div id="mobileGraveWhite" class="mobileGraveGrid"></div>
+      </div>
+    </div>
+  </div>
+  <!-- Positioned in JS (main.js's positionMobileCastOverlay) directly over
+       specific unplayable house-row squares, at the same col/row pixel
+       rects render-mobile.js's own cellRect() computes - the bottom-left
+       cluster for casting, the top-right cluster for the status prompt
+       desktop shows on-canvas. Only meaningful in mobile board mode; see
+       style.css's #boardWrap:fullscreen rules for visibility. -->
+  <button id="mobileStrikeBtn" class="mobileCastBtn">Strike</button>
+  <button id="mobileRaiseBtn" class="mobileCastBtn">Raise</button>
+  <div id="mobilePrompt"><span id="mobilePromptText"></span><span id="mobileChatFlash" class="chatFlashIcon" hidden>&#128172;</span></div>
+  <div id="belowBoard">
+    <div id="displayPanel">
+      <div id="displaySettings">
+        <button id="displaySettingsBtn" title="Display settings">&#9881; Display</button>
+        <div id="displaySettingsDropdown" hidden>
+          <label>Theme:
+            <select id="themeSelect"></select>
+          </label>
+          <label>Piece style:
+            <select id="pieceSetSelect"></select>
+          </label>
+          <label><input type="checkbox" id="effectsToggle" checked> Thunder &amp; lightning</label>
+        </div>
+      </div>
+      <button id="flipBoardBtn" title="Flip the board">Flip Board</button>
+    </div>
+    <div id="quickActions">
+      <button id="abortBtn" hidden>Abort</button>
+      <button id="resignBtn" hidden>Resign</button>
+    </div>
+    <div id="gameActions" hidden>
+      <button id="offerDrawBtn">Offer Draw</button>
+      <button id="acceptDrawBtn" hidden>Accept Draw</button>
+      <button id="declineDrawBtn" hidden>Decline Draw</button>
+    </div>
+    <div id="historyControls">
+      <button id="historyPrevBtn" title="Previous move">&larr;</button>
+      <button id="historyLiveBtn" title="Return to the live position">Live</button>
+      <button id="historyNextBtn" title="Next move">&rarr;</button>
+    </div>
+  </div>
+  <div id="chatPanel" hidden>
+    <div id="chatMessages"></div>
+    <div id="chatInputRow">
+      <input id="chatInput" type="text" placeholder="Message your opponent..." maxlength="500">
+      <button id="chatSendBtn">Send</button>
+    </div>
+  </div>
+  <div id="movesPanel" hidden>
+    <button id="movesToggleBtn" aria-expanded="false">Moves <span id="movesToggleArrow">&#9662;</span></button>
+    <div id="movesList" hidden></div>
+  </div>
+  <div id="liveGamesPanel">
+    <h2>Live Games</h2>
+    <div id="liveGamesList"></div>
+  </div>
+</main>
+
+<script type="module" src="js/header.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
