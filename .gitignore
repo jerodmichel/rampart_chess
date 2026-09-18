@@ -12,6 +12,7 @@ RampartChessWindows/
 RampartChessLinux/
 *.tar.gz
 *.tar.xz
+*.apk
 
 # runtime debug log
 launch_error.log
