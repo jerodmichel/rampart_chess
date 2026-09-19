@@ -41,10 +41,10 @@ HERE = Path(__file__).parent
 WWW_DST = HERE / "www"
 PYTHON_DST = HERE / "android" / "app" / "src" / "main" / "python"
 
-# Same API host the phone browser already uses via the Cloudflare tunnel
-# (see ~/.cloudflared/config.yml) - swap this if/when there's a real
-# production domain instead of the personal dev tunnel.
-API_BASE = "https://test-api.rampartchess.com"
+# Production API (Fly.io, see fly.toml at the repo root). For testing
+# against the dev tunnel instead, temporarily use
+# "https://test-api.rampartchess.com" and rebuild.
+API_BASE = "https://api.rampartchess.com"
 INJECT = f'<script>window.RAMPART_API_BASE="{API_BASE}";</script>'
 
 EXCLUDE_NAMES = {"serve_dev.py", "README.md"}
