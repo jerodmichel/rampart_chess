@@ -1,0 +1,18 @@
+# Keep secrets and junk out of the image - the Dockerfile does
+# `COPY server/ server/`, which would otherwise include these.
+**/serviceAccountKey.json
+**/*firebase-adminsdk*.json
+**/resend_key.txt
+**/cloudflare_testing.txt
+**/debug_trace.txt
+**/mcts_trace.txt
+**/__pycache__
+**/*.pyc
+.git
+android_app
+web
+screenshots
+fonts
+*.apk
+*.mp3
+*.png

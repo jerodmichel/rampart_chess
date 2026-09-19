@@ -26,4 +26,7 @@ COPY io_src_dev_ai/const.py io_src_dev_ai/board.py io_src_dev_ai/square.py \
 
 EXPOSE 8080
 WORKDIR /app/server
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+# --forwarded-allow-ips: behind Fly's proxy (and Cloudflare) the real client IP
+# arrives in X-Forwarded-For; without this slowapi's per-IP limits would see
+# every user as the same proxy address.
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]

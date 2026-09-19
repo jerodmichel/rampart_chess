@@ -1,0 +1,31 @@
+# fly.toml app configuration file generated for rampart-api on 2026-09-18T15:48:43-07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'rampart-api'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'server/Dockerfile'
+
+[env]
+  ALLOWED_ORIGINS = 'https://rampartchess.com,https://www.rampartchess.com,https://localhost,http://localhost,capacitor://localhost'
+  DISABLE_API_DOCS = '1'
+  FIREBASE_CREDENTIALS_PATH = '/secrets/firebase.json'
+  SITE_BASE_URL = 'https://rampartchess.com'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[files]]
+  guest_path = '/secrets/firebase.json'
+  secret_name = 'FIREBASE_SA_B64'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '1gb'

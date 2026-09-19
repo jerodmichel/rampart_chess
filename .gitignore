@@ -22,3 +22,8 @@ serviceAccountKey.json
 *firebase-adminsdk*.json
 server/resend_key.txt
 server/resend_key.txt
+
+# Cloudflare Access test credentials + debug traces - never commit
+server/cloudflare_testing.txt
+server/debug_trace.txt
+server/mcts_trace.txt

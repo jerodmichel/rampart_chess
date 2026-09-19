@@ -10,7 +10,9 @@
 const BASE_URL = window.RAMPART_API_BASE || (
     window.location.hostname === 'test.rampartchess.com'
         ? 'https://test-api.rampartchess.com'
-        : 'http://localhost:8080'
+        : (window.location.hostname === 'rampartchess.com' || window.location.hostname === 'www.rampartchess.com')
+            ? 'https://api.rampartchess.com'
+            : 'http://localhost:8080'
 );
 
 // -- Android local engine (offline vs-AI play) ---------------------------
