@@ -222,6 +222,13 @@ export const api = {
         return request('/auth/me');
     },
 
+    deleteAccount(confirmUsername) {
+        return request('/account', {
+            method: 'DELETE',
+            body: JSON.stringify({ confirm_username: confirmUsername }),
+        });
+    },
+
     updateBio(bio) {
         return request('/profile/bio', {
             method: 'POST',

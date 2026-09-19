@@ -27,3 +27,6 @@ server/resend_key.txt
 server/cloudflare_testing.txt
 server/debug_trace.txt
 server/mcts_trace.txt
+
+# Firebase RTDB exports contain user emails/messages - never commit
+*-rtdb-export*.json

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Messages - RampartChess</title>
+<title>Delete Your Account - RampartChess</title>
 <link rel="icon" href="favicon.ico" />
 <link rel="stylesheet" href="style.css?v=54" />
 </head>
@@ -51,36 +51,53 @@
   </div>
 </header>
 
-<p id="signedOutMessage" hidden>Please sign in on the <a href="index.html">Home page</a> first.</p>
+<main id="legalPage">
+  <h2>Delete your RampartChess account</h2>
 
-<main id="messagesPage" hidden>
-  <div id="friendsColumn">
-    <div id="addFriendBox">
-      <input id="addFriendInput" type="text" placeholder="Add a friend by username...">
-      <button id="addFriendBtn">Send Friend Request</button>
-    </div>
-    <p id="addFriendStatus"></p>
+  <h3>How to delete your account</h3>
+  <ol>
+    <li>Sign in at <a href="index.html">rampartchess.com</a> or in the Rampart Chess app.</li>
+    <li>Open your <a href="profile.html">Profile</a> and scroll to the bottom.</li>
+    <li>Choose <strong>Delete my account...</strong>, type your username, enter your password, and confirm.</li>
+  </ol>
+  <p>
+    You can't delete an account while you have a two-player game in progress - finish or
+    resign it first.
+  </p>
 
-    <div id="friendRequestsSection">
-      <div id="incomingFriendRequests"></div>
-      <div id="outgoingFriendRequests"></div>
-    </div>
+  <h3>Can't sign in?</h3>
+  <p>
+    Email <a href="mailto:apecrank@gmail.com">apecrank@gmail.com</a> from the address on the
+    account, with the subject "Delete my Rampart account" and your username. We'll delete it
+    for you.
+  </p>
 
-    <h3>Friends</h3>
-    <div id="friendsList"></div>
-  </div>
+  <h3>What is deleted</h3>
+  <ul>
+    <li>Your sign-in account and email address</li>
+    <li>Your profile: username (which becomes available to others), bio, country, avatar</li>
+    <li>Your trophies and rating history</li>
+    <li>Your friends list, friend requests and game challenges</li>
+    <li>Your private messages (the conversation is removed for both people)</li>
+    <li>Your games against the computer</li>
+  </ul>
 
-  <div id="threadColumn">
-    <h3 id="threadHeader">Select a friend to start messaging</h3>
-    <div id="threadMessages"></div>
-    <div id="threadInputRow" hidden>
-      <input id="threadInput" type="text" placeholder="Type a message..." maxlength="500">
-      <button id="threadSendBtn">Send</button>
-    </div>
-  </div>
+  <h3>What is kept</h3>
+  <ul>
+    <li>
+      Finished games you played against other people, and the in-game chat from them, stay in
+      those players' histories - but they no longer identify you. Your name is replaced with
+      "Deleted user" and nothing links the games back to you.
+    </li>
+  </ul>
+
+  <p>Deletion is immediate and permanent. It can't be undone.</p>
 </main>
 
 <script type="module" src="js/header.js"></script>
-<script type="module" src="js/messages.js"></script>
+<script type="module">
+  import { initNavMenu } from './js/nav.js';
+  initNavMenu();
+</script>
 </body>
 </html>

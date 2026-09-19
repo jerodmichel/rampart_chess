@@ -2427,3 +2427,12 @@ a.ledgerOpponent:hover {
     animation: chatFlashBlink 0.5s ease-in-out 3;
 }
 
+
+
+/* -- Profile: account deletion ------------------------------------------ */
+#dangerZone { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.15); }
+#dangerZone h3 { color: #d9534f; }
+#deleteAccountPanel label { display: block; margin: 0.6rem 0; }
+#deleteAccountPanel input { display: block; margin-top: 0.25rem; max-width: 18rem; width: 100%; }
+#deleteAccountConfirmBtn { background: #b52b27; color: #fff; }
+#deleteAccountStatus { min-height: 1.2em; }

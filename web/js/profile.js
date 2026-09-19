@@ -1,5 +1,5 @@
 import { api, setTokenProvider, apiErrorDetail } from './api.js';
-import { getIdToken, onAuthChange, uploadAvatar, getAvatarUrl, auth } from './firebase.js';
+import { getIdToken, onAuthChange, uploadAvatar, getAvatarUrl, auth, logOut, reauthenticateWithPassword } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
 import { initNavMenu } from './nav.js';
 import { COUNTRIES, flagEmoji } from './countries.js';
@@ -45,6 +45,56 @@ const addFriendBtn = document.getElementById('addFriendBtn');
 const acceptIncomingFriendBtn = document.getElementById('acceptIncomingFriendBtn');
 const declineIncomingFriendBtn = document.getElementById('declineIncomingFriendBtn');
 const addFriendStatus = document.getElementById('addFriendStatus');
+
+const dangerZone = document.getElementById('dangerZone');
+const deleteAccountOpenBtn = document.getElementById('deleteAccountOpenBtn');
+const deleteAccountPanel = document.getElementById('deleteAccountPanel');
+const deleteConfirmUsername = document.getElementById('deleteConfirmUsername');
+const deletePassword = document.getElementById('deletePassword');
+const deleteAccountConfirmBtn = document.getElementById('deleteAccountConfirmBtn');
+const deleteAccountCancelBtn = document.getElementById('deleteAccountCancelBtn');
+const deleteAccountStatus = document.getElementById('deleteAccountStatus');
+
+deleteAccountOpenBtn.addEventListener('click', () => {
+    deleteAccountPanel.hidden = false;
+    deleteAccountOpenBtn.hidden = true;
+});
+deleteAccountCancelBtn.addEventListener('click', () => {
+    deleteAccountPanel.hidden = true;
+    deleteAccountOpenBtn.hidden = false;
+    deleteConfirmUsername.value = '';
+    deletePassword.value = '';
+    deleteAccountStatus.textContent = '';
+});
+deleteAccountConfirmBtn.addEventListener('click', async () => {
+    const typed = deleteConfirmUsername.value.trim();
+    if (typed.toLowerCase() !== myProfile.username.toLowerCase()) {
+        deleteAccountStatus.textContent = 'The username you typed does not match.';
+        return;
+    }
+    if (!deletePassword.value) {
+        deleteAccountStatus.textContent = 'Enter your password to continue.';
+        return;
+    }
+    deleteAccountConfirmBtn.disabled = true;
+    deleteAccountStatus.textContent = 'Deleting...';
+    try {
+        await reauthenticateWithPassword(deletePassword.value);
+    } catch (e) {
+        deleteAccountStatus.textContent = 'Incorrect password.';
+        deleteAccountConfirmBtn.disabled = false;
+        return;
+    }
+    try {
+        await api.deleteAccount(typed);
+    } catch (e) {
+        deleteAccountStatus.textContent = apiErrorDetail(e) || 'Could not delete the account. Nothing was lost - try again.';
+        deleteAccountConfirmBtn.disabled = false;
+        return;
+    }
+    try { await logOut(); } catch (_) { /* the auth user is already gone server-side */ }
+    window.location.replace('index.html');
+});
 
 addFriendBtn.addEventListener('click', async () => {
     addFriendBtn.disabled = true;
@@ -587,6 +637,7 @@ async function loadProfile() {
     // editing it only makes sense on your own profile.
     countryEditor.hidden = true;
     countryRow.hidden = !isOwnProfile;
+    dangerZone.hidden = !isOwnProfile;
     if (isOwnProfile) renderCountryLabel();
 
     // Only makes sense on someone ELSE's profile, and only for a signed-in

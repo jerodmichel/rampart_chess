@@ -9,6 +9,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/fireba
 import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
     onAuthStateChanged, signOut, sendEmailVerification, sendPasswordResetEmail,
+    EmailAuthProvider, reauthenticateWithCredential,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import {
     getStorage, ref as storageRef, uploadBytes, getDownloadURL,
@@ -41,6 +42,16 @@ export function logInWithEmail(email, password) {
 
 export function logOut() {
     return signOut(auth);
+}
+
+// Account deletion requires a fresh sign-in (server checks the token's
+// auth_time - see server/firebase_auth.py). Re-authenticating with the
+// password, then forcing a token refresh, is what makes that claim current.
+export async function reauthenticateWithPassword(password) {
+    const user = auth.currentUser;
+    if (!user || !user.email) throw new Error('not signed in');
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+    return user.getIdToken(true);
 }
 
 // Soft nudge, not a gate - nothing in server/ checks email_verified, so

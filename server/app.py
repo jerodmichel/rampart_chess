@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
+import account_deletion
 import accounts
 import badges
 import chat
@@ -26,7 +27,7 @@ import game_records
 import messages
 import notifications
 import ratings
-from firebase_auth import get_current_uid, get_optional_uid
+from firebase_auth import get_current_uid, get_optional_uid, get_recently_authenticated_uid
 from game_session import GameSession, IllegalMoveError, ReplayOnlyGame
 
 logger = logging.getLogger(__name__)
@@ -529,6 +530,24 @@ class CountryRequest(BaseModel):
 @app.post("/profile/country")
 def update_profile_country(req: CountryRequest, uid: str = Depends(get_current_uid)):
     return accounts.update_country(uid, req.country.upper())
+
+
+class DeleteAccountRequest(BaseModel):
+    confirm_username: str
+
+
+@app.delete("/account")
+@limiter.limit("3/minute")
+def delete_account(
+    request: Request, req: DeleteAccountRequest,
+    uid: str = Depends(get_recently_authenticated_uid),
+):
+    result = account_deletion.delete_account(uid, req.confirm_username)
+    # A finished game's cached session would otherwise keep serving the
+    # deleted user's uid/name until the next restart.
+    for game_id in [g for g, s in GAMES.items() if uid in (s.white_uid, s.black_uid)]:
+        GAMES.pop(game_id, None)
+    return result
 
 
 @app.get("/games/{game_id}/legal_moves")

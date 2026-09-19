@@ -12,6 +12,7 @@ committed - see .gitignore.
 """
 
 import os
+import time
 from typing import Optional
 
 import firebase_admin
@@ -41,6 +42,26 @@ def get_current_uid(authorization: Optional[str] = Header(None)) -> str:
     missing/malformed/invalid/expired token (uniformly - the header is
     declared optional here specifically so a missing one lands here too,
     rather than FastAPI's own validation short-circuiting it to a 422)."""
+    return _verify_bearer(authorization)["uid"]
+
+
+# How recently the user must have actually typed their password (Firebase's
+# "auth_time" claim - unchanged by silent token refreshes) for an
+# irreversible action like account deletion.
+RECENT_LOGIN_SECONDS = 300
+
+
+def get_recently_authenticated_uid(authorization: Optional[str] = Header(None)) -> str:
+    """Like get_current_uid, but also requires a sign-in within the last
+    RECENT_LOGIN_SECONDS - so a stolen or left-open session can't delete an
+    account. The client re-authenticates with the password first."""
+    decoded = _verify_bearer(authorization)
+    if time.time() - decoded.get("auth_time", 0) > RECENT_LOGIN_SECONDS:
+        raise HTTPException(status_code=401, detail="recent-login-required")
+    return decoded["uid"]
+
+
+def _verify_bearer(authorization: Optional[str]) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="missing bearer token")
     token = authorization.removeprefix("Bearer ")
@@ -54,7 +75,7 @@ def get_current_uid(authorization: Optional[str] = Header(None)) -> str:
         decoded = firebase_auth_sdk.verify_id_token(token, clock_skew_seconds=10)
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"invalid auth token: {e}")
-    return decoded["uid"]
+    return decoded
 
 
 def get_optional_uid(authorization: Optional[str] = Header(None)) -> Optional[str]:
