@@ -1,6 +1,7 @@
 import { api, setTokenProvider } from './api.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
+import { attachTapLabel } from './taplabel.js';
 import { aiOpponentName, aiOpponentAvatar } from './constants.js';
 import {
     signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl,
@@ -1795,7 +1796,7 @@ async function buildPlayerEntry(slot, username, isAiSide, difficulty) {
                 for (const badge of trophies) {
                     const iconEl = badge.image ? document.createElement('img') : document.createElement('span');
                     iconEl.className = 'playerTrophyIcon';
-                    iconEl.title = badge.name;
+                    attachTapLabel(iconEl, badge.name);
                     if (badge.image) {
                         iconEl.src = badge.image;
                         iconEl.alt = badge.name;

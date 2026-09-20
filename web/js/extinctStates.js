@@ -16,6 +16,7 @@
 // Sorted by code, matching insertion order - not alphabetical by name.
 
 import { COUNTRIES, flagEmoji } from './countries.js';
+import { attachTapLabel } from './taplabel.js';
 
 export const EXTINCT_STATES = [
     { code: 'ACEH', name: 'Aceh Sultanate', flag: 'assets/flags/extinct/aceh.png' },
@@ -161,7 +162,7 @@ export const EXTINCT_STATES = [
 // A flag as a DOM node - a <span> carrying the Unicode glyph for a real
 // country (flagEmoji()) or an <img> for an extinct state - either way with
 // a `title` attribute so hovering it (mouse only, obviously - there's no
-// hover on a touch screen) shows the full state/country name, since the
+// hover on a touch screen - taplabel.js adds a tap bubble for those) shows the full state/country name, since the
 // flag alone doesn't always identify it at a glance. null if code is
 // falsy or unrecognized by either list.
 export function flagNode(code) {
@@ -171,7 +172,7 @@ export function flagNode(code) {
         const span = document.createElement('span');
         span.className = 'flagIcon';
         span.textContent = emoji;
-        span.title = stateName(code) ?? '';
+        attachTapLabel(span, stateName(code));
         return span;
     }
     const extinct = EXTINCT_STATES.find((s) => s.code === code);
@@ -179,7 +180,7 @@ export function flagNode(code) {
     const img = document.createElement('img');
     img.src = extinct.flag;
     img.alt = extinct.name;
-    img.title = extinct.name;
+    attachTapLabel(img, extinct.name);
     img.className = 'extinctFlagIcon flagIcon';
     return img;
 }

@@ -65,6 +65,14 @@ export function setTokenProvider(fn) {
 // patience for "did my move go through".
 const REQUEST_TIMEOUT_MS = 10000;
 
+// /ai_move is the one call that legitimately blocks for a long time: it runs
+// the engine search server-side, and Hard's search budget alone is 15s
+// (game_session.py's AI_DIFFICULTY_SETTINGS) - always the 2nd move, since
+// move 1 is an instant opening-book pick. Under the generic 10s cap above
+// every Hard game died with "/ai_move timed out" on its first real search.
+// 45s = Hard's 15s budget with plenty of headroom for a slow shared-CPU host.
+const AI_MOVE_TIMEOUT_MS = 45000;
+
 function withTimeout(promise, ms, message) {
     let timeoutId;
     const timeout = new Promise((_, reject) => {
@@ -73,7 +81,7 @@ function withTimeout(promise, ms, message) {
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
-async function request(path, options) {
+async function request(path, options, timeoutMs = REQUEST_TIMEOUT_MS) {
     const headers = { 'Content-Type': 'application/json' };
     let token;
     try {
@@ -93,7 +101,7 @@ async function request(path, options) {
     }
     if (token) headers.Authorization = `Bearer ${token}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     let res;
     try {
         res = await fetch(`${BASE_URL}${path}`, {
@@ -199,7 +207,7 @@ export const api = {
 
     aiMove(gameId) {
         if (localGameAiColor.has(gameId)) return localCall('aiMove', { gameId }, `/games/${gameId}/ai_move`);
-        return request(`/games/${gameId}/ai_move`, { method: 'POST' });
+        return request(`/games/${gameId}/ai_move`, { method: 'POST' }, AI_MOVE_TIMEOUT_MS);
     },
 
     // Read-only snapshot of the position after `index` half-moves (0 = the

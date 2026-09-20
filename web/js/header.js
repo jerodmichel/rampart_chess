@@ -10,6 +10,7 @@ import { drawIdenticon } from './identicon.js';
 import { setupDropdown, keepOnScreen } from './nav.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
+import { attachTapLabel } from './taplabel.js';
 
 setTokenProvider(getIdToken); // harmless if the page's own script already did this
 
@@ -130,7 +131,7 @@ if (accountHeader) {
             for (const badge of highestPerCategory(earned)) {
                 const iconEl = badge.image ? document.createElement('img') : document.createElement('span');
                 iconEl.className = 'playerTrophyIcon';
-                iconEl.title = badge.name;
+                attachTapLabel(iconEl, badge.name);
                 if (badge.image) {
                     iconEl.src = badge.image;
                     iconEl.alt = badge.name;
