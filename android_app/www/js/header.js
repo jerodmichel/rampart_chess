@@ -86,7 +86,7 @@ if (accountHeader) {
         }
     }
 
-    async function initAccountHeader() {
+    async function initAccountHeader(retried) {
         const token = await getIdToken();
         accountHeader.hidden = !token;
         if (!token) return;
@@ -94,7 +94,13 @@ if (accountHeader) {
         try {
             profile = await api.me();
         } catch (e) {
-            accountHeader.hidden = true; // signed in but hasn't claimed a username yet
+            // Only a 404 means "signed in but hasn't claimed a username
+            // yet" - anything else is a transient failure, so retry once
+            // before giving up rather than hiding the header for good.
+            if (!/\(404\)/.test(e.message) && !retried) {
+                setTimeout(() => initAccountHeader(true), 2000);
+            }
+            accountHeader.hidden = true;
             return;
         }
         avatarMenuBtn.title = `${profile.username} (${profile.rating ?? 1200})`;
@@ -135,11 +141,11 @@ if (accountHeader) {
         } catch (e) { /* decorative only - see comment above */ }
     }
 
-    onAuthChange(initAccountHeader);
+    onAuthChange(() => initAccountHeader());
     // Fired by main.js right after a fresh sign-up finishes claiming a
     // username - that doesn't touch Firebase Auth itself, so onAuthChange
     // alone never re-fires and this widget would otherwise stay hidden
     // until something else (e.g. a page refresh) re-triggered it.
-    window.addEventListener('rampart:profileClaimed', initAccountHeader);
+    window.addEventListener('rampart:profileClaimed', () => initAccountHeader());
     setInterval(() => { if (!accountHeader.hidden) renderNotifications(); }, 10000);
 }

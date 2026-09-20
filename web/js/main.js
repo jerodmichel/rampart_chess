@@ -4,10 +4,10 @@ import { highestPerCategory } from './badges.js';
 import { aiOpponentName, aiOpponentAvatar } from './constants.js';
 import {
     signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl,
-    sendVerificationEmail, isEmailVerified, resetPassword,
+    isEmailVerified, reloadCurrentUser, resetPassword,
 } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
-import { initNavMenu, setupDropdown } from './nav.js';
+import { initNavMenu, setupDropdown, keepOnScreen } from './nav.js';
 import { enterMobileFullscreen, exitMobileFullscreen, onLayoutModeChange, isMobileBoardActive, isFakeFullscreenActive } from './mobile.js';
 import {
     computeCellSize, boardSize, drawBoardMobile, colRowFromPointMobile, cellRect,
@@ -352,7 +352,7 @@ function renderAuthUI(message) {
     challengePanel.hidden = currentProfile === null;
 
     // Soft nudge only - nothing server-side is gated on this (see
-    // firebase.js's sendVerificationEmail comment), just a reminder banner.
+    // firebase.js's verifyEmailWithCode comment), just a reminder banner.
     verifyEmailBanner.hidden = !signedIn || isEmailVerified();
 
     if (message) {
@@ -416,6 +416,18 @@ async function refreshProfile() {
     if (currentProfile) refreshChallenges();
 }
 
+// The verification link opens in its OWN tab (verify.html), so this tab's
+// cached emailVerified flag never changes on its own - re-read it from
+// Firebase when the player comes back to this tab (and slowly while it
+// stays open), so the banner clears without a manual refresh.
+async function recheckEmailVerified() {
+    if (verifyEmailBanner.hidden) return;
+    if (await reloadCurrentUser()) verifyEmailBanner.hidden = true;
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) recheckEmailVerified(); });
+window.addEventListener('focus', recheckEmailVerified);
+setInterval(() => { if (!document.hidden) recheckEmailVerified(); }, 30000);
+
 signUpBtn.addEventListener('click', async () => {
     if (!authEmail.value || !authPassword.value) {
         renderAuthUI('Enter an email and password.');
@@ -423,7 +435,7 @@ signUpBtn.addEventListener('click', async () => {
     }
     try {
         await signUpWithEmail(authEmail.value, authPassword.value);
-        sendVerificationEmail().catch(() => {}); // best-effort - the resend button covers a failure here
+        api.sendVerificationEmail().catch(() => {}); // best-effort - the resend button covers a failure here
         await refreshProfile();
     } catch (e) {
         renderAuthUI(friendlyErrorMessage(e));
@@ -446,7 +458,7 @@ forgotPasswordBtn.addEventListener('click', async () => {
 resendVerificationBtn.addEventListener('click', async () => {
     resendVerificationBtn.disabled = true;
     try {
-        await sendVerificationEmail();
+        await api.sendVerificationEmail();
         resendVerificationBtn.textContent = 'Sent!';
     } catch (e) {
         resendVerificationBtn.textContent = 'Resend email';
@@ -2247,6 +2259,7 @@ for (const m of playModeMenus) {
         m.panel.hidden = !m.panel.hidden;
         m.btn.setAttribute('aria-expanded', String(!m.panel.hidden));
         closePlayModeMenus(m);
+        if (!m.panel.hidden) keepOnScreen(m.panel);
     });
     // Picking a color/difficulty from a <select> inside the panel isn't
     // "elsewhere".

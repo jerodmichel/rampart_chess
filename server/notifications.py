@@ -19,7 +19,7 @@ import html as html_lib
 import logging
 import os
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlparse
 
 import resend
 from firebase_admin import auth as firebase_auth_sdk
@@ -119,6 +119,50 @@ def notify_message(to_uid: str, from_username: str) -> None:
     heading = "You have a new message."
     body_html = _email_layout(heading, _button_html(url, "View Message"))
     notify_user(to_uid, subject, body_text, body_html)
+
+
+def send_verification_email(uid: str) -> None:
+    """Sends our own branded "verify your email" message through Resend
+    instead of Firebase's built-in sender (whose body/subject can't be
+    edited and which lands in spam far more often - it's a shared generic
+    sender, not this project's own authenticated domain).
+
+    Unlike notify_user this RAISES on failure - the caller (a "Resend
+    email" button) needs to tell the user it didn't go out.
+
+    Firebase still mints the one-time code (generate_email_verification_
+    link) - only the delivery and the landing page are ours: the link in
+    the email points at this site's own verify.html, which applies the code
+    via the client SDK's applyActionCode. That keeps the link's domain
+    matching the sender's, a common spam signal otherwise.
+    """
+    if not resend.api_key or not _FROM_ADDRESS:
+        raise RuntimeError("RESEND_API_KEY/RESEND_FROM_ADDRESS not configured")
+    user = firebase_auth_sdk.get_user(uid)
+    if not user.email:
+        raise RuntimeError(f"user {uid} has no email address")
+    if user.email_verified:
+        return
+    firebase_link = firebase_auth_sdk.generate_email_verification_link(user.email)
+    code = parse_qs(urlparse(firebase_link).query)["oobCode"][0]
+    url = f"{_SITE_BASE_URL}/verify.html?oobCode={quote(code)}"
+    subject = "Verify your email for RampartChess"
+    body_text = (
+        "Welcome to RampartChess! Confirm your email address to finish setting up your account.\n\n"
+        f"Verify your email here: {url}\n\n"
+        "If you didn't create a RampartChess account, you can ignore this message."
+    )
+    heading = "Welcome to RampartChess! Confirm your email address to finish setting up your account."
+    footer = ('<p style="font-size: 13px; color: #777; margin: 16px 0 0;">'
+              "If you didn't create a RampartChess account, you can ignore this message.</p>")
+    body_html = _email_layout(heading, _button_html(url, "Verify Email") + footer)
+    resend.Emails.send({
+        "from": _FROM_ADDRESS,
+        "to": [user.email],
+        "subject": subject,
+        "text": body_text,
+        "html": body_html,
+    })
 
 
 def notify_friend_request(to_uid: str, from_username: str) -> None:

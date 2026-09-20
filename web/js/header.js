@@ -7,7 +7,7 @@
 import { api, setTokenProvider } from './api.js';
 import { getIdToken, onAuthChange, logOut, getAvatarUrl } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
-import { setupDropdown } from './nav.js';
+import { setupDropdown, keepOnScreen } from './nav.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
 
@@ -71,6 +71,7 @@ if (accountHeader) {
             row.textContent = `${c.from_username} challenged you to a game (you'd play ${yourColor})`;
             notifDropdown.appendChild(row);
         }
+        if (!notifDropdown.hidden) keepOnScreen(notifDropdown);
     }
 
     async function loadAvatar(uid) {

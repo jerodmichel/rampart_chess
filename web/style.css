@@ -129,7 +129,7 @@ header h1 {
     gap: 4px;
     padding: 8px;
     min-width: 240px;
-    max-width: 320px;
+    max-width: min(320px, calc(100vw - 16px));
     background: var(--panel);
     border: 1px solid var(--panel-border);
     border-radius: 6px;

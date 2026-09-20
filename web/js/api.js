@@ -75,11 +75,22 @@ function withTimeout(promise, ms, message) {
 
 async function request(path, options) {
     const headers = { 'Content-Type': 'application/json' };
-    const token = await withTimeout(
-        tokenProvider(),
-        REQUEST_TIMEOUT_MS,
-        'timed out waiting for auth token',
-    );
+    let token;
+    try {
+        token = await withTimeout(
+            tokenProvider(),
+            REQUEST_TIMEOUT_MS,
+            'timed out waiting for auth token',
+        );
+    } catch (e) {
+        // Firebase throttles token refreshes after a burst of sign-ins/
+        // sign-ups from one place - say so plainly instead of surfacing
+        // the SDK's raw "Firebase: Error (auth/too-many-requests)".
+        if (e.code === 'auth/too-many-requests') {
+            throw new Error('Too many attempts - please wait a few minutes and try again.');
+        }
+        throw e;
+    }
     if (token) headers.Authorization = `Bearer ${token}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -220,6 +231,10 @@ export const api = {
 
     me() {
         return request('/auth/me');
+    },
+
+    sendVerificationEmail() {
+        return request('/auth/send-verification', { method: 'POST' });
     },
 
     deleteAccount(confirmUsername) {

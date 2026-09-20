@@ -401,7 +401,16 @@ async function refreshProfile() {
         pendingUsernameClaim = false;
     } catch (e) {
         currentProfile = null;
-        pendingUsernameClaim = true;
+        // ONLY a 404 ("no account registered") means "signed in but hasn't
+        // claimed a username" - anything else (timeout, network failure,
+        // 5xx, expired token) says nothing about whether a username
+        // exists, and treating it as "no username" is what kept dropping
+        // already-registered users onto the choose-a-username screen.
+        pendingUsernameClaim = /\(404\)/.test(e.message);
+        if (!pendingUsernameClaim) {
+            renderAuthUI(`Couldn't load your account (${friendlyErrorMessage(e)}). Click Log In to try again.`);
+            return;
+        }
     }
     renderAuthUI();
     if (currentProfile) refreshChallenges();

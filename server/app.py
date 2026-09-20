@@ -247,6 +247,17 @@ def register(request: Request, req: RegisterRequest, uid: str = Depends(get_curr
     return accounts.register_username(uid, req.username)
 
 
+@app.post("/auth/send-verification")
+@limiter.limit("3/minute")
+def send_verification(request: Request, uid: str = Depends(get_current_uid)):
+    try:
+        notifications.send_verification_email(uid)
+    except Exception as e:
+        logger.warning("send_verification failed for %s: %s", uid, e)
+        raise HTTPException(status_code=502, detail="Couldn't send the verification email - please try again in a moment.")
+    return {"status": "sent"}
+
+
 @app.get("/auth/me")
 def get_me(uid: str = Depends(get_current_uid)):
     return accounts.get_profile(uid)

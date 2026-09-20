@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verify Email - RampartChess</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css?v=57" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
+  </div>
+</header>
+
+<main id="legalPage">
+  <h2>Verify your email</h2>
+  <p id="verifyStatus">Verifying...</p>
+  <p><button id="verifyRetryBtn" hidden>Try again</button></p>
+  <p><a href="index.html">Go to RampartChess</a></p>
+</main>
+
+<script type="module">
+  import { verifyEmailWithCode } from './js/firebase.js';
+
+  const status = document.getElementById('verifyStatus');
+  const retryBtn = document.getElementById('verifyRetryBtn');
+  const code = new URLSearchParams(window.location.search).get('oobCode');
+
+  // Firebase reports an already-used and an expired link the same way
+  // (auth/invalid-action-code, or auth/expired-action-code) - those are
+  // the only failures where the link itself is dead. Anything else (a
+  // throttle, a dropped connection) says nothing about the link, so it
+  // gets a retry instead of a misleading "expired".
+  const DEAD_LINK_CODES = ['auth/invalid-action-code', 'auth/expired-action-code'];
+
+  async function verify() {
+    retryBtn.hidden = true;
+    status.textContent = 'Verifying...';
+    try {
+      await verifyEmailWithCode(code);
+      status.textContent = 'Your email is verified. Thank you!';
+    } catch (e) {
+      if (DEAD_LINK_CODES.includes(e.code)) {
+        status.textContent = 'This link was already used or has expired. If you already verified, you\'re all set - just sign in. Otherwise sign in and click "Resend email" for a new link.';
+      } else {
+        status.textContent = e.code === 'auth/too-many-requests'
+          ? 'Too many attempts right now - wait a minute, then try again.'
+          : 'Couldn\'t verify right now (' + (e.code || e.message) + '). Check your connection and try again.';
+        retryBtn.hidden = false;
+      }
+    }
+  }
+
+  retryBtn.addEventListener('click', verify);
+  if (!code) {
+    status.textContent = 'This verification link is missing its code. Use the link from your email, or request a new one from the site.';
+  } else {
+    verify();
+  }
+</script>
+</body>
+</html>
