@@ -370,33 +370,57 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 #playModes {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    gap: 10px;
     max-width: 1000px;
     margin: 10px auto 0;
-    padding: 0 15px;
+    padding: 6px 15px;
 }
 
+/* Each band is just a trigger button plus a popover panel that drops
+   down under it (positioned against the band on desktop; against
+   #playModes itself on mobile - see the media query below). */
 .playModeBand {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--panel-border);
+    position: relative;
 }
 
-.playModeBand:last-child {
-    border-bottom: none;
-}
-
-.playModeBand h2 {
-    margin: 0;
-    min-width: 130px;
+.playModeTrigger {
     font-family: 'Cinzel Web', Georgia, serif;
     font-size: 0.95em;
-    font-weight: normal;
-    color: var(--muted);
+    padding: 6px 14px;
     white-space: nowrap;
+}
+
+.playModeTrigger[aria-expanded="true"] {
+    background: #40412f;
+}
+
+/* No `display` here on purpose - the `hidden` attribute has to keep
+   winning (same id-selector-vs-[hidden] gotcha noted on #navMenuDropdown). */
+.playModePanel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 30;
+    width: max-content;
+    max-width: calc(100vw - 30px);
+    padding: 10px 12px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Shown only while #challengePanel is hidden (signed out) - pure CSS, so
+   renderAuthUI's existing challengePanel.hidden toggle drives it. */
+#humanSignedOutNote {
+    display: none;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9em;
+}
+#challengePanel[hidden] + #humanSignedOutNote {
+    display: block;
 }
 
 #challengePanel {
@@ -518,6 +542,23 @@ button:disabled { opacity: 0.5; cursor: default; }
     min-width: 60px;
     padding: 6px 14px;
     font-size: 1em;
+}
+
+/* First/last jump buttons sit outside the arrows - narrower, since
+   "|<" / ">|" don't need arrow-width targets. */
+#historyControls #historyFirstBtn,
+#historyControls #historyLastBtn {
+    min-width: 40px;
+    padding: 6px 10px;
+}
+
+/* Just a hint of red so Resign reads as the consequential one - a tinted
+   border only, not a filled danger button. */
+#resignBtn {
+    border-color: rgba(200, 70, 70, 0.7);
+}
+#resignBtn:hover:not(:disabled) {
+    border-color: rgb(220, 80, 80);
 }
 
 /* Shares #quickActions' center column (see the comment on #quickActions
@@ -2028,12 +2069,19 @@ a.ledgerOpponent:hover {
        desktop to sit on one line - on a narrow phone it needs to stack, and
        the form's own fields need to wrap rather than force a horizontal
        scroll. */
-    .playModeBand {
-        flex-direction: column;
-        align-items: stretch;
+    /* Anchor the popovers to the full-width #playModes row instead of
+       their own (half-width) trigger, so they can span the screen. */
+    #playModes {
+        position: relative;
     }
-    .playModeBand h2 {
-        min-width: 0;
+    .playModeBand {
+        position: static;
+    }
+    .playModePanel {
+        left: 15px;
+        right: 15px;
+        width: auto;
+        max-width: none;
     }
     /* "AI plays:" and its <select> were landing right on top of each
        other with zero breathing room when the label's own inline content
@@ -2427,3 +2475,12 @@ a.ledgerOpponent:hover {
     animation: chatFlashBlink 0.5s ease-in-out 3;
 }
 
+
+
+/* -- Profile: account deletion ------------------------------------------ */
+#dangerZone { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.15); }
+#dangerZone h3 { color: #d9534f; }
+#deleteAccountPanel label { display: block; margin: 0.6rem 0; }
+#deleteAccountPanel input { display: block; margin-top: 0.25rem; max-width: 18rem; width: 100%; }
+#deleteAccountConfirmBtn { background: #b52b27; color: #fff; }
+#deleteAccountStatus { min-height: 1.2em; }

@@ -235,7 +235,8 @@ const newGameBtn = document.getElementById('newGameBtn');
 const themeSelect = document.getElementById('themeSelect');
 const pieceSetSelect = document.getElementById('pieceSetSelect');
 const historyPrevBtn = document.getElementById('historyPrevBtn');
-const historyLiveBtn = document.getElementById('historyLiveBtn');
+const historyFirstBtn = document.getElementById('historyFirstBtn');
+const historyLastBtn = document.getElementById('historyLastBtn');
 const historyNextBtn = document.getElementById('historyNextBtn');
 const effectsToggle = document.getElementById('effectsToggle');
 const flipBoardBtn = document.getElementById('flipBoardBtn');
@@ -944,20 +945,18 @@ function historyLastMoveSquares(idx) {
 
 function updateHistoryButtons() {
     if (!state) {
+        historyFirstBtn.disabled = true;
         historyPrevBtn.disabled = true;
         historyNextBtn.disabled = true;
-        historyLiveBtn.disabled = true;
+        historyLastBtn.disabled = true;
         return;
     }
     const total = state.history.length;
     const currentIndex = viewIndex === null ? total : viewIndex;
+    historyFirstBtn.disabled = busy || currentIndex <= 0;
     historyPrevBtn.disabled = busy || currentIndex <= 0;
     historyNextBtn.disabled = busy || currentIndex >= total;
-    // Once a game is over there's no "live" position distinct from the
-    // final one in its history - Next already gets you back to the same
-    // place - so this is disabled outright rather than staying clickable
-    // while browsing a finished game's history.
-    historyLiveBtn.disabled = busy || viewIndex === null || isGameOver(state);
+    historyLastBtn.disabled = busy || currentIndex >= total;
 }
 
 async function goToHistory(index) {
@@ -986,6 +985,11 @@ function goLive() {
     viewIndex = null;
     drawCanvas();
     renderMovesList();
+    // goToHistory() returns straight here for "the latest position"
+    // without ever going through setBusy() (the only other thing that
+    // refreshes these), so without this the arrows kept their stale
+    // while-browsing enabled/disabled state after jumping back to live.
+    updateHistoryButtons();
 }
 
 // ---- small display helpers ----------------------------------------------
@@ -2206,7 +2210,43 @@ canvas.addEventListener('click', async (evt) => {
     }
 });
 
-newGameBtn.addEventListener('click', startNewGame);
+newGameBtn.addEventListener('click', () => {
+    closePlayModeMenus();
+    startNewGame();
+});
+
+// ---- Play vs Computer / Play vs Human dropdowns ---------------------------
+// Same "click to open, click elsewhere to close" behavior as nav.js's
+// setupDropdown, plus only ever one open at a time (setupDropdown's
+// stopPropagation-on-trigger would otherwise leave the other one open).
+const playModeMenus = [
+    { btn: document.getElementById('aiMenuBtn'), panel: document.getElementById('aiMenuPanel') },
+    { btn: document.getElementById('humanMenuBtn'), panel: document.getElementById('humanMenuPanel') },
+];
+
+function closePlayModeMenus(except) {
+    for (const m of playModeMenus) {
+        if (m === except) continue;
+        m.panel.hidden = true;
+        m.btn.setAttribute('aria-expanded', 'false');
+    }
+}
+
+for (const m of playModeMenus) {
+    m.btn.addEventListener('click', (evt) => {
+        evt.stopPropagation();
+        m.panel.hidden = !m.panel.hidden;
+        m.btn.setAttribute('aria-expanded', String(!m.panel.hidden));
+        closePlayModeMenus(m);
+    });
+    // Picking a color/difficulty from a <select> inside the panel isn't
+    // "elsewhere".
+    m.panel.addEventListener('click', (evt) => evt.stopPropagation());
+}
+document.addEventListener('click', () => closePlayModeMenus());
+document.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Escape') closePlayModeMenus();
+});
 
 historyPrevBtn.addEventListener('click', () => {
     if (!state || busy) return;
@@ -2218,9 +2258,13 @@ historyNextBtn.addEventListener('click', () => {
     const currentIndex = viewIndex === null ? state.history.length : viewIndex;
     goToHistory(currentIndex + 1);
 });
-historyLiveBtn.addEventListener('click', () => {
+historyFirstBtn.addEventListener('click', () => {
     if (!state || busy) return;
-    goLive();
+    goToHistory(0);
+});
+historyLastBtn.addEventListener('click', () => {
+    if (!state || busy) return;
+    goToHistory(state.history.length);
 });
 
 updateHistoryButtons();

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>RampartChess</title>
 <link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=53" />
+<link rel="stylesheet" href="style.css?v=56" />
 </head>
 <body>
 <header>
@@ -29,7 +29,7 @@
     <input id="authEmail" type="email" placeholder="Email" size="16">
     <input id="authPassword" type="password" placeholder="Password" size="12">
     <input id="authUsername" type="text" placeholder="Username" enterkeyhint="done" hidden>
-    <button id="claimUsernameBtn" type="button" hidden>Confirm Username</button>
+    <button id="claimUsernameBtn" type="button" hidden>Confirm</button>
     <button id="signUpBtn">Sign Up</button>
     <button id="logInBtn">Log In</button>
     <button id="forgotPasswordBtn" type="button">Forgot password?</button>
@@ -69,7 +69,8 @@
 
 <div id="playModes">
   <section class="playModeBand">
-    <h2>Play vs Computer</h2>
+    <button type="button" class="playModeTrigger" id="aiMenuBtn" aria-expanded="false">Play vs Computer &#9662;</button>
+    <div class="playModePanel" id="aiMenuPanel" hidden>
     <div id="newGamePanel">
       <label>AI plays:
         <select id="aiColorSelect">
@@ -86,9 +87,11 @@
       </label>
       <button id="newGameBtn">New Game</button>
     </div>
+    </div>
   </section>
   <section class="playModeBand">
-    <h2>Play vs Human</h2>
+    <button type="button" class="playModeTrigger" id="humanMenuBtn" aria-expanded="false">Play vs Human &#9662;</button>
+    <div class="playModePanel" id="humanMenuPanel" hidden>
     <div id="challengePanel" hidden>
       <div id="challengeSend">
         <input id="challengeUsername" type="text" placeholder="Username to challenge">
@@ -106,6 +109,8 @@
       </div>
       <div id="incomingChallenges"></div>
       <div id="outgoingChallenges"></div>
+    </div>
+    <p id="humanSignedOutNote">Log in to challenge another player.</p>
     </div>
   </section>
 </div>
@@ -214,9 +219,10 @@
       <button id="declineDrawBtn" hidden>Decline Draw</button>
     </div>
     <div id="historyControls">
+      <button id="historyFirstBtn" title="First position">|&lt;</button>
       <button id="historyPrevBtn" title="Previous move">&larr;</button>
-      <button id="historyLiveBtn" title="Return to the live position">Live</button>
       <button id="historyNextBtn" title="Next move">&rarr;</button>
+      <button id="historyLastBtn" title="Latest position">&gt;|</button>
     </div>
   </div>
   <div id="chatPanel" hidden>
