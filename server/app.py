@@ -762,9 +762,17 @@ class FriendRequestBody(BaseModel):
 
 @app.post("/friends/request")
 @limiter.limit("10/minute")
-def send_friend_request(request: Request, req: FriendRequestBody, uid: str = Depends(get_current_uid)):
+def send_friend_request(request: Request, req: FriendRequestBody, background_tasks: BackgroundTasks,
+                         uid: str = Depends(get_current_uid)):
     profile = accounts.get_profile(uid)
-    return friends.send_request(uid, profile["username"], req.to_username)
+    record = friends.send_request(uid, profile["username"], req.to_username)
+    # Only a genuinely new pending request warrants a "you got a friend
+    # request" email - send_request() silently auto-accepts instead when
+    # the other side already asked first (see its own comment), in which
+    # case record["status"] comes back "accepted" and no such email is due.
+    if record["status"] == "pending":
+        background_tasks.add_task(notifications.notify_friend_request, record["to_uid"], profile["username"])
+    return record
 
 
 @app.get("/friends/incoming")

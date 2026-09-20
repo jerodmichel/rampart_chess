@@ -121,6 +121,21 @@ def notify_message(to_uid: str, from_username: str) -> None:
     notify_user(to_uid, subject, body_text, body_html)
 
 
+def notify_friend_request(to_uid: str, from_username: str) -> None:
+    # messages.html is where incoming friend requests are listed/accepted
+    # (see js/messages.js's friendRequestsSection) - no deep-link param
+    # needed since there's only ever one such list.
+    url = f"{_SITE_BASE_URL}/messages.html"
+    subject = f"{from_username} sent you a friend request on RampartChess"
+    body_text = (
+        f"{from_username} wants to be friends on RampartChess.\n\n"
+        f"View the request here: {url}"
+    )
+    heading = f"<strong>{html_lib.escape(from_username)}</strong> sent you a friend request."
+    body_html = _email_layout(heading, _button_html(url, "View Friend Request"))
+    notify_user(to_uid, subject, body_text, body_html)
+
+
 def notify_challenge(to_uid: str, from_username: str, time_control: str) -> None:
     label = _TIME_CONTROL_LABELS.get(time_control, time_control)
     url = f"{_SITE_BASE_URL}/index.html"

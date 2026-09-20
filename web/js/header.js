@@ -136,5 +136,10 @@ if (accountHeader) {
     }
 
     onAuthChange(initAccountHeader);
+    // Fired by main.js right after a fresh sign-up finishes claiming a
+    // username - that doesn't touch Firebase Auth itself, so onAuthChange
+    // alone never re-fires and this widget would otherwise stay hidden
+    // until something else (e.g. a page refresh) re-triggered it.
+    window.addEventListener('rampart:profileClaimed', initAccountHeader);
     setInterval(() => { if (!accountHeader.hidden) renderNotifications(); }, 10000);
 }

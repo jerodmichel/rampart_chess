@@ -320,6 +320,7 @@ const authStatus = document.getElementById('authStatus');
 const authEmail = document.getElementById('authEmail');
 const authPassword = document.getElementById('authPassword');
 const authUsername = document.getElementById('authUsername');
+const claimUsernameBtn = document.getElementById('claimUsernameBtn');
 const signUpBtn = document.getElementById('signUpBtn');
 const logInBtn = document.getElementById('logInBtn');
 const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
@@ -346,6 +347,7 @@ function renderAuthUI(message) {
     logInBtn.hidden = signedIn;
     forgotPasswordBtn.hidden = signedIn;
     authUsername.hidden = !pendingUsernameClaim;
+    claimUsernameBtn.hidden = !pendingUsernameClaim;
     challengePanel.hidden = currentProfile === null;
 
     // Soft nudge only - nothing server-side is gated on this (see
@@ -473,8 +475,12 @@ authPassword.addEventListener('keydown', loginOnEnter);
 // it does a full navigation to index.html, so there's no in-place state
 // to reset here.
 
-authUsername.addEventListener('keydown', async (evt) => {
-    if (evt.key !== 'Enter' || !pendingUsernameClaim) return;
+// Shared by both the Enter key and claimUsernameBtn - on mobile there's no
+// guarantee the on-screen keyboard's return key even fires a 'keydown'
+// Enter (and it wasn't obviously discoverable as the way to submit even
+// when it does), so a real button is required, not just a nicety.
+async function claimUsername() {
+    if (!pendingUsernameClaim) return;
     if (!authUsername.value) {
         renderAuthUI('Choose a username to finish setting up your account:');
         return;
@@ -483,10 +489,20 @@ authUsername.addEventListener('keydown', async (evt) => {
         currentProfile = await api.register(authUsername.value);
         pendingUsernameClaim = false;
         renderAuthUI();
+        // header.js's account widget only re-fills itself on Firebase auth
+        // state changes (onAuthChange) - claiming a username here doesn't
+        // touch Firebase Auth at all, so without this it stayed hidden/
+        // stale until something else (e.g. a page refresh) re-fired that.
+        window.dispatchEvent(new CustomEvent('rampart:profileClaimed'));
     } catch (e) {
         renderAuthUI(friendlyErrorMessage(e));
     }
+}
+
+authUsername.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Enter') claimUsername();
 });
+claimUsernameBtn.addEventListener('click', claimUsername);
 
 // One-time corrective re-check, not a delay - loadGameFromUrl further down
 // still fires its own api.getGame()/loadGame() immediately as before,
