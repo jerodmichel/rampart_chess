@@ -71,8 +71,9 @@
 
   <h3>Accounts</h3>
   <p>
-    An account requires a real email address (used only for sign-in and, optionally,
-    password recovery and email verification) and a username you choose. You're
+    An account requires a real email address (used for sign-in, password recovery,
+    email verification, and the notification emails described in the Privacy Policy
+    below) and a username you choose. You must be at least 13 years old. You're
     responsible for keeping your login credentials to yourself. You can delete your
     account at any time from the bottom of your Profile page; see
     <a href="delete-account.html">how account deletion works</a> for exactly what is
@@ -85,6 +86,16 @@
     Harassment, hate speech, spam, cheating (including engine assistance in a
     human-vs-human game), or attempting to disrupt the service for other players
     is not allowed and may result in your account being suspended or removed.
+  </p>
+  <p>
+    You can <strong>report</strong> a player from their Profile page, from a direct-message
+    conversation, or from a game's chat panel (the "Report opponent" button), and
+    <strong>block</strong> a player from the same places. Blocking ends any friendship and
+    stops that player messaging you, challenging you, or sending you friend requests; your
+    Profile page lists the players you have blocked so you can unblock them. Reports are read by
+    a person, and we act on them - from removing an offending bio or avatar to suspending the
+    account. We aim to review reports within a few days, but this is a one-person project, so
+    please email us if something is urgent.
   </p>
 
   <h3>No warranty</h3>
@@ -102,13 +113,26 @@
     <li><strong>Account info:</strong> your email address and password are handled
       entirely by Firebase Authentication (a Google Cloud service) - RampartChess's
       own servers never see or store your password.</li>
-    <li><strong>Profile info:</strong> the username, bio, and avatar image you
-      choose to add.</li>
+    <li><strong>Profile info:</strong> the username you choose, plus an optional bio,
+      avatar image, and country. The country is simply whatever you pick from a list
+      - it is never taken from your device's location.</li>
     <li><strong>Gameplay data:</strong> move history, chat messages sent in a game,
-      ratings, and match results, for players in a human-vs-human game.</li>
+      ratings, badges, and match results, for players in a human-vs-human game.
+      Games you play against the computer in the Android app run entirely on your
+      device.</li>
     <li><strong>Social data:</strong> your friend connections (who you're friends
       with) and any direct messages you send to a friend. Direct messages are only
       ever readable by the two people in that conversation.</li>
+    <li><strong>Reports and blocks:</strong> if you report someone, we store your report
+      (who reported whom, the reason, any note you add, and a copy of the reported player's
+      recent messages or profile text so it can't be edited away before we look). Your list of
+      blocked players is stored so the blocks can be enforced. Nobody is told who reported or
+      blocked them.</li>
+    <li><strong>Technical data:</strong> like any online service, our servers see the
+      IP address of each request. We use it only for rate limiting (blocking abuse)
+      and do not store it in your account or profile. We do not use analytics,
+      advertising, or tracking tools, and the Android app does not request access to
+      your location, contacts, camera, microphone, or files.</li>
   </ul>
 
   <h3>How it's used</h3>
@@ -116,20 +140,58 @@
     Solely to run the game itself: authenticating you, displaying your profile and
     match history to other players (your username, bio, avatar, rating, and public
     game history are visible to anyone), matching you with opponents, and keeping
-    a record of games played. Nothing is sold or shared with advertisers.
+    a record of games played.
+  </p>
+  <p>
+    We also send you email when something needs your attention: an
+    email-verification message, and notifications when another player sends you a
+    friend request, challenges you to a game, or sends you a direct message. These
+    include the sender's username (and, for a direct message, an excerpt of it).
+    There is not yet a setting to switch these notifications off - email us at the
+    address under Contact and we will turn them off for you, or you can delete
+    your account. Nothing is sold, and nothing is shared with advertisers.
   </p>
 
   <h3>Where it's stored</h3>
   <p>
-    All data is stored using Google Firebase (Authentication, Realtime Database,
-    and Storage) on Google Cloud infrastructure. No other third-party services
-    currently have access to your data.
+    Account and game data is stored using Google Firebase (Authentication, Realtime
+    Database, and Storage) on Google Cloud infrastructure. The services below
+    process data on our behalf, only to run RampartChess, and are not permitted to
+    use it for their own purposes:
+  </p>
+  <ul>
+    <li><strong>Google Firebase</strong> - sign-in, database, and avatar storage.</li>
+    <li><strong>Fly.io</strong> - hosts the game server (the API that runs online games
+      and stores results in Firebase).</li>
+    <li><strong>Cloudflare</strong> - serves the rampartchess.com website and
+      delivers its pages.</li>
+    <li><strong>Resend</strong> - sends the emails described above, so it receives
+      your email address and the content of those emails.</li>
+  </ul>
+  <p>
+    The rulebook shown on the Game Rules page is loaded from apecrank.net, a site
+    run by the same developer.
+  </p>
+
+  <h3>How long we keep it, and deleting it</h3>
+  <p>
+    We keep your data until you delete your account. You can delete it yourself at
+    any time from the bottom of your Profile page, in the website or the app, or
+    email us if you cannot sign in - see
+    <a href="delete-account.html">how account deletion works</a> for exactly what is
+    removed (your sign-in account and email, profile, avatar, friends, messages,
+    ratings, and games against the computer) and what is kept: finished games
+    between two people stay in the other player's history, but your name is
+    replaced with "Deleted user" and nothing links them back to you. Reports you filed or
+    that were filed about you are kept for moderation records, with your name and any copied
+    content removed. Deletion is immediate and permanent.
   </p>
 
   <h3>Children's privacy</h3>
   <p>
-    RampartChess is not directed at children under 13, and we don't knowingly
-    collect information from them.
+    RampartChess is for people aged 13 and over. It is not directed at children
+    under 13, and we don't knowingly collect information from them. If you believe
+    a child under 13 has created an account, contact us and we will delete it.
   </p>
 
   <h3>Changes</h3>

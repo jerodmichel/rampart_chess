@@ -1,7 +1,17 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
+    ".read": false,
+    ".write": false,
+
+    "games": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "pin_mappings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
     "challenges": {
       ".indexOn": ["from_uid", "to_uid"]
     },

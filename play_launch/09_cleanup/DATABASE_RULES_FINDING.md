@@ -37,3 +37,23 @@ The web client uploads avatars straight to Storage (`avatars/{uid}`). Rules are 
 console (Storage -> Rules) confirm: read allowed (avatars are public), write only when
 `request.auth.uid == uid`, and a size/content-type limit, e.g.
 `allow write: if request.auth.uid == uid && request.resource.size < 2 * 1024 * 1024 && request.resource.contentType.matches('image/.*');`
+
+## Baseline measured 2026-09-21 (before the change) - throwaway signed-in user, direct REST calls, counts only
+READ status 200 on: dm_threads (2 keys), user_threads (3), users (7), usernames (7), friends (5), game_records (33),
+game_chat (15), reports, blocks, games (389), pin_mappings (382). WRITE to a scratch path: 200.
+=> any account could read every DM thread and overwrite anything. (Script: scratchpad db_probe.py - reads key COUNTS
+only, writes only a scratch node it deletes.) Expected AFTER publishing the proposed rules: 401 "Permission denied"
+on everything except `games` and `pin_mappings` (kept open to signed-in users for the legacy desktop client), and the
+scratch write denied.
+
+## Legacy desktop client audit (io_src_dev): touches ONLY games/{id}/{moves,chat,heartbeats,rematch} and pin_mappings/{pin}
+-> both stay `auth != null` in the proposed rules, so the desktop client keeps working. Everything else is denied to
+clients; the server (Admin SDK) is unaffected by rules.
+
+## RESULT - rules published 2026-09-21 (owner saved the previous rules first)
+After publishing: direct REST reads as an ordinary signed-in user -> 401 on dm_threads, user_threads, users, usernames, friends,
+game_records, game_chat, reports, blocks; 200 only on games (389) and pin_mappings (382) as intended; scratch write -> 401.
+Live API smoke test (throwaway account, api.rampartchess.com): 17/17 passed - me, profiles, friends, messages inbox, challenges,
+blocks, live games, bio write, new vs-AI game, move, ai_move, resign, badges, rating history; stranger resign -> 403.
+Repo copy io_src_dev/database.rules.json now matches what is live (uncommitted). Probe account deleted.
+STILL TO DO: Firebase STORAGE rules check (avatars) - owner to paste current rules for review.

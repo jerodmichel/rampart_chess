@@ -374,6 +374,10 @@ export const api = {
         return request(`/messages/${encodeURIComponent(username)}`);
     },
 
+    markThreadRead(username) {
+        return request(`/messages/${encodeURIComponent(username)}/read`, { method: 'POST' });
+    },
+
     inbox() {
         return request('/messages');
     },

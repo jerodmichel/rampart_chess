@@ -3,10 +3,15 @@ backed by the same Realtime Database everything else uses:
 
   dm_threads/{thread_id}/messages/{message_id} -> {from_uid, text, timestamp}
   user_threads/{uid}/{thread_id} -> {other_uid, other_username, last_text,
-                                      last_timestamp}
+                                      last_timestamp, unread}
       denormalized preview info, written to BOTH participants on every
       send - lets the inbox list every conversation with a snippet/time
       in one read instead of N+1 (one read per thread).
+      `unread` is per participant: set True on the RECIPIENT's entry when a
+      message arrives, False on the sender's, cleared by mark_read(). It
+      drives the header notification bell. A thread from before this field
+      existed has none, which reads as "not unread" - no flood of false
+      alerts for old conversations.
 
 thread_id is deterministic - the two uids sorted and joined - rather than
 a pushed id, so "the conversation between A and B" needs no lookup step at
@@ -58,10 +63,12 @@ def send_message(from_uid: str, from_username: str, to_username: str, text: str)
     db.reference(f"user_threads/{from_uid}/{thread_id}").update({
         "other_uid": to_uid, "other_username": to_username,
         "last_text": text, "last_timestamp": stored["timestamp"],
+        "unread": False,
     })
     db.reference(f"user_threads/{to_uid}/{thread_id}").update({
         "other_uid": from_uid, "other_username": from_username,
         "last_text": text, "last_timestamp": stored["timestamp"],
+        "unread": True,
     })
     return {"id": ref.key, **stored}
 
@@ -80,6 +87,20 @@ def list_inbox(uid: str) -> list:
     """Every conversation this account has, most recently active first -
     the data behind the Messages page's conversation list."""
     threads = db.reference(f"user_threads/{uid}").get() or {}
-    out = [{"thread_id": k, **v} for k, v in threads.items()]
+    # A conversation with someone you have since blocked never alerts you.
+    hidden = blocks.blocked_uids(uid)
+    out = [{"thread_id": k, **v, "unread": bool(v.get("unread")) and v.get("other_uid") not in hidden}
+           for k, v in threads.items()]
     out.sort(key=lambda t: t.get("last_timestamp") or 0, reverse=True)
     return out
+
+
+def mark_read(uid: str, other_username: str) -> None:
+    """The viewer has looked at this conversation - clears its unread flag.
+    A no-op if the two have never messaged."""
+    other_uid = accounts.lookup_uid(other_username)
+    thread_id = _thread_id(uid, other_uid)
+    _require_participant(thread_id, uid)
+    ref = db.reference(f"user_threads/{uid}/{thread_id}")
+    if ref.get() is not None:
+        ref.update({"unread": False})

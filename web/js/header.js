@@ -1,5 +1,5 @@
 // Shared "who's signed in + what needs my attention" header widget -
-// notification bell (friend requests, challenges) and an account avatar
+// notification bell (friend requests, challenges, unread messages) and an account avatar
 // with a Profile/Sign Out dropdown - included on every page the same way
 // nav.js's initNavMenu() already is. Lives to the left, next to the
 // hamburger menu, per the user's explicit placement request.
@@ -39,6 +39,7 @@ if (accountHeader) {
     async function renderNotifications() {
         let incomingFriends = [];
         let incomingChallenges = [];
+        let unreadThreads = [];
         try {
             [incomingFriends, incomingChallenges] = await Promise.all([
                 api.incomingFriendRequests(), api.incomingChallenges(),
@@ -46,8 +47,13 @@ if (accountHeader) {
         } catch (e) {
             return; // background poll - transient failure just retries next tick
         }
+        // Separate try: the bell must keep working for requests/challenges
+        // even if the inbox call hiccups (or an older server lacks `unread`).
+        try {
+            unreadThreads = (await api.inbox()).filter((t) => t.unread);
+        } catch (e) { /* no message alerts this tick */ }
 
-        const total = incomingFriends.length + incomingChallenges.length;
+        const total = incomingFriends.length + incomingChallenges.length + unreadThreads.length;
         notifBadge.hidden = total === 0;
         notifBadge.textContent = String(total);
 
@@ -70,6 +76,14 @@ if (accountHeader) {
             row.href = 'index.html';
             const yourColor = c.challenger_color === 'white' ? 'black' : 'white';
             row.textContent = `${c.from_username} challenged you to a game (you'd play ${yourColor})`;
+            notifDropdown.appendChild(row);
+        }
+        for (const t of unreadThreads) {
+            const row = document.createElement('a');
+            row.className = 'notifRow';
+            // messages.html?user=X opens that conversation directly.
+            row.href = `messages.html?user=${encodeURIComponent(t.other_username)}`;
+            row.textContent = `New message from ${t.other_username}`;
             notifDropdown.appendChild(row);
         }
         if (!notifDropdown.hidden) keepOnScreen(notifDropdown);

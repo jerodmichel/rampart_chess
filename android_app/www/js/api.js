@@ -339,6 +339,28 @@ export const api = {
         return request(`/friends/${encodeURIComponent(username)}/remove`, { method: 'POST' });
     },
 
+    // -- blocking + reporting (server/blocks.py, server/reports.py) ---------
+
+    blocks() {
+        return request('/blocks');
+    },
+
+    blockPlayer(username) {
+        return request(`/blocks/${encodeURIComponent(username)}`, { method: 'POST' });
+    },
+
+    unblockPlayer(username) {
+        return request(`/blocks/${encodeURIComponent(username)}`, { method: 'DELETE' });
+    },
+
+    // kind: 'profile' | 'chat' | 'dm' | 'other'; gameId is required for 'chat'.
+    reportPlayer(targetUsername, kind, reason, details = '', gameId = null) {
+        return request('/report', {
+            method: 'POST',
+            body: JSON.stringify({ target_username: targetUsername, kind, reason, details, game_id: gameId }),
+        });
+    },
+
     // -- direct messages (friends only) -------------------------------------
 
     sendDirectMessage(username, text) {

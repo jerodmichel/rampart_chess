@@ -918,6 +918,12 @@ def send_direct_message(request: Request, username: str, req: DirectMessageBody,
     return record
 
 
+@app.post("/messages/{username}/read")
+def mark_thread_read(username: str, uid: str = Depends(get_current_uid)):
+    messages.mark_read(uid, username)
+    return {"status": "read"}
+
+
 @app.get("/messages/{username}")
 def get_direct_messages(username: str, uid: str = Depends(get_current_uid)):
     return messages.list_messages(uid, username)

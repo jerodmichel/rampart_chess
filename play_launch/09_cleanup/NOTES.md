@@ -35,3 +35,12 @@ opened a game on the AI's turn). FIXED (uncommitted): server/app.py _require_ai_
 _resigning_color/abort, ai_move); web/js/main.js humanColor() ownership check + guarded AI trigger + resume-after-profile-load.
 Anonymous vs-AI games (no uid on either side) deliberately unchanged. Verified: 19 server checks (stranger / other user / owner /
 anonymous) + 7 browser checks (spectator, logged-out visitor, owner resuming). Server deploy needed (same one as report/block).
+
+## Notification bell now includes unread DMs (2026-09-21, uncommitted)
+Owner asked (bell only counted friend requests + challenges; email for DMs was fine - a few minutes' delay had looked like a failure).
+Server: user_threads/{uid}/{thread}.unread (True for recipient on send, False for sender), POST /messages/{username}/read,
+list_inbox returns normalized `unread` (False for old threads without the field, and for threads with blocked users).
+Client: header.js bell adds 'New message from X' rows (link messages.html?user=X); messages.js marks the open thread read (only
+while the tab is visible). Tests: server/tests/test_unread.py (7) + browser run 11/11 (light up within the 10s poll, row link,
+opening clears, live message in open thread doesn't leave bell lit, sender not alerted, reply lights the other side).
+Deploy: `fly deploy --ha=false` first, then push web/. Android: re-sync + bump versionCode before next bundle.

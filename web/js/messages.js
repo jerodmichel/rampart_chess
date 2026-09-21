@@ -195,7 +195,17 @@ async function openThread(username) {
         activeThreadMessages = [];
     }
     renderThreadMessages();
+    markActiveThreadRead();
 }
+
+// Clears this conversation's unread flag (which lights the header bell).
+// Only while the tab is actually visible - a message that lands while the
+// player is in another tab should still be waiting for them.
+function markActiveThreadRead() {
+    if (!activeFriend || document.hidden) return;
+    api.markThreadRead(activeFriend).catch(() => { /* best effort - the next poll retries */ });
+}
+document.addEventListener('visibilitychange', markActiveThreadRead);
 
 function closeThread() {
     activeFriend = null;
@@ -254,6 +264,7 @@ async function pollActiveThread() {
     if (fresh.length === activeThreadMessages.length) return;
     activeThreadMessages = fresh;
     renderThreadMessages();
+    markActiveThreadRead();
 }
 
 // ---- page load --------------------------------------------------------

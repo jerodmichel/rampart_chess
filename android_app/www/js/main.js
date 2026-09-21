@@ -2,9 +2,10 @@ import { api, setTokenProvider } from './api.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
 import { attachTapLabel } from './taplabel.js';
+import { openReportDialog } from './moderation-ui.js';
 import { aiOpponentName, aiOpponentAvatar } from './constants.js';
 import {
-    signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl,
+    signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl, auth,
     isEmailVerified, reloadCurrentUser, resetPassword,
 } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
@@ -567,6 +568,13 @@ onAuthChange(async () => {
     if (state) {
         if (humanColor() && !userFlippedManually) setFlipped(humanColor() === 'black');
         renderAll();
+        // A game opened from ?game= loads before the profile does, so an
+        // owner resuming their own vs-AI game on the AI's turn wasn't
+        // recognised as the owner yet when afterStateUpdate() ran, and
+        // the computer's move wasn't triggered - pick it up here.
+        if (humanColor() && !isGameOver(state) && state.next_player === state.ai_color && !aiThinking) {
+            triggerAiMove();
+        }
     }
 });
 
@@ -1037,7 +1045,17 @@ function isGameOver(s) {
 }
 
 function humanColor() {
-    if (state.ai_color) return state.ai_color === 'white' ? 'black' : 'white';
+    if (state.ai_color) {
+        // A vs-AI game a signed-in player started belongs to that player
+        // (their uid is on the human color - see server/app.py's
+        // _require_ai_game_owner); anyone else opening it - e.g. from that
+        // player's profile - is only a spectator, with no move/resign
+        // controls. A fully anonymous game has no uid on either side and
+        // is treated as the viewer's own, as it always has been.
+        const owner = state.white_uid || state.black_uid;
+        if (owner && owner !== (currentProfile?.uid ?? auth.currentUser?.uid)) return null;
+        return state.ai_color === 'white' ? 'black' : 'white';
+    }
     // human-vs-human game (see challenges.py): "my" color is whichever
     // side server/ assigned my uid to, not inferred from an AI opponent.
     if (currentProfile) {
@@ -1576,6 +1594,22 @@ async function sendChatMessage() {
     }
 }
 
+// Reports/blocks the OTHER player of the game whose chat this is. The
+// server checks you were in that game and copies their recent messages into
+// the report; blocking also hides their messages from your chat from then on.
+document.getElementById('chatReportBtn').addEventListener('click', async () => {
+    const opponentColor = humanColor() === 'white' ? 'black' : 'white';
+    const opponent = opponentColor === 'white' ? state?.white_username : state?.black_username;
+    if (!opponent || !gameId) return;
+    const { blocked } = await openReportDialog({ targetUsername: opponent, kind: 'chat', gameId });
+    if (blocked) {
+        try {
+            chatMessages = await api.chatMessages(gameId);
+            renderChatMessages();
+        } catch (e) { /* the next poll will catch up */ }
+    }
+});
+
 chatSendBtn.addEventListener('click', sendChatMessage);
 chatInput.addEventListener('keydown', (evt) => {
     if (evt.key === 'Enter') sendChatMessage();
@@ -1874,12 +1908,15 @@ async function afterStateUpdate(notation, casterColor, captured) {
     viewIndex = null;
     renderAll();
     if (isGameOver(state)) return;
-    if (state.next_player === state.ai_color) {
+    // humanColor() guard: a spectator of someone else's game must never be
+    // the one who makes the computer move.
+    if (state.next_player === state.ai_color && humanColor()) {
         await triggerAiMove();
     }
 }
 
 async function triggerAiMove() {
+    if (aiThinking) return;   // the game-load and profile-load paths can both get here
     aiThinking = true;
     startHourglass();
     ensureAnimationLoop();
