@@ -1,0 +1,1 @@
+First release on Google Play. Play Rampart Chess against the computer offline, or challenge friends and other players online.

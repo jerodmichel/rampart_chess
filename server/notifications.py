@@ -64,6 +64,44 @@ def notify_user(uid: str, subject: str, body_text: str, body_html: Optional[str]
         logger.warning("notify_user: email send failed for %s: %s", uid, e)
 
 
+# Where reports (see reports.py) are emailed - the owner reviews them by hand.
+_ADMIN_EMAIL = os.environ.get("REPORT_EMAIL", "apecrank@gmail.com")
+
+
+def notify_report(record: dict) -> None:
+    """Best-effort email to the site owner about a new report - same
+    never-raises contract as notify_user. Plain text only: this goes to one
+    trusted inbox, and reporter-supplied text must never be rendered as HTML."""
+    if not resend.api_key or not _FROM_ADDRESS:
+        logger.warning("notify_report skipped: RESEND_API_KEY/RESEND_FROM_ADDRESS not configured")
+        return
+    lines = [
+        f"New report on RampartChess ({record.get('kind')}, reason: {record.get('reason')})",
+        f"Reported player: {record.get('target_username')}",
+        f"Reported by:     {record.get('reporter_username')}",
+    ]
+    if record.get("details"):
+        lines += ["", "Reporter's note:", record["details"]]
+    if record.get("game_id"):
+        lines.append(f"Game: {record['game_id']}")
+    if record.get("excerpt"):
+        lines += ["", "Recent messages from the reported player:"] + [f"  - {m.get('text')}" for m in record["excerpt"]]
+    if record.get("profile_snapshot"):
+        lines += ["", f"Their bio: {record['profile_snapshot'].get('bio') or '(empty)'}"]
+    lines += ["", f"Report id: {record.get('report_id')}",
+              "Review:  python3 server/admin_moderation.py reports",
+              f"Act:     python3 server/admin_moderation.py suspend {record.get('target_username')}"]
+    try:
+        resend.Emails.send({
+            "from": _FROM_ADDRESS,
+            "to": [_ADMIN_EMAIL],
+            "subject": f"[RampartChess report] {record.get('reason')} - {record.get('target_username')}",
+            "text": "\n".join(lines),
+        })
+    except Exception as e:
+        logger.warning("notify_report: email send failed: %s", e)
+
+
 # Matches the friendly labels already used client-side for the same raw
 # time_control keys (web/js/profile.js's TIME_CONTROL_LABELS) - kept as its
 # own copy rather than a shared source of truth, since one's Python and one's

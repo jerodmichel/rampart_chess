@@ -23,6 +23,7 @@ from fastapi import HTTPException
 from firebase_admin import db
 
 import accounts
+import blocks
 
 # Kept as a plain local constant (rather than importing GameSession.
 # TIME_CONTROLS) so this module still doesn't need to know GameSession
@@ -63,6 +64,7 @@ def create_challenge(from_uid: str, from_username: str, to_username: str, color:
     to_uid = accounts.lookup_uid(to_username)
     if to_uid == from_uid:
         raise HTTPException(status_code=400, detail="you can't challenge yourself")
+    blocks.require_can_interact(from_uid, to_uid, "challenge")
 
     if color == "random":
         challenger_color = random.choice(["white", "black"])
@@ -101,7 +103,10 @@ def _get(challenge_id: str) -> dict:
 def list_incoming(uid: str) -> list:
     results = db.reference("challenges").order_by_child("to_uid").equal_to(uid).get() or {}
     out = []
+    hidden = blocks.blocked_uids(uid)
     for k, v in results.items():
+        if v.get("from_uid") in hidden:
+            continue
         v = _expire_if_stale(k, v)
         if v.get("status") == "pending":
             out.append({"challenge_id": k, **v})
@@ -125,6 +130,7 @@ def accept(challenge_id: str, uid: str) -> dict:
         raise HTTPException(status_code=403, detail="this challenge isn't addressed to you")
     if record["status"] != "pending":
         raise HTTPException(status_code=409, detail=f'challenge already {record["status"]}')
+    blocks.require_can_interact(uid, record["from_uid"], "accept a challenge from")
     return record
 
 

@@ -1,0 +1,22 @@
+Rampart Chess is a strategic hybrid of chess and card play. Two armies face each other across a rampart barrier, and victory comes by checkmating the enemy king - using both tactical piece movement and a deck of cards.
+
+HOW IT PLAYS
+- Pieces move like in chess, with a twist: Raiders (your pawns) step one square in any direction, capture diagonally, and can never cross back over the rampart barrier.
+- Your deck of cards is a second set of weapons. Cast by combining exactly three cards - from your deck and from the board - that total 21.
+- Raise: with a Raider inside the enemy's Jack's House, spend board cards which hold Raiders, and deck cards, to bring a captured Raider or your Queen back onto the board.
+- Strike: with a Raider inside the enemy's Jack's House, capture an enemy Raider by making 21.
+- The Jack, Queen and King houses on the first and last rows each unlock different powers once Raiders occupy them.
+
+PLAY YOUR WAY
+- Play against the computer on your device at Easy, Medium or Hard difficulty. Games against the computer run entirely on your phone.
+- Challenge other players online, with time controls from 30 minutes to a day per move.
+- Chat during games, add friends and send them direct messages.
+- Build your rating and earn badges and trophies.
+- Review any game move by move.
+- Choose your board theme and piece style.
+
+Landscape full-screen board designed for phones, with tap-to-select pieces and cards.
+
+No ads. No in-app purchases. An account (email and password) is needed for online play, friends and ratings.
+
+Rampart Chess is an independent project and is growing - feedback is welcome at apecrank@gmail.com.

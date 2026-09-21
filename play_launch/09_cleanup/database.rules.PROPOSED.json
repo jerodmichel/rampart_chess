@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "games": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "pin_mappings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "challenges": {
+      ".indexOn": ["from_uid", "to_uid"]
+    },
+    "friend_requests": {
+      ".indexOn": ["from_uid", "to_uid"]
+    }
+  }
+}

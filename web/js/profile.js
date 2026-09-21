@@ -7,6 +7,7 @@ import { aiOpponentName } from './constants.js';
 import { EXTINCT_STATES, flagNode, stateName } from './extinctStates.js';
 import { BADGE_CATEGORIES } from './badges.js';
 import { attachTapLabel } from './taplabel.js';
+import { openReportDialog, confirmAndBlock } from './moderation-ui.js';
 
 setTokenProvider(getIdToken);
 initNavMenu();
@@ -44,6 +45,11 @@ const addFriendRow = document.getElementById('addFriendRow');
 const messageFriendBtn = document.getElementById('messageFriendBtn');
 const addFriendBtn = document.getElementById('addFriendBtn');
 const removeFriendBtn = document.getElementById('removeFriendBtn');
+const reportBtn = document.getElementById('reportBtn');
+const blockBtn = document.getElementById('blockBtn');
+const unblockBtn = document.getElementById('unblockBtn');
+const blockedSection = document.getElementById('blockedSection');
+const blockedList = document.getElementById('blockedList');
 const acceptIncomingFriendBtn = document.getElementById('acceptIncomingFriendBtn');
 const declineIncomingFriendBtn = document.getElementById('declineIncomingFriendBtn');
 const addFriendStatus = document.getElementById('addFriendStatus');
@@ -123,6 +129,34 @@ removeFriendBtn.addEventListener('click', async () => {
     }
 });
 
+reportBtn.addEventListener('click', async () => {
+    const { blocked } = await openReportDialog({ targetUsername: myProfile.username, kind: 'profile' });
+    if (blocked) await refreshFriendStatus();
+});
+
+blockBtn.addEventListener('click', async () => {
+    blockBtn.disabled = true;
+    try {
+        if (await confirmAndBlock(myProfile.username)) await refreshFriendStatus();
+    } catch (e) {
+        addFriendStatus.textContent = apiErrorDetail(e);
+    } finally {
+        blockBtn.disabled = false;
+    }
+});
+
+unblockBtn.addEventListener('click', async () => {
+    unblockBtn.disabled = true;
+    try {
+        await api.unblockPlayer(myProfile.username);
+        await refreshFriendStatus();
+    } catch (e) {
+        addFriendStatus.textContent = apiErrorDetail(e);
+    } finally {
+        unblockBtn.disabled = false;
+    }
+});
+
 let incomingRequestFromViewedPlayer = null; // set by refreshFriendStatus - the request_id, if this player has sent YOU one
 
 acceptIncomingFriendBtn.addEventListener('click', async () => {
@@ -169,12 +203,25 @@ async function refreshFriendStatus() {
     declineIncomingFriendBtn.hidden = true;
     messageFriendBtn.hidden = true;
     removeFriendBtn.hidden = true;
+    reportBtn.hidden = false;
+    blockBtn.hidden = false;
+    unblockBtn.hidden = true;
     addFriendStatus.textContent = '';
     incomingRequestFromViewedPlayer = null;
 
-    const [currentFriends, incoming, outgoing] = await Promise.all([
-        api.friends(), api.incomingFriendRequests(), api.outgoingFriendRequests(),
+    const [currentFriends, incoming, outgoing, blocked] = await Promise.all([
+        api.friends(), api.incomingFriendRequests(), api.outgoingFriendRequests(), api.blocks(),
     ]);
+
+    // Blocked: nothing to do here except offer to undo it (the server
+    // refuses every friend request/challenge/message in either direction).
+    if (blocked.some((b) => b.username === myProfile.username)) {
+        addFriendBtn.hidden = true;
+        blockBtn.hidden = true;
+        unblockBtn.hidden = false;
+        addFriendStatus.textContent = 'You have blocked this player';
+        return;
+    }
 
     if (currentFriends.some((f) => f.username === myProfile.username)) {
         addFriendBtn.hidden = true;
@@ -674,6 +721,8 @@ async function loadProfile() {
         }
     }
 
+    if (isOwnProfile) loadBlockedList();
+
     renderProfileUsername();
     // rating/games_played are absent only for an account registered before
     // ratings existed (accounts.register_username sets them for every new
@@ -707,6 +756,42 @@ async function loadProfile() {
             profileFriendsList.textContent = `Error loading friends: ${e.message}`;
         }
     }
+}
+
+// Own profile only: who you've blocked, with an Unblock button each. The
+// whole section stays hidden while the list is empty.
+async function loadBlockedList() {
+    blockedSection.hidden = true;
+    let blocked;
+    try {
+        blocked = await api.blocks();
+    } catch (e) {
+        console.error('loadBlockedList failed:', e);
+        return;
+    }
+    blockedList.innerHTML = '';
+    for (const b of blocked) {
+        const row = document.createElement('div');
+        row.className = 'friendRow';
+        const name = document.createElement('a');
+        name.href = `profile.html?user=${encodeURIComponent(b.username)}`;
+        name.textContent = b.username;
+        const unblock = document.createElement('button');
+        unblock.textContent = 'Unblock';
+        unblock.addEventListener('click', async () => {
+            unblock.disabled = true;
+            try {
+                await api.unblockPlayer(b.username);
+                await loadBlockedList();
+            } catch (e) {
+                unblock.disabled = false;
+                alert(apiErrorDetail(e));
+            }
+        });
+        row.append(name, unblock);
+        blockedList.appendChild(row);
+    }
+    blockedSection.hidden = blocked.length === 0;
 }
 
 onAuthChange(loadProfile);

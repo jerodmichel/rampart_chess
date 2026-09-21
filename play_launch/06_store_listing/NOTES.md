@@ -1,6 +1,6 @@
 # Store listing text + graphics
 
-Status: NOT STARTED
+Status: DRAFTED 2026-09-21 - text/ and assets/ complete, owner to review; not uploaded.
 
 Put drafts in text/ and image files in assets/ (see subfolders).
 - [ ] App name (<=30 chars), short description (<=80), full description (<=4000)

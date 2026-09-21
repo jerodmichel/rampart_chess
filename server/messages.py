@@ -23,6 +23,7 @@ from fastapi import HTTPException
 from firebase_admin import db
 
 import accounts
+import blocks
 import friends
 
 MAX_MESSAGE_LENGTH = 500
@@ -39,6 +40,7 @@ def _require_participant(thread_id: str, uid: str) -> None:
 
 def send_message(from_uid: str, from_username: str, to_username: str, text: str) -> dict:
     to_uid = accounts.lookup_uid(to_username)
+    blocks.require_can_interact(from_uid, to_uid, "message")
     if not friends.is_friend(from_uid, to_uid):
         raise HTTPException(status_code=403, detail="you can only message a friend")
 

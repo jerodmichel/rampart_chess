@@ -1,8 +1,8 @@
 # Data safety, content rating, declarations
 
-Status: NOT STARTED
+Status: DRAFTED 2026-09-21 - see DRAFT_ANSWERS.md. policy text rewritten + report/block built (both uncommitted). REMAINING: owner applies DB rules fix (09_cleanup/DATABASE_RULES_FINDING.md).
 
-- [ ] Data safety form. Data actually handled (verify against code before submitting):
+- [~] Data safety form. Data actually handled (verify against code before submitting):
       email + user ID (Firebase Auth), username/profile, chat + DMs, game records,
       friends list, ratings. Encrypted in transit (HTTPS). Deletion supported.
 - [ ] Account deletion: in-app (profile page) + web URL https://rampartchess.com/delete-account

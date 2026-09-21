@@ -4,7 +4,8 @@ lets people create accounts).
 Policy, matching web/legal.html and web/delete-account.html:
   - Deleted outright: profile, username (freed for reuse), avatar, badges,
     rating history, friends (both directions), friend requests, challenges,
-    DM threads (both sides), and the user's game index.
+    DM threads (both sides), blocks (both directions), and the user's game
+    index. Reports involving them are kept but redacted (reports.py).
   - Anonymized, NOT deleted: finished human-vs-human game records and their
     in-game chat - the opponent's own history depends on them. The user's
     uid becomes a random "deleted_xxxxxxxx" placeholder (not None: badges.py
@@ -23,6 +24,9 @@ import secrets
 from fastapi import HTTPException
 from firebase_admin import auth as firebase_auth_sdk
 from firebase_admin import db, storage
+
+import blocks
+import reports
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +144,8 @@ def delete_account(uid: str, confirm_username: str) -> dict:
     _delete_friends(uid)
     _delete_challenges(uid)
     _delete_dms(uid)
+    blocks.delete_for_user(uid)
+    reports.anonymize_for_deleted_user(uid)
     db.reference(f"badges/{uid}").delete()
     db.reference(f"rating_history/{uid}").delete()
     _delete_avatar(uid)

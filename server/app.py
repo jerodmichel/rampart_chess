@@ -20,6 +20,7 @@ from slowapi.util import get_remote_address
 import account_deletion
 import accounts
 import badges
+import blocks
 import chat
 import challenges
 import friends
@@ -27,6 +28,7 @@ import game_records
 import messages
 import notifications
 import ratings
+import reports
 from firebase_auth import get_current_uid, get_optional_uid, get_recently_authenticated_uid
 from game_session import GameSession, IllegalMoveError, ReplayOnlyGame
 
@@ -159,6 +161,24 @@ def get_view(game_id: str):
     raise HTTPException(status_code=404, detail=f"no game with id {game_id}")
 
 
+def _require_ai_game_owner(session: GameSession, uid: Optional[str]) -> None:
+    """A game against the computer that a SIGNED-IN player started has that
+    player's uid on their own color (new_game), while the AI's color has no
+    uid at all. Every check below that only compared against a color's uid
+    therefore let ANYONE act on the AI's side, and _resigning_color didn't
+    look at the uid for AI games at all - so a stranger (even one not logged
+    in) could resign, abort, or advance someone else's game against the
+    computer just by knowing its id, which profiles and /games/{id} expose.
+    A fully anonymous game (nobody signed in - no uid on either side) stays
+    unrestricted, exactly as it has always worked: there's no account to
+    protect, and the id is the only handle."""
+    if session.ai_color is None:
+        return
+    owner = session.white_uid or session.black_uid
+    if owner is not None and uid != owner:
+        raise HTTPException(status_code=403, detail="this isn't your game")
+
+
 def _authorize_mover(session: GameSession, uid: Optional[str]) -> None:
     """A game created via /challenges has a real uid on file for each
     color; a game created via /games (human-vs-AI) has both left None and
@@ -166,6 +186,7 @@ def _authorize_mover(session: GameSession, uid: Optional[str]) -> None:
     play the AI. Only enforced here, at the point a move actually mutates
     the game; read-only endpoints (legal_moves, cast_combo_destinations,
     GET /games/{id}) stay open to either side."""
+    _require_ai_game_owner(session, uid)
     expected = session.white_uid if session.next_player == "white" else session.black_uid
     if expected is None:
         return
@@ -180,6 +201,7 @@ def _resigning_color(session: GameSession, uid: Optional[str]) -> str:
     account is needed to identify who's acting there, same as the rest of
     that mode."""
     if session.ai_color is not None:
+        _require_ai_game_owner(session, uid)
         return "black" if session.ai_color == "white" else "white"
     if uid == session.white_uid:
         return "white"
@@ -636,8 +658,9 @@ def cast_combo_move(game_id: str, req: CastComboMoveRequest, uid: Optional[str] 
 
 
 @app.post("/games/{game_id}/ai_move")
-def ai_move(game_id: str):
+def ai_move(game_id: str, uid: Optional[str] = Depends(get_optional_uid)):
     session = get_session(game_id)
+    _require_ai_game_owner(session, uid)
     try:
         notation = session.request_ai_move()
     except IllegalMoveError as e:
@@ -757,7 +780,7 @@ def get_chat_messages(game_id: str, uid: str = Depends(get_current_uid)):
     # should stay readable the same way its move history does.
     session = get_view(game_id)
     _participant_color(session, uid)
-    return chat.list_messages(game_id)
+    return chat.list_messages(game_id, viewer_uid=uid)
 
 
 # -- friends --------------------------------------------------------------
@@ -822,6 +845,57 @@ def list_my_friends(uid: str = Depends(get_current_uid)):
 def remove_friend(username: str, uid: str = Depends(get_current_uid)):
     friends.remove_friend(uid, username)
     return {"status": "removed"}
+
+
+# -- blocking + reporting (Google Play user-generated-content policy) -------
+#
+# See blocks.py / reports.py for what each does and where it is enforced.
+# Reports are only ever READ by the owner through admin_moderation.py - there
+# is deliberately no endpoint that returns them.
+
+@app.get("/blocks")
+def list_my_blocks(uid: str = Depends(get_current_uid)):
+    return blocks.list_blocked(uid)
+
+
+@app.post("/blocks/{username}")
+@limiter.limit("30/minute")
+def block_player(request: Request, username: str, uid: str = Depends(get_current_uid)):
+    return blocks.block(uid, username)
+
+
+@app.delete("/blocks/{username}")
+@limiter.limit("30/minute")
+def unblock_player(request: Request, username: str, uid: str = Depends(get_current_uid)):
+    blocks.unblock(uid, username)
+    return {"status": "unblocked"}
+
+
+class ReportRequest(BaseModel):
+    target_username: str
+    kind: str                      # reports.KINDS
+    reason: str                    # reports.REASONS
+    details: str = ""
+    game_id: Optional[str] = None  # required for kind == "chat"
+
+
+@app.post("/report")
+@limiter.limit("10/hour")
+def report_player(request: Request, req: ReportRequest, background_tasks: BackgroundTasks,
+                  uid: str = Depends(get_current_uid)):
+    verified_game_id = None
+    if req.kind == "chat":
+        if not req.game_id:
+            raise HTTPException(status_code=400, detail="game_id is required to report chat")
+        # Same gate as reading the chat itself: only a participant of a real
+        # two-human game can report messages from it.
+        _participant_color(get_view(req.game_id), uid)
+        verified_game_id = req.game_id
+    profile = accounts.get_profile(uid)
+    record = reports.submit(uid, profile["username"], req.target_username, req.kind,
+                            req.reason, req.details, verified_game_id)
+    background_tasks.add_task(notifications.notify_report, record)
+    return {"report_id": record["report_id"], "status": "received"}
 
 
 # -- direct messages (friends only) ----------------------------------------

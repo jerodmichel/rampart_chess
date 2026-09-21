@@ -14,6 +14,8 @@ chat to support here.
 from firebase_admin import db
 from fastapi import HTTPException
 
+import blocks
+
 MAX_MESSAGE_LENGTH = 500
 
 
@@ -36,8 +38,12 @@ def send_message(game_id: str, uid: str, username: str, text: str) -> dict:
     return {"id": ref.key, **ref.get()}
 
 
-def list_messages(game_id: str) -> list:
+def list_messages(game_id: str, viewer_uid: str = None) -> list:
+    """`viewer_uid`: messages from anyone this viewer has blocked are left
+    out (the blocked player can still type - the blocker just never sees it,
+    and the blocked player isn't told)."""
     results = db.reference(f"game_chat/{game_id}").get() or {}
-    messages = [{"id": k, **v} for k, v in results.items()]
+    hidden = blocks.blocked_uids(viewer_uid) if viewer_uid else set()
+    messages = [{"id": k, **v} for k, v in results.items() if v.get("uid") not in hidden]
     messages.sort(key=lambda m: m.get("timestamp") or 0)
     return messages

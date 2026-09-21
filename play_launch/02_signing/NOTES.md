@@ -1,6 +1,6 @@
 # Release signing key + gradle signing config
 
-Status: DONE except backup - signed release .aab builds and verifies (2026-09-21). Backup of key + passwords still to record.
+Status: DONE - signed release .aab builds and verifies; key + passwords backed up off-machine by user (2026-09-21).
 
 Rules
 - The keystore and its passwords live OUTSIDE the repo: ~/Documents/rampart_secrets/
@@ -27,4 +27,4 @@ Log
 - 2026-09-20: rampart-upload.jks created in ~/Documents/rampart_secrets/ (chmod 600 recommended).
 - 2026-09-21: build.gradle reads ~/Documents/rampart_secrets/keystore.properties; absent file = unsigned release, debug unaffected. `./gradlew help` parses OK. Still TODO: create keystore.properties, backup, then try a signed bundleRelease (box 3).
 - 2026-09-21: first signed bundleRelease OK, jarsigner verifies. Upload cert SHA256 9E:1C:01:24:E2:A1:EC:D8:02:36:F7:B9:00:47:A7:B3:FC:E7:F0:AE:E4:C7:CE:08:6B:64:E0:14:50:76:78:62 (public fingerprint; Play will ask for/show it). Cert subject has country 'C=01' (typo, harmless for an upload key).
-- TODO: back up ~/Documents/rampart_secrets (jks + passwords) OFF this machine and record where above.
+- 2026-09-21: user confirmed ~/Documents/rampart_secrets backed up off this machine.

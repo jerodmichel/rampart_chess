@@ -2515,3 +2515,61 @@ a.ledgerOpponent:hover {
     color: #e5837a;
     border-color: #e5837a;
 }
+
+/* ---- Report / Block (Google Play user-content policy) ------------------
+   Quiet like Remove friend: muted until hovered, red on hover. */
+#reportBtn, #blockBtn, #unblockBtn,
+#threadActions button, #chatReportBtn {
+    color: var(--muted);
+    background: transparent;
+}
+#reportBtn:not([hidden]):hover, #reportBtn:not([hidden]):focus-visible,
+#blockBtn:not([hidden]):hover, #blockBtn:not([hidden]):focus-visible,
+#threadActions button:hover, #threadActions button:focus-visible,
+#chatReportBtn:hover, #chatReportBtn:focus-visible {
+    color: #e5837a;
+    border-color: #e5837a;
+}
+#threadActions { display: flex; gap: 8px; margin: 0 0 8px; }
+#threadActions[hidden] { display: none; }
+#threadActions button, #chatReportBtn { font-size: 0.8em; padding: 2px 8px; }
+#chatReportBtn { align-self: flex-end; margin: 0 0 4px auto; display: block; }
+#blockedSection[hidden] { display: none; }
+
+/* Shared report dialog (js/moderation-ui.js). position:fixed + a high
+   z-index; it is appended inside the fullscreen element when there is one,
+   since nothing outside a fullscreen element renders. */
+.modReportOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.6);
+}
+.modReportDialog {
+    width: 100%;
+    max-width: 420px;
+    max-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 16px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text);
+}
+.modReportDialog h3 { margin: 0 0 8px; }
+.modReportDialog label { display: block; margin: 10px 0; }
+.modReportDialog select, .modReportDialog textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 4px;
+}
+.modReportHint, .modReportStatus { font-size: 0.85em; color: var(--muted); margin: 0 0 8px; }
+.modReportStatus:empty { display: none; }
+.modReportBlockRow { display: flex; align-items: center; gap: 6px; }
+.modReportButtons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.modReportSubmit { background: rgb(159, 43, 104); border-color: rgb(159, 43, 104); color: #fff; }

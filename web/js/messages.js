@@ -1,6 +1,7 @@
 import { api, setTokenProvider, apiErrorDetail } from './api.js';
 import { getIdToken, onAuthChange } from './firebase.js';
 import { initNavMenu } from './nav.js';
+import { openReportDialog, confirmAndBlock } from './moderation-ui.js';
 
 setTokenProvider(getIdToken);
 initNavMenu();
@@ -10,6 +11,9 @@ const messagesPage = document.getElementById('messagesPage');
 const addFriendInput = document.getElementById('addFriendInput');
 const addFriendBtn = document.getElementById('addFriendBtn');
 const addFriendStatus = document.getElementById('addFriendStatus');
+const threadActions = document.getElementById('threadActions');
+const threadReportBtn = document.getElementById('threadReportBtn');
+const threadBlockBtn = document.getElementById('threadBlockBtn');
 const incomingFriendRequestsList = document.getElementById('incomingFriendRequests');
 const outgoingFriendRequestsList = document.getElementById('outgoingFriendRequests');
 const friendsList = document.getElementById('friendsList');
@@ -183,6 +187,7 @@ async function openThread(username) {
     activeFriend = username;
     threadHeader.textContent = username;
     threadInputRow.hidden = false;
+    threadActions.hidden = false;
     renderFriends(currentFriends); // re-render to highlight the active row
     try {
         activeThreadMessages = await api.directMessages(username);
@@ -197,6 +202,7 @@ function closeThread() {
     activeThreadMessages = [];
     threadHeader.textContent = 'Select a friend to start messaging';
     threadInputRow.hidden = true;
+    threadActions.hidden = true;
     threadMessages.innerHTML = '';
 }
 
@@ -211,6 +217,24 @@ async function sendThreadMessage() {
         addFriendStatus.textContent = apiErrorDetail(e);
     }
 }
+
+threadReportBtn.addEventListener('click', async () => {
+    if (!activeFriend) return;
+    const { blocked } = await openReportDialog({ targetUsername: activeFriend, kind: 'dm' });
+    if (blocked) { closeThread(); refreshFriends(); }   // blocking ended the friendship
+});
+
+threadBlockBtn.addEventListener('click', async () => {
+    if (!activeFriend) return;
+    threadBlockBtn.disabled = true;
+    try {
+        if (await confirmAndBlock(activeFriend)) { closeThread(); await refreshFriends(); }
+    } catch (e) {
+        addFriendStatus.textContent = apiErrorDetail(e);
+    } finally {
+        threadBlockBtn.disabled = false;
+    }
+});
 
 threadSendBtn.addEventListener('click', sendThreadMessage);
 threadInput.addEventListener('keydown', (evt) => {
