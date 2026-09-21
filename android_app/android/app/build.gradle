@@ -1,6 +1,16 @@
 apply plugin: 'com.android.application'
 apply plugin: 'com.chaquo.python'
 
+// Release signing: credentials live OUTSIDE the repo in
+// ~/Documents/rampart_secrets/keystore.properties (storeFile, storePassword, keyAlias,
+// keyPassword). If that file is absent the release build is simply unsigned,
+// so debug builds and fresh checkouts keep working.
+def keystorePropsFile = new File(System.getProperty("user.home"), "Documents/rampart_secrets/keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace = "com.rampartchess.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -23,8 +33,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystoreProps.containsKey("storeFile")) {
+            release {
+                storeFile file(keystoreProps["storeFile"])
+                storePassword keystoreProps["storePassword"]
+                keyAlias keystoreProps["keyAlias"]
+                keyPassword keystoreProps["keyPassword"]
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystoreProps.containsKey("storeFile")) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
