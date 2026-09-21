@@ -1,13 +1,14 @@
 import { api, setTokenProvider } from './api.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
+import { attachTapLabel } from './taplabel.js';
 import { aiOpponentName, aiOpponentAvatar } from './constants.js';
 import {
     signUpWithEmail, logInWithEmail, onAuthChange, getIdToken, getAvatarUrl,
-    sendVerificationEmail, isEmailVerified, resetPassword,
+    isEmailVerified, reloadCurrentUser, resetPassword,
 } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
-import { initNavMenu, setupDropdown } from './nav.js';
+import { initNavMenu, setupDropdown, keepOnScreen } from './nav.js';
 import { enterMobileFullscreen, exitMobileFullscreen, onLayoutModeChange, isMobileBoardActive, isFakeFullscreenActive } from './mobile.js';
 import {
     computeCellSize, boardSize, drawBoardMobile, colRowFromPointMobile, cellRect,
@@ -142,7 +143,14 @@ function syncMobileCanvasResolution() {
     // measured before this function changes the canvas's own size, so it
     // isn't measuring something that depends on the very thing being
     // computed.
-    const spaceAboveCanvas = canvas.getBoundingClientRect().top;
+    //
+    // Scroll-independent on purpose: #boardWrap is a scroll container in
+    // fullscreen (belowBoard/chat/moves sit under the board), and
+    // getBoundingClientRect().top shrinks by however far it's scrolled -
+    // a re-sync while scrolled then saw extra room above the board and
+    // ballooned it. Adding scrollTop back gives the unscrolled distance.
+    const spaceAboveCanvas = canvas.getBoundingClientRect().top +
+        (document.getElementById('boardWrap')?.scrollTop || 0);
     const availableWidth = window.innerWidth;
     const availableHeight = Math.max(100, window.innerHeight - spaceAboveCanvas);
     const cell = computeCellSize(availableWidth, availableHeight);
@@ -352,7 +360,7 @@ function renderAuthUI(message) {
     challengePanel.hidden = currentProfile === null;
 
     // Soft nudge only - nothing server-side is gated on this (see
-    // firebase.js's sendVerificationEmail comment), just a reminder banner.
+    // firebase.js's verifyEmailWithCode comment), just a reminder banner.
     verifyEmailBanner.hidden = !signedIn || isEmailVerified();
 
     if (message) {
@@ -416,6 +424,18 @@ async function refreshProfile() {
     if (currentProfile) refreshChallenges();
 }
 
+// The verification link opens in its OWN tab (verify.html), so this tab's
+// cached emailVerified flag never changes on its own - re-read it from
+// Firebase when the player comes back to this tab (and slowly while it
+// stays open), so the banner clears without a manual refresh.
+async function recheckEmailVerified() {
+    if (verifyEmailBanner.hidden) return;
+    if (await reloadCurrentUser()) verifyEmailBanner.hidden = true;
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) recheckEmailVerified(); });
+window.addEventListener('focus', recheckEmailVerified);
+setInterval(() => { if (!document.hidden) recheckEmailVerified(); }, 30000);
+
 signUpBtn.addEventListener('click', async () => {
     if (!authEmail.value || !authPassword.value) {
         renderAuthUI('Enter an email and password.');
@@ -423,7 +443,7 @@ signUpBtn.addEventListener('click', async () => {
     }
     try {
         await signUpWithEmail(authEmail.value, authPassword.value);
-        sendVerificationEmail().catch(() => {}); // best-effort - the resend button covers a failure here
+        api.sendVerificationEmail().catch(() => {}); // best-effort - the resend button covers a failure here
         await refreshProfile();
     } catch (e) {
         renderAuthUI(friendlyErrorMessage(e));
@@ -446,7 +466,7 @@ forgotPasswordBtn.addEventListener('click', async () => {
 resendVerificationBtn.addEventListener('click', async () => {
     resendVerificationBtn.disabled = true;
     try {
-        await sendVerificationEmail();
+        await api.sendVerificationEmail();
         resendVerificationBtn.textContent = 'Sent!';
     } catch (e) {
         resendVerificationBtn.textContent = 'Resend email';
@@ -1783,7 +1803,7 @@ async function buildPlayerEntry(slot, username, isAiSide, difficulty) {
                 for (const badge of trophies) {
                     const iconEl = badge.image ? document.createElement('img') : document.createElement('span');
                     iconEl.className = 'playerTrophyIcon';
-                    iconEl.title = badge.name;
+                    attachTapLabel(iconEl, badge.name);
                     if (badge.image) {
                         iconEl.src = badge.image;
                         iconEl.alt = badge.name;
@@ -2044,9 +2064,18 @@ function positionMobileCastOverlay() {
     // Top-right cluster: row 0, cols 5-9. Shifted right 30px and
     // shortened 20px (net: right edge moves right 10px) per explicit ask.
     const clusterTR = cellRect(5, 0, cell);
-    mobilePrompt.style.left = `${ox + clusterTR.x + inset + 28}px`;
+    // Right edge is pinned to the board's own right edge (where the
+    // graveyard column starts) minus a small gap, rather than derived from
+    // a width guess - the font is what flexes to fit (below), not the box.
+    // The .fakeFullscreen path paints this 7px further left via a CSS
+    // transform (style.css), so its layout edge sits 7px further right to
+    // land the same visible gap.
+    const promptLeft = clusterTR.x + inset + 28;
+    const promptRightGap = isFakeFullscreenActive() ? -3 : 4;
+    const promptWidth = clusterTR.x + clusterWidth - promptRightGap - promptLeft;
+    mobilePrompt.style.left = `${ox + promptLeft}px`;
     mobilePrompt.style.top = `${oy + clusterTR.y + inset}px`;
-    mobilePrompt.style.width = `${clusterWidth - inset * 2 - 20}px`;
+    mobilePrompt.style.width = `${promptWidth}px`;
     mobilePrompt.style.height = `${cell - inset * 2}px`;
     // A fixed em size only ever happens to fit at one particular cell size
     // - computeStatus() ranges from "White to move." up to a 62-character
@@ -2055,7 +2084,56 @@ function positionMobileCastOverlay() {
     // card-label text does) rather than assume one size fits every device.
     // Tuned so the longest real message wraps onto 2 lines and fits both
     // axes, not just picked to look right on one test screen.
-    mobilePrompt.style.fontSize = `${Math.max(9, cell * 0.28)}px`;
+    // The body font (Georgia -> whatever serif the device falls back to) has
+    // different widths per device, so a cell-scaled size alone can't
+    // guarantee the longest sentence fits 2 lines everywhere - shrink it
+    // until it does, using the device's real resolved font.
+    mobilePrompt.style.fontSize = `${fitPromptFontSize(promptWidth, cell - inset * 2, Math.max(9, cell * 0.28))}px`;
+}
+
+// The longest real computeStatus() message - the one the console must be
+// able to show on two lines.
+const PROMPT_LONGEST_MESSAGE = 'Choose cards from your deck and from the board that sum to 21.';
+const PROMPT_MAX_LINES = 2;
+const PROMPT_LINE_HEIGHT = 1.15; // keep in sync with style.css #mobilePrompt
+let promptFitCache = { key: '', size: 0 };
+let promptMeasureCtx = null;
+
+// Largest font size <= maxSize (in 0.5px steps, floor 9) at which
+// PROMPT_LONGEST_MESSAGE word-wraps into at most PROMPT_MAX_LINES lines
+// inside a box of boxWidth x boxHeight (its padding/border subtracted).
+// Greedy word wrap on canvas measureText - the same algorithm the browser
+// uses for normal text - with a small safety margin. Cached: this runs on
+// every redraw but its inputs only change with the board size.
+function fitPromptFontSize(boxWidth, boxHeight, maxSize) {
+    const cs = getComputedStyle(mobilePrompt);
+    const key = [boxWidth.toFixed(1), boxHeight.toFixed(1), maxSize.toFixed(2), cs.fontFamily, cs.fontWeight].join('|');
+    if (promptFitCache.key === key) return promptFitCache.size;
+
+    promptMeasureCtx ??= document.createElement('canvas').getContext('2d');
+    const innerWidth = boxWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) -
+        parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth) - 3;
+    const innerHeight = boxHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) -
+        parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+    const words = PROMPT_LONGEST_MESSAGE.split(' ');
+
+    let size = maxSize;
+    for (; size > 9; size -= 0.5) {
+        promptMeasureCtx.font = `${cs.fontWeight} ${size}px ${cs.fontFamily}`;
+        let lines = 1;
+        let lineWidth = 0;
+        const space = promptMeasureCtx.measureText(' ').width;
+        for (const word of words) {
+            const w = promptMeasureCtx.measureText(word).width;
+            if (lineWidth === 0) lineWidth = w;
+            else if (lineWidth + space + w <= innerWidth) lineWidth += space + w;
+            else { lines++; lineWidth = w; }
+        }
+        if (lines <= PROMPT_MAX_LINES && lines * size * PROMPT_LINE_HEIGHT <= innerHeight) break;
+    }
+    size = Math.max(9, size);
+    promptFitCache = { key, size };
+    return size;
 }
 
 canvas.addEventListener('click', async (evt) => {
@@ -2247,6 +2325,7 @@ for (const m of playModeMenus) {
         m.panel.hidden = !m.panel.hidden;
         m.btn.setAttribute('aria-expanded', String(!m.panel.hidden));
         closePlayModeMenus(m);
+        if (!m.panel.hidden) keepOnScreen(m.panel);
     });
     // Picking a color/difficulty from a <select> inside the panel isn't
     // "elsewhere".

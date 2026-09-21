@@ -8,7 +8,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    onAuthStateChanged, signOut, sendEmailVerification, sendPasswordResetEmail,
+    onAuthStateChanged, signOut, applyActionCode, sendPasswordResetEmail,
     EmailAuthProvider, reauthenticateWithCredential,
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import {
@@ -58,8 +58,25 @@ export async function reauthenticateWithPassword(password) {
 // this only ever drives a UI reminder (see the banner in main.js). Firebase
 // itself has no way to check verification status for anyone but the
 // currently signed-in user, which is all a soft nudge needs anyway.
-export function sendVerificationEmail() {
-    return auth.currentUser ? sendEmailVerification(auth.currentUser) : Promise.resolve();
+//
+// The verification email itself is sent by server/ (api.sendVerificationEmail,
+// our own branded message via Resend) - this is only the landing side:
+// verify.html hands the one-time code from that email's link to here.
+export async function verifyEmailWithCode(code) {
+    await applyActionCode(auth, code);
+    // The email IS verified at this point - refreshing this browser's
+    // cached flag is only a nicety, so a failure here (e.g. a Firebase
+    // throttle) must not turn a success into an error.
+    await reloadCurrentUser();
+}
+
+// Re-reads the signed-in user from Firebase so isEmailVerified() reflects a
+// verification done elsewhere (another tab/device). Never throws.
+export async function reloadCurrentUser() {
+    if (auth.currentUser) {
+        try { await auth.currentUser.reload(); } catch (_) { /* transient - keep the cached value */ }
+    }
+    return isEmailVerified();
 }
 
 export function isEmailVerified() {

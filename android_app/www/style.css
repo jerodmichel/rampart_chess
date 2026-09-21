@@ -129,7 +129,7 @@ header h1 {
     gap: 4px;
     padding: 8px;
     min-width: 240px;
-    max-width: 320px;
+    max-width: min(320px, calc(100vw - 16px));
     background: var(--panel);
     border: 1px solid var(--panel-border);
     border-radius: 6px;
@@ -538,18 +538,11 @@ button:disabled { opacity: 0.5; cursor: default; }
     justify-self: end;
 }
 
+/* All four history buttons ("|<" "<" ">" ">|") share one width. */
 #historyControls button {
-    min-width: 60px;
-    padding: 6px 14px;
-    font-size: 1em;
-}
-
-/* First/last jump buttons sit outside the arrows - narrower, since
-   "|<" / ">|" don't need arrow-width targets. */
-#historyControls #historyFirstBtn,
-#historyControls #historyLastBtn {
     min-width: 40px;
     padding: 6px 10px;
+    font-size: 1em;
 }
 
 /* Just a hint of red so Resign reads as the consequential one - a tinted
@@ -915,6 +908,16 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .friendRow span:first-child {
     flex: 1;
+}
+
+/* Same quiet treatment as the profile page's #removeFriendBtn. */
+.friendRow button {
+    color: var(--muted);
+    background: transparent;
+}
+.friendRow button:hover, .friendRow button:focus-visible {
+    color: #e5837a;
+    border-color: #e5837a;
 }
 
 .friendProfileLink {
@@ -2484,3 +2487,31 @@ a.ledgerOpponent:hover {
 #deleteAccountPanel input { display: block; margin-top: 0.25rem; max-width: 18rem; width: 100%; }
 #deleteAccountConfirmBtn { background: #b52b27; color: #fff; }
 #deleteAccountStatus { min-height: 1.2em; }
+
+/* Touch-screen name bubble for trophies/flags - see js/taplabel.js. */
+#tapLabelBubble {
+    position: fixed;
+    z-index: 10000;
+    max-width: min(280px, calc(100vw - 16px));
+    padding: 5px 10px;
+    background: #000;
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-size: 0.9em;
+    line-height: 1.3;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+#tapLabelBubble[hidden] { display: none; }
+
+/* Deliberately quiet - a destructive action shouldn't look like the primary
+   one next to it; turns red only on hover/focus. */
+#removeFriendBtn {
+    color: var(--muted);
+    background: transparent;
+}
+#removeFriendBtn:not([hidden]):hover, #removeFriendBtn:not([hidden]):focus-visible {
+    color: #e5837a;
+    border-color: #e5837a;
+}

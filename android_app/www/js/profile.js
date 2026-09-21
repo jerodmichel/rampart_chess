@@ -6,6 +6,7 @@ import { COUNTRIES, flagEmoji } from './countries.js';
 import { aiOpponentName } from './constants.js';
 import { EXTINCT_STATES, flagNode, stateName } from './extinctStates.js';
 import { BADGE_CATEGORIES } from './badges.js';
+import { attachTapLabel } from './taplabel.js';
 
 setTokenProvider(getIdToken);
 initNavMenu();
@@ -42,6 +43,7 @@ const playerSearchBtn = document.getElementById('playerSearchBtn');
 const addFriendRow = document.getElementById('addFriendRow');
 const messageFriendBtn = document.getElementById('messageFriendBtn');
 const addFriendBtn = document.getElementById('addFriendBtn');
+const removeFriendBtn = document.getElementById('removeFriendBtn');
 const acceptIncomingFriendBtn = document.getElementById('acceptIncomingFriendBtn');
 const declineIncomingFriendBtn = document.getElementById('declineIncomingFriendBtn');
 const addFriendStatus = document.getElementById('addFriendStatus');
@@ -108,6 +110,19 @@ addFriendBtn.addEventListener('click', async () => {
     }
 });
 
+removeFriendBtn.addEventListener('click', async () => {
+    if (!confirm(`Remove ${myProfile.username} from your friends?`)) return;
+    removeFriendBtn.disabled = true;
+    try {
+        await api.removeFriend(myProfile.username);
+        await refreshFriendStatus(); // back to "Send Friend Request"
+    } catch (e) {
+        addFriendStatus.textContent = apiErrorDetail(e);
+    } finally {
+        removeFriendBtn.disabled = false;
+    }
+});
+
 let incomingRequestFromViewedPlayer = null; // set by refreshFriendStatus - the request_id, if this player has sent YOU one
 
 acceptIncomingFriendBtn.addEventListener('click', async () => {
@@ -153,6 +168,7 @@ async function refreshFriendStatus() {
     acceptIncomingFriendBtn.hidden = true;
     declineIncomingFriendBtn.hidden = true;
     messageFriendBtn.hidden = true;
+    removeFriendBtn.hidden = true;
     addFriendStatus.textContent = '';
     incomingRequestFromViewedPlayer = null;
 
@@ -167,6 +183,7 @@ async function refreshFriendStatus() {
         // link only ever appears once that's actually true.
         messageFriendBtn.href = `messages.html?user=${encodeURIComponent(myProfile.username)}`;
         messageFriendBtn.hidden = false;
+        removeFriendBtn.hidden = false;
         return;
     }
 
@@ -416,9 +433,9 @@ function renderBadges(earned) {
             const unlock = earned[badge.id];
             const cell = document.createElement('div');
             cell.className = unlock ? 'badgeCell badgeEarned' : 'badgeCell badgeLocked';
-            cell.title = unlock
+            attachTapLabel(cell, unlock
                 ? `${badge.name} - ${badge.description}`
-                : `${badge.name} (locked) - ${badge.description}`;
+                : `${badge.name} (locked) - ${badge.description}`);
             const icon = document.createElement('span');
             icon.className = 'badgeIcon';
             if (badge.image) {

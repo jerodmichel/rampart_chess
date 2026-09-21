@@ -149,6 +149,8 @@ async function dismissFriendRequest(requestId) {
 }
 
 async function removeFriend(username) {
+    // One stray click on the row's Remove button used to unfriend instantly.
+    if (!confirm(`Remove ${username} from your friends?`)) return;
     try {
         await api.removeFriend(username);
         if (activeFriend === username) closeThread();

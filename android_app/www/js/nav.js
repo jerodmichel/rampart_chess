@@ -5,10 +5,27 @@
 
 import { isTouchDevice } from './mobile.js';
 
+// Nudges an already-visible, absolutely-positioned panel horizontally so it
+// never spills past either edge of the viewport - a right-anchored menu
+// (e.g. the notification bell's, which sits toward the LEFT of the header
+// on mobile) otherwise runs off the left edge. Call it right after
+// un-hiding, and again after any content change while open.
+export function keepOnScreen(panel) {
+    panel.style.transform = '';
+    const rect = panel.getBoundingClientRect();
+    const margin = 8;
+    const viewportWidth = document.documentElement.clientWidth;
+    let dx = 0;
+    if (rect.left < margin) dx = margin - rect.left;
+    else if (rect.right > viewportWidth - margin) dx = viewportWidth - margin - rect.right;
+    if (dx) panel.style.transform = `translateX(${dx}px)`;
+}
+
 export function setupDropdown(btn, panel) {
     btn.addEventListener('click', (evt) => {
         evt.stopPropagation();
         panel.hidden = !panel.hidden;
+        if (!panel.hidden) keepOnScreen(panel);
     });
     // A click inside the panel (picking a theme, ticking the effects
     // checkbox) shouldn't count as "elsewhere" and close it.

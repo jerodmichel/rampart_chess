@@ -7,9 +7,10 @@
 import { api, setTokenProvider } from './api.js';
 import { getIdToken, onAuthChange, logOut, getAvatarUrl } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
-import { setupDropdown } from './nav.js';
+import { setupDropdown, keepOnScreen } from './nav.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
+import { attachTapLabel } from './taplabel.js';
 
 setTokenProvider(getIdToken); // harmless if the page's own script already did this
 
@@ -71,6 +72,7 @@ if (accountHeader) {
             row.textContent = `${c.from_username} challenged you to a game (you'd play ${yourColor})`;
             notifDropdown.appendChild(row);
         }
+        if (!notifDropdown.hidden) keepOnScreen(notifDropdown);
     }
 
     async function loadAvatar(uid) {
@@ -129,7 +131,7 @@ if (accountHeader) {
             for (const badge of highestPerCategory(earned)) {
                 const iconEl = badge.image ? document.createElement('img') : document.createElement('span');
                 iconEl.className = 'playerTrophyIcon';
-                iconEl.title = badge.name;
+                attachTapLabel(iconEl, badge.name);
                 if (badge.image) {
                     iconEl.src = badge.image;
                     iconEl.alt = badge.name;

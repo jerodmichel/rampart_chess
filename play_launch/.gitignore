@@ -1,0 +1,9 @@
+# Never commit signing material or build outputs (keystore lives OUTSIDE
+# the repo in ~/rampart_secrets/ - these patterns are a safety net).
+*.jks
+*.keystore
+*.p12
+keystore.properties
+*.aab
+*.apk
+*.zip
