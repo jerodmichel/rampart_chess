@@ -19,6 +19,7 @@ import { renderMobilePanels, setDeckCardTapHandler } from './mobile-panels.js';
 import {
     CARD_VAL, CARD_SQUARES, ROWS, COLS,
     DECK_SUIT_INDEX, boardCardSuitIndex, boardCardRankIndex,
+    BOARD_X, RWIDTH, RHEIGHT,
 } from './constants.js';
 import {
     drawScreen, colRowFromPoint, buttonAt, deckCardAt, isPlayableSquare,
@@ -234,6 +235,56 @@ mobileExitFullscreenBtn.addEventListener('click', () => {
 onLayoutModeChange(() => {
     if (syncActiveCanvasResolution()) drawCanvas();
 });
+
+// The empty board (no game loaded) shows a watermark that alternates between
+// the crown and the alchemy queen. Chosen from the wall clock, not at random,
+// so every tab and device agrees and a page left open swaps by itself: even
+// blocks of WATERMARK_PERIOD_MS show the crown, odd blocks the queen. Only
+// visible while no game is loaded - drawScreen() paints the canvas opaque
+// once a game exists - so this can never affect play.
+const WATERMARK_PERIOD_MS = 20 * 60 * 1000;
+function updateWatermark() {
+    const alchemy = Math.floor(Date.now() / WATERMARK_PERIOD_MS) % 2 === 1;
+    canvas.classList.toggle('watermarkAlchemy', alchemy);
+}
+new Image().src = 'assets/misc/queen_alchemy.png'; // preload so the swap is instant
+updateWatermark();
+setInterval(updateWatermark, 30 * 1000);
+
+// Standing "try full screen" nudge for phones (#fullscreenHint; CSS only ever
+// displays it on touch devices). It sits over the blank top-right squares of
+// the normal board - top row, display columns 5-9, which are blank whichever
+// way the board is flipped (a 180-degree turn maps blank squares onto blank
+// squares) - and is shown whenever a game is loaded and fullscreen is not
+// active. Deliberately no "already used it" memory: it is always there on the
+// normal board, and only absent while actually in fullscreen.
+function updateFullscreenHint(gameLoaded) {
+    const hint = document.getElementById('fullscreenHint');
+    if (!hint) return;
+    const inFullscreen = Boolean(document.fullscreenElement) || isFakeFullscreenActive();
+    const show = gameLoaded && !inFullscreen;
+    hint.hidden = !show;
+    if (!show) return;
+    const scale = canvas.getBoundingClientRect().width / DESIGN_WIDTH;
+    const cellH = RHEIGHT * scale;
+    // 2px in from the covered squares' edges on every side, so the label
+    // never touches the grid lines around them.
+    const INSET = 2;
+    hint.style.left = `${canvas.offsetLeft + (BOARD_X + 5 * RWIDTH) * scale + INSET}px`;
+    hint.style.top = `${canvas.offsetTop + INSET}px`;
+    hint.style.width = `${5 * RWIDTH * scale - INSET * 2}px`;
+    hint.style.height = `${cellH - INSET * 2}px`;
+    hint.style.fontSize = `${Math.max(8, cellH * 0.32)}px`;
+}
+document.getElementById('fullscreenHint').addEventListener('click', () => {
+    enterMobileFullscreen(boardWrap).catch(() => {});
+});
+onLayoutModeChange(() => updateFullscreenHint(Boolean(activeState())));
+// The player-names bar (and anything else above the canvas) appears AFTER the
+// first draw and shifts the canvas down without resizing it, which the canvas
+// ResizeObserver above never sees - so re-place the hint whenever #boardWrap
+// itself changes size.
+new ResizeObserver(() => updateFullscreenHint(Boolean(activeState()))).observe(document.getElementById('boardWrap'));
 
 const statusLine = document.getElementById('statusLine');
 const statusLineTextEl = document.getElementById('statusLineText');
@@ -1327,6 +1378,7 @@ function currentDeckCardAt(x, y) {
 
 function drawCanvas() {
     const s = activeState();
+    updateFullscreenHint(Boolean(s));
     if (!s) return;
     updateNamesClocksOrder();
     const browsing = isBrowsingHistory();

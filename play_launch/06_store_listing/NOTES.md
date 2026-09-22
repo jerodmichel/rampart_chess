@@ -9,3 +9,17 @@ Put drafts in text/ and image files in assets/ (see subfolders).
 - [ ] Phone screenshots (min 2, up to 8; landscape is fine for this game)
 - [ ] Category (Board / Strategy), contact email (apecrank@gmail.com), website rampartchess.com
 - [ ] Privacy policy URL: https://rampartchess.com/legal
+
+## REAL-APP SCREENSHOTS 2026-09-21 (late) - assets/real/
+Captured from the real signed release APK running in an Android emulator (AVD `rampart_169`, Pixel 2 = 16:9, so landscape
+is exactly 1920x1080; the Pixel 6 AVD is 2.22:1 and would be REJECTED - Play caps the ratio at 2:1). Fullscreen board, vs-AI game
+(Cletus, Medium), no OS chrome. Flattened to 24-bit RGB (Play rejects alpha). 0.24 MB each.
+- real_1_opening_1920x1080.png   - opening position
+- real_2_legal_moves_1920x1080.png - a Raider selected, legal squares dotted
+- real_3_midgame_1920x1080.png   - mid-game (AI Knight has crossed the rampart; yellow last-move highlights)
+The three owner-reviewed drafts in assets/ are untouched (also 24-bit RGB, also 1920x1080). Use whichever set you prefer; they show
+the same UI. Not yet uploaded anywhere. Known cosmetic: the round X (exit fullscreen) button overlaps the "A" of the top-left deck label.
+Observed in the emulator (real-phone behavior UNVERIFIED): entering fullscreen while in portrait shows the "Rotate your device to
+landscape" overlay - screen.orientation.lock('landscape') (web/js/mobile.js, best-effort by design) was not honored by the
+Android WebView. Players with auto-rotate on just turn the phone; players with rotation locked would have to unlock it. A native
+landscape lock (small Capacitor/Java change) would make this smoother - optional, not a store blocker.

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>RampartChess</title>
 <link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=60" />
+<link rel="stylesheet" href="style.css?v=72" />
 </head>
 <body>
 <header>
@@ -122,6 +122,12 @@
        fullscreens #boardWrap and attempts a landscape orientation lock,
        like YouTube's fullscreen button. Hidden again once fullscreen. -->
   <button id="mobileFullscreenBtn" title="Fullscreen">&#x26F6;</button>
+  <!-- Phones only: a standing nudge toward fullscreen, laid over the blank
+       top-right squares of the normal (non-fullscreen) board - the round
+       button above is easy to miss. main.js positions/sizes it from the
+       canvas and shows it whenever a game is loaded and fullscreen is not
+       active. Tapping it does what the round button does. -->
+  <button type="button" id="fullscreenHint" hidden>&#x26F6; Tap for full screen</button>
   <!-- Shown only while #boardWrap IS the fullscreen element and the device
        is still portrait (see the #boardWrap:fullscreen CSS rule) - i.e.
        only on platforms without orientation-lock support (iOS Safari),
@@ -244,6 +250,6 @@
 </main>
 
 <script type="module" src="js/header.js"></script>
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=66"></script>
 </body>
 </html>

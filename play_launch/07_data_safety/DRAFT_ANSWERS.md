@@ -84,3 +84,36 @@ No edit made yet - needs the owner's OK since it is live legal text.
 - Report/block abusive users: grep of web/js (messages/profile) found NO report or block feature - only Remove friend. Play's UGC policy expects in-app reporting + a way to block/remove abusive users; user-set avatars/bios/usernames/chat are public UGC. LIKELY REVIEW RISK - decide on a minimal report+block feature (see 09_cleanup).
 - Is the DM/chat text moderated or filtered at all?
 - OK to edit legal.html per the list above (I'd prepare the diff for review)?
+
+## CONSISTENCY PASS 2026-09-21 (late) - store text + Data safety vs. the code/built app
+Checked against the CURRENT code and the real signed release APK in the emulator. RESULT: no blocking mismatches.
+
+**Verified TRUE (listing + policy claims):**
+- Manifest (source AND merged release): only INTERNET (+ Android's own signature-level receiver perm). No location/contacts/camera/mic/storage.
+- No analytics/ads/crash-reporting/billing anywhere in web/ or the Android build files. External hosts in the shipped app:
+  api.rampartchess.com, www.gstatic.com (Firebase SDK), firebaseio.com, apecrank.net (rulebook) - matches the policy. No Google Fonts.
+- vs-AI works with NO connectivity: emulator in airplane mode (ping unreachable), cold launch -> menu -> New Game -> board ->
+  a human move -> on-device AI replied. So "runs entirely on your phone" and the release note "offline" are true.
+- Difficulties Easy/Medium/Hard, time controls 30 min / 1 hour / 1 day per move, theme + piece-style pickers, badges/trophies,
+  move-by-move review, chat/friends/DMs all exist. Report (profile, DM thread, game chat "Report opponent") + block/unblock exist
+  and are in the built bundle, as legal.html claims. In-app delete-account controls exist in profile.js.
+- Live URLs return 200: rampartchess.com/legal and /delete-account. Policy covers Resend/Fly.io/Cloudflare, notification emails,
+  country/badges, IP-for-rate-limiting, 13+, retention + deletion, reports/blocks. Items 1-7 of the old "MUST BE FIXED" list are DONE,
+  and the old DB-rules finding is DONE (rules hardened + verified 401s).
+
+**Update the form answers vs. the draft table above:**
+- Email address purposes: add "Developer communications" (notification emails) alongside Account management + App functionality.
+- Bio is "Other user-generated content" (App activity), not "Other personal info"; country is "Other info" (Personal info) - NOT Location.
+- Add reports + block lists (App activity / Messages: copied reported text). Purposes: App functionality + Fraud prevention, security and compliance.
+- Target audience: choose age bands 13-15, 16-17, 18+ (nothing under 13) and do NOT opt into Families.
+- Content rating (IARC): answer YES to user interaction/UGC (chat, DMs, profile text). Answer NO to gambling: the game uses playing cards and
+  a "make 21" rule but has no betting/money - answer literally, since card imagery can look like simulated gambling to a skimmer.
+
+**Owner decisions still open (none block the closed test):**
+1. android:allowBackup is "true". A chess app has nothing on-device worth restoring, and auto-backup would copy WebView storage (incl. the
+   Firebase login token) to a Google backup. Recommend false (one-line manifest change + rebuild; safe while nothing is uploaded).
+   Data safety answer is the same either way - backups to the user's own Google account are not counted as developer collection.
+2. legal.html opens with "a plain-language starter policy ... not a lawyer-drafted legal document ... should get a real legal review before
+   any wide public launch". Honest, and not a rejection risk, but reads unprofessional on a store-linked policy. Consider trimming the wording.
+3. Firebase STORAGE rules (avatars) still unreviewed - avatars are publicly readable by design; want owner-only write + size/type limit.
+4. No in-app switch for notification emails (policy says "email us") - acceptable, but Play reviewers may like a toggle later.

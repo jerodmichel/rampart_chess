@@ -9,8 +9,8 @@ Update the Status line in the folder AND tick the box here.
 | 2 | Release keystore + signing config | 02_signing | [x] done, key backed up |
 | 3 | Version bump + release .aab | 03_release_build | [x] signed .aab ready (v1); bump versionCode for later uploads |
 | 4 | 16KB page-size check | 04_16kb_check | [x] PASS |
-| 5 | Play Console developer account | 05_play_account | [~] created; verification NOT yet submitted (needs ID) |
-| 6 | Store listing text + graphics | 06_store_listing | [~] drafted - owner review |
+| 5 | Play Console developer account | 05_play_account | [x] created + identity and phone VERIFIED 2026-09-22; next: create the app entry |
+| 6 | Store listing text + graphics | 06_store_listing | [~] drafted + real-app screenshots (assets/real/) - owner review |
 | 7 | Data safety / content rating / declarations | 07_data_safety | [~] drafted; report/block built; DB rules HARDENED (live); Storage rules check pending |
 | 8 | Internal -> closed testing -> production | 08_testing_tracks | [ ] |
 | 9 | Cleanup / loose ends | 09_cleanup | [ ] |
@@ -50,9 +50,9 @@ notification bell now shows unread DMs; x86_64 ABI kept in release (decided).
 5. Read reports occasionally: `python3 server/admin_moderation.py reports` (needs server/serviceAccountKey.json).
 
 **Ready for me to do when asked:**
-- Take real-app screenshots from the emulator (needs touch emulation kept on so the mobile layout applies).
+- (DONE 2026-09-21) Real-app screenshots: 06_store_listing/assets/real/ (see 06_store_listing/NOTES.md).
+- (DONE 2026-09-21) Pre-upload consistency pass: see the bottom of 07_data_safety/DRAFT_ANSWERS.md - no blocking mismatches; 4 owner decisions listed there.
 - Review Storage rules once pasted.
-- Final pre-upload checklist pass (store text vs. actual features, Data safety vs. code) - see 07_data_safety/DRAFT_ANSWERS.md.
 
 **Loose ends / nice-to-have:** no in-app switch for notification emails (privacy policy says "email us"); android_app/node_modules is
 tracked in git (~1000 files, untrack later); DMARC is p=reject (loosen if mail vanishes); live two-device human-vs-human test;

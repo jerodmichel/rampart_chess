@@ -492,6 +492,26 @@ button:disabled { opacity: 0.5; cursor: default; }
        canvas pixels during the blank state before/between games. */
     background: var(--bg) url('assets/misc/queen_watermark.png') center / auto 60% no-repeat;
 }
+/* Every WATERMARK_PERIOD_MS (main.js) the empty board swaps between the crown
+   above and the alchemy queen - on the website (desktop and phone browsers) and
+   in the Android app alike. Only the image changes, so position/size/colour
+   above still apply. */
+#boardCanvas.watermarkAlchemy {
+    background-image: url('assets/misc/queen_alchemy.png');
+    /* Fills the whole empty-board box edge to edge (cropping a bit of the
+       image rather than leaving margins - the box is a 1000/860 landscape
+       shape, the source art a 749/906 portrait one, so a straight fit would
+       letterbox). This is a `background` on #boardCanvas ITSELF, i.e. still
+       fully contained inside the board's own box - it can never paint over
+       any sibling element (Flip Board, the history arrows, the round
+       fullscreen button, anything above/below the board), regardless of how
+       large the image is scaled here. */
+    /* cover overflows vertically here (the box is wider-than-tall, the art
+       taller-than-wide) - "top" keeps the crop entirely at the bottom, never
+       cutting into her face/hair at the top. */
+    background-size: cover;
+    background-position: center top;
+}
 
 /* Three tracks - left (display settings/flip board), center (Abort/
    Resign for a vs-AI game, OR Offer Draw/Resign for human-vs-human -
@@ -2573,3 +2593,34 @@ a.ledgerOpponent:hover {
 .modReportBlockRow { display: flex; align-items: center; gap: 6px; }
 .modReportButtons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .modReportSubmit { background: rgb(159, 43, 104); border-color: rgb(159, 43, 104); color: #fff; }
+
+/* Fullscreen nudge (see #fullscreenHint in index.html): phones only, laid
+   over the blank top-right squares of the normal board. main.js sets its
+   left/top/width/height/font-size from the canvas and toggles [hidden]
+   (game loaded + not fullscreen). */
+#fullscreenHint {
+    display: none;
+}
+@media (pointer: coarse) and (hover: none) {
+    #fullscreenHint:not([hidden]) {
+        display: flex;
+        position: absolute;
+        z-index: 5;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        overflow: hidden;
+        background: rgba(20, 20, 16, 0.82);
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        color: var(--text);
+        font: inherit;
+        line-height: 1.1;
+        text-align: center;
+        cursor: pointer;
+    }
+    #boardWrap:fullscreen #fullscreenHint,
+    #boardWrap.fakeFullscreen #fullscreenHint {
+        display: none;
+    }
+}
