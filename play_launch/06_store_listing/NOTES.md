@@ -23,3 +23,11 @@ Observed in the emulator (real-phone behavior UNVERIFIED): entering fullscreen w
 landscape" overlay - screen.orientation.lock('landscape') (web/js/mobile.js, best-effort by design) was not honored by the
 Android WebView. Players with auto-rotate on just turn the phone; players with rotation locked would have to unlock it. A native
 landscape lock (small Capacitor/Java change) would make this smoother - optional, not a store blocker.
+
+## Feature graphic UPDATE 2026-09-22
+Replaced feature_graphic_1024x500.png: same layout/crown/rule as before, new tagline "Chess and cards,
+transmuted. A game of pure strategy." (echoes short_description.txt's "while remaining a game of pure
+strategy"), queen art re-cropped centered on the face (was showing the "Rampart" script sliver + dark
+spire edge before), fades on all sides. Rebuilt with PIL from web/assets/misc/logo_crown.png +
+fonts/cinzel/Cinzel-SemiBold.ttf + rampart_bg.png (no source file existed for the original - recreated
+to match). 1024x500, RGB, no alpha - matches Play's requirement.
