@@ -1030,14 +1030,14 @@ button:disabled { opacity: 0.5; cursor: default; }
     min-width: 0;
 }
 
-#legalPage {
+#legalPage, #aboutPage {
     max-width: 800px;
     margin: 30px auto 60px;
     padding: 0 15px;
     line-height: 1.5;
 }
 
-#legalPage h2 {
+#legalPage h2, #aboutPage h2 {
     font-family: 'Cinzel Web', Georgia, serif;
     color: var(--muted);
     border-bottom: 1px solid var(--panel-border);
@@ -1045,7 +1045,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     margin-top: 32px;
 }
 
-#legalPage h3 {
+#legalPage h3, #aboutPage h3 {
     margin-bottom: 4px;
 }
 
