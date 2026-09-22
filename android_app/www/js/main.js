@@ -242,14 +242,14 @@ onLayoutModeChange(() => {
 // blocks of WATERMARK_PERIOD_MS show the crown, odd blocks the queen. Only
 // visible while no game is loaded - drawScreen() paints the canvas opaque
 // once a game exists - so this can never affect play.
-const WATERMARK_PERIOD_MS = 20 * 60 * 1000;
+const WATERMARK_PERIOD_MS = 3 * 60 * 1000;
 function updateWatermark() {
     const alchemy = Math.floor(Date.now() / WATERMARK_PERIOD_MS) % 2 === 1;
     canvas.classList.toggle('watermarkAlchemy', alchemy);
 }
 new Image().src = 'assets/misc/queen_alchemy.png'; // preload so the swap is instant
 updateWatermark();
-setInterval(updateWatermark, 30 * 1000);
+setInterval(updateWatermark, 10 * 1000);
 
 // Standing "try full screen" nudge for phones (#fullscreenHint; CSS only ever
 // displays it on touch devices). It sits over the blank top-right squares of
