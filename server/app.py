@@ -17,6 +17,8 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
+from firebase_admin import db
+
 import account_deletion
 import accounts
 import badges
@@ -27,6 +29,7 @@ import friends
 import game_records
 import messages
 import notifications
+import players
 import ratings
 import reports
 from firebase_auth import get_current_uid, get_optional_uid, get_recently_authenticated_uid
@@ -461,6 +464,86 @@ def _serialize_cast_moves(moves_by_category: dict) -> dict:
     return out
 
 
+def _live_human_sessions() -> list:
+    """In-progress human-vs-human games. A clock that ran out with nobody
+    looking is only noticed by _check_timeout on a read, so check here too -
+    otherwise an abandoned game would sit in Live Games forever."""
+    out = []
+    for session in list(GAMES.values()):
+        if session.ai_color is not None or session.white_uid is None or session.black_uid is None:
+            continue
+        session._check_timeout()
+        if session.is_game_over():
+            _finalize_if_needed(session)
+            continue
+        out.append(session)
+    return out
+
+
+def _rehydrate_unfinished_games() -> None:
+    """Startup: reload every unfinished human-vs-human game into GAMES, so a
+    deploy/restart doesn't drop them from Live Games until a player happens
+    to open one. Games whose clock already ran out are skipped (left to the
+    usual lazy finalize on first read) so a deploy never writes results or
+    ratings by itself."""
+    try:
+        records = db.reference("game_records").get() or {}
+    except Exception:
+        logger.exception("startup: couldn't read game_records to rehydrate games")
+        return
+    loaded = 0
+    for game_id, record in records.items():
+        if game_id in GAMES or not isinstance(record, dict) or not _rehydrate_eligible(record):
+            continue
+        try:
+            session = GameSession.rehydrate(record)
+        except Exception:
+            logger.exception("startup: failed to rehydrate game %s", game_id)
+            continue
+        session._check_timeout()
+        if session.is_game_over():
+            continue
+        GAMES.setdefault(game_id, session)
+        loaded += 1
+    logger.info("startup: rehydrated %d unfinished game(s)", loaded)
+
+
+@app.on_event("startup")
+def _on_startup():
+    if os.environ.get("RAMPART_SKIP_STARTUP_REHYDRATE"):
+        return
+    _rehydrate_unfinished_games()
+
+
+# -- Players page ----------------------------------------------------------
+
+@app.get("/players")
+def list_players(uid: Optional[str] = Depends(get_optional_uid)):
+    """Public: every account ranked by rating, with online/playing status.
+    Signed-in viewers also get per-row can_challenge (see players.py)."""
+    playing = {}
+    for session in _live_human_sessions():
+        playing[session.white_uid] = playing[session.black_uid] = session.id
+    return players.list_players(uid, playing)
+
+
+@app.post("/presence")
+@limiter.limit("10/minute")
+def presence_ping(request: Request, uid: str = Depends(get_current_uid)):
+    players.ping(uid)
+    return {"ok": True}
+
+
+class PrivacyRequest(BaseModel):
+    challenge_policy: Optional[str] = None  # "everyone" | "friends"
+    show_online: Optional[bool] = None
+
+
+@app.post("/profile/privacy")
+def update_privacy(req: PrivacyRequest, uid: str = Depends(get_current_uid)):
+    return players.update_privacy(uid, req.challenge_policy, req.show_online)
+
+
 @app.get("/games/live")
 def list_live_games():
     """Public spectator list - every in-memory, still-in-progress
@@ -471,9 +554,7 @@ def list_live_games():
     viewer's own uid happens to match a color (see humanColor() in
     main.js), so no separate "spectator mode" was needed."""
     out = []
-    for session in GAMES.values():
-        if session.ai_color is not None or session.is_game_over():
-            continue
+    for session in _live_human_sessions():
         out.append({
             "id": session.id,
             "white_username": accounts.get_profile(session.white_uid)["username"],

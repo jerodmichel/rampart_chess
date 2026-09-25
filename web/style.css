@@ -2654,3 +2654,517 @@ a.ledgerOpponent:hover {
         display: none;
     }
 }
+
+/* ---- Players page (players.html / js/players.js) ------------------------ */
+
+#playersPage {
+    --gold: #d9b44a;
+    --silver: #c3c8cf;
+    --bronze: #c98a4e;
+    --online: #6cc070;
+    --accent: #8fb56a;
+    max-width: 860px;
+    margin: 30px auto 60px;
+    padding: 0 16px;
+}
+
+#playersHero {
+    text-align: center;
+    margin-bottom: 22px;
+}
+
+#playersHero h2 {
+    margin: 0;
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-size: 2.2em;
+    letter-spacing: 2px;
+    font-weight: 600;
+}
+
+#playersSummary {
+    margin: 6px 0 0;
+    color: var(--muted);
+}
+
+.summaryOnline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
+}
+
+#playersToolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+#playersFilters {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 999px;
+}
+
+.playersFilter {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    padding: 5px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95em;
+}
+
+.playersFilter[hidden] { display: none; }
+
+.playersFilter.active {
+    background: #3a3b30;
+    color: var(--text);
+}
+
+#playersSearch {
+    flex: 0 1 240px;
+    min-width: 0;
+    padding: 6px 12px;
+    border-radius: 999px;
+}
+
+#playersSignedOutNote {
+    margin: 0 0 14px;
+    color: var(--muted);
+    text-align: center;
+}
+
+#playersSignedOutNote a { color: var(--accent); }
+
+/* avatar with a presence dot in its corner */
+.playerAvatar {
+    position: relative;
+    flex: none;
+    display: inline-block;
+    width: var(--avatar-size);
+    height: var(--avatar-size);
+}
+
+.playerAvatar img,
+.playerAvatar canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    background: #1c1d17;
+}
+
+.playerAvatar img[hidden],
+.playerAvatar canvas[hidden] { display: none; }
+
+.statusDot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #55564c;
+}
+
+.playerAvatar .statusDot {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: max(10px, calc(var(--avatar-size) * 0.24));
+    height: max(10px, calc(var(--avatar-size) * 0.24));
+    border: 2px solid var(--panel);
+}
+
+.statusDot.offline { display: none; }
+.statusDot.online { background: var(--online); }
+
+.statusDot.pulse {
+    box-shadow: 0 0 0 0 rgba(108, 192, 112, 0.6);
+    animation: onlinePulse 2.4s ease-out infinite;
+}
+
+@keyframes onlinePulse {
+    0% { box-shadow: 0 0 0 0 rgba(108, 192, 112, 0.55); }
+    70% { box-shadow: 0 0 0 8px rgba(108, 192, 112, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(108, 192, 112, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .statusDot.pulse { animation: none; }
+}
+
+.playerNameLine {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+
+.playerName {
+    color: var(--text);
+    text-decoration: none;
+    font-weight: bold;
+    overflow-wrap: anywhere;
+}
+
+.playerName:hover { text-decoration: underline; }
+
+.playerTag {
+    font-size: 0.68em;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+    font-family: sans-serif;
+}
+
+.playerTag.me { color: var(--accent); }
+.playerTag.friend { color: #8fb3d9; }
+.playerTag.new { color: var(--muted); }
+
+.playersTrophies {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.playersTrophyIcon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+.playersTrophyMore {
+    font-size: 0.8em;
+    color: var(--muted);
+}
+
+.ratingValue {
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-size: 1.35em;
+    font-variant-numeric: tabular-nums;
+}
+
+.ratingSub {
+    font-size: 0.75em;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.playerActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.challengeBtn,
+.watchBtn,
+.primaryBtn {
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.challengeBtn,
+.primaryBtn {
+    background: var(--accent, #8fb56a);
+    color: #15160f;
+    border: 1px solid var(--accent, #8fb56a);
+    font-weight: bold;
+}
+
+.challengeBtn:hover,
+.primaryBtn:hover { filter: brightness(1.1); }
+
+.watchBtn {
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    background: transparent;
+}
+
+.watchBtn:hover { border-color: var(--muted); }
+
+.friendsOnlyNote {
+    font-size: 0.8em;
+    color: var(--muted);
+    font-style: italic;
+}
+
+/* podium: gold raised in the middle, silver left, bronze right */
+/* Heights are fixed by place, not by content: every card stretches to the
+   row's bottom edge, and silver/bronze start a step lower (margin-top), so
+   gold is always tallest, then silver, then bronze - however many trophies
+   or buttons each one happens to carry. */
+#podium {
+    --step: 26px;
+    list-style: none;
+    margin: 0 0 18px;
+    padding: 16px 0 0; /* room for the rank badges that overhang the top */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 12px;
+}
+
+#podium[hidden] { display: none; }
+
+.podiumCard {
+    --medal: var(--bronze);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 26px 12px 14px;
+    text-align: center;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--medal) 14%, var(--panel)) 0%, var(--panel) 60%);
+    border: 1px solid color-mix(in srgb, var(--medal) 45%, var(--panel-border));
+    border-radius: 10px;
+    min-width: 0;
+}
+
+.podiumCard.gold { --medal: var(--gold); order: 2; padding-top: 38px; box-shadow: 0 0 24px -6px color-mix(in srgb, var(--gold) 45%, transparent); }
+.podiumCard.silver { --medal: var(--silver); order: 1; margin-top: var(--step); }
+.podiumCard.bronze { --medal: var(--bronze); order: 3; margin-top: calc(var(--step) * 2); }
+
+.podiumCard .playerAvatar {
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--medal);
+}
+
+.podiumCard.gold .playerAvatar { --avatar-size: 88px !important; }
+
+.podiumRank {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--medal);
+    color: #1a1a14;
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.podiumCard .playerNameLine {
+    justify-content: center;
+    max-width: 100%;
+}
+
+.podiumRating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
+}
+
+.podiumCard.gold .ratingValue { font-size: 1.7em; color: var(--gold); }
+.podiumRating .ratingSub.live { color: var(--online); }
+.podiumCard .playerActions { justify-content: center; flex-wrap: wrap; margin-top: auto; }
+
+/* ranked rows */
+#playersList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.playerRow {
+    display: grid;
+    grid-template-columns: 34px auto minmax(0, 1fr) 84px 150px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+}
+
+.playerRow.isMe {
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--panel-border));
+    background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+}
+
+.playerRank {
+    text-align: center;
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+    font-size: 1.05em;
+}
+
+.playerInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.playerMeta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.85em;
+}
+
+.playerStatus { color: var(--muted); }
+.playerStatus.online { color: var(--online); }
+.playerStatus.playing { color: var(--gold); }
+
+.playerRating {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.2;
+}
+
+.playersDivider {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 14px 4px 2px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+}
+
+.playersDivider small {
+    font-family: Georgia, serif;
+    font-size: 0.8em;
+    opacity: 0.8;
+}
+
+#playersEmpty {
+    text-align: center;
+    color: var(--muted);
+    padding: 30px 0;
+}
+
+/* challenge dialog */
+#challengeDialog {
+    width: min(380px, calc(100vw - 32px));
+    padding: 20px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+#challengeDialog::backdrop {
+    background: rgba(10, 10, 8, 0.65);
+    backdrop-filter: blur(2px);
+}
+
+#challengeDialogTitle {
+    margin: 0 0 12px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-weight: 600;
+}
+
+#challengeDialogPlayer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.dialogRating {
+    margin-left: auto;
+    font-family: 'Cinzel Web', Georgia, serif;
+}
+
+#challengeForm label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    font-size: 0.9em;
+    color: var(--muted);
+}
+
+#challengeDialogStatus {
+    min-height: 1.2em;
+    margin: 4px 0 12px;
+    font-size: 0.9em;
+}
+
+#challengeDialogStatus.ok { color: var(--online, #6cc070); }
+#challengeDialogStatus.ok a { color: var(--text); }
+#challengeDialogStatus.error { color: #e5837a; }
+
+#challengeDialogButtons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+#challengeDialogButtons button[hidden] { display: none; }
+
+#challengeDialogCancel {
+    border-radius: 999px;
+    padding: 6px 14px;
+}
+
+@media (max-width: 600px) {
+    #playersHero h2 { font-size: 1.8em; }
+    #playersToolbar { justify-content: center; }
+    #playersSearch { flex: 1 1 100%; }
+
+    #podium { gap: 8px; --step: 18px; }
+    .podiumCard { padding: 22px 6px 10px; gap: 6px; }
+    .podiumCard.gold { padding-top: 30px; }
+    .podiumCard .playerAvatar { --avatar-size: 52px !important; }
+    .podiumCard.gold .playerAvatar { --avatar-size: 64px !important; }
+    .podiumCard .playerName { font-size: 0.9em; }
+    .podiumCard .playersTrophyIcon { width: 18px; height: 18px; }
+    .podiumCard .challengeBtn,
+    .podiumCard .watchBtn { padding: 4px 10px; font-size: 0.8em; }
+
+    .playerRow {
+        grid-template-columns: 26px auto minmax(0, 1fr) auto;
+        gap: 4px 10px;
+        padding: 10px;
+    }
+    .playerRow .playerActions {
+        grid-column: 3 / -1;
+        justify-content: flex-start;
+    }
+    .playerRow .playerActions:empty { display: none; }
+}
+
+/* -- Profile: privacy ------------------------------------------------------ */
+#privacySection { margin-top: 2.5rem; }
+.privacyRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--panel-border);
+}
+.privacyRow a { color: inherit; }
+#showOnlineToggle { width: 18px; height: 18px; accent-color: #8fb56a; }
+#privacyStatus { min-height: 1.2em; color: var(--muted); font-size: 0.85em; }

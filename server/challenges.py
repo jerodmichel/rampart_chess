@@ -24,6 +24,7 @@ from firebase_admin import db
 
 import accounts
 import blocks
+import players
 
 # Kept as a plain local constant (rather than importing GameSession.
 # TIME_CONTROLS) so this module still doesn't need to know GameSession
@@ -65,6 +66,10 @@ def create_challenge(from_uid: str, from_username: str, to_username: str, color:
     if to_uid == from_uid:
         raise HTTPException(status_code=400, detail="you can't challenge yourself")
     blocks.require_can_interact(from_uid, to_uid, "challenge")
+    target = db.reference(f"users/{to_uid}").get() or {}
+    if not players.accepts_challenge_from(target, to_uid, from_uid):
+        raise HTTPException(status_code=403,
+                            detail=f"{target.get('username', to_username)} only accepts challenges from friends")
 
     if color == "random":
         challenger_color = random.choice(["white", "black"])

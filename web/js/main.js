@@ -2429,6 +2429,12 @@ document.addEventListener('keydown', (evt) => {
     if (evt.key === 'Escape') closePlayModeMenus();
 });
 
+// index.html?open=human - the Players page's "Go to your challenges" link
+// lands here with the Play vs Human panel (sent/incoming challenges) open.
+if (new URLSearchParams(window.location.search).get('open') === 'human') {
+    playModeMenus[1].btn.click();
+}
+
 historyPrevBtn.addEventListener('click', () => {
     if (!state || busy) return;
     const currentIndex = viewIndex === null ? state.history.length : viewIndex;

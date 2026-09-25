@@ -56,6 +56,10 @@ const declineIncomingFriendBtn = document.getElementById('declineIncomingFriendB
 const addFriendStatus = document.getElementById('addFriendStatus');
 
 const dangerZone = document.getElementById('dangerZone');
+const privacySection = document.getElementById('privacySection');
+const challengePolicySelect = document.getElementById('challengePolicySelect');
+const showOnlineToggle = document.getElementById('showOnlineToggle');
+const privacyStatus = document.getElementById('privacyStatus');
 const deleteAccountOpenBtn = document.getElementById('deleteAccountOpenBtn');
 const deleteAccountPanel = document.getElementById('deleteAccountPanel');
 const deleteConfirmUsername = document.getElementById('deleteConfirmUsername');
@@ -251,6 +255,29 @@ async function refreshFriendStatus() {
         addFriendStatus.textContent = 'Friend request pending';
     }
 }
+
+// ---- privacy (Players page visibility + who may challenge you) -----------
+
+async function savePrivacy(settings, control) {
+    control.disabled = true;
+    privacyStatus.textContent = 'Saving...';
+    try {
+        const updated = await api.updatePrivacy(settings);
+        Object.assign(myProfile, updated);
+        privacyStatus.textContent = 'Saved.';
+    } catch (e) {
+        privacyStatus.textContent = apiErrorDetail(e);
+        challengePolicySelect.value = myProfile.challenge_policy || 'everyone';
+        showOnlineToggle.checked = myProfile.show_online !== false;
+    } finally {
+        control.disabled = false;
+    }
+}
+
+challengePolicySelect.addEventListener('change', () =>
+    savePrivacy({ challenge_policy: challengePolicySelect.value }, challengePolicySelect));
+showOnlineToggle.addEventListener('change', () =>
+    savePrivacy({ show_online: showOnlineToggle.checked }, showOnlineToggle));
 
 let myProfile = null; // whichever profile is currently ON SCREEN - your own, or someone else's (see isOwnProfile)
 let isOwnProfile = true; // false when viewing another player's profile via ?user=
@@ -703,6 +730,12 @@ async function loadProfile() {
     countryEditor.hidden = true;
     countryRow.hidden = !isOwnProfile;
     dangerZone.hidden = !isOwnProfile;
+    privacySection.hidden = !isOwnProfile;
+    if (isOwnProfile) {
+        challengePolicySelect.value = myProfile.challenge_policy || 'everyone';
+        showOnlineToggle.checked = myProfile.show_online !== false;
+        privacyStatus.textContent = '';
+    }
     if (isOwnProfile) renderCountryLabel();
 
     // Only makes sense on someone ELSE's profile, and only for a signed-in

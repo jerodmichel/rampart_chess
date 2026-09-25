@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Profile - RampartChess</title>
 <link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=73" />
+<link rel="stylesheet" href="style.css?v=78" />
 </head>
 <body>
 <header>
@@ -17,8 +17,9 @@
         <a href="profile.html">Profile</a>
         <a href="stats.html">Stats</a>
         <a href="messages.html">Messages</a>
-        <a href="rules.html">Game Rules</a>
+        <a href="players.html">Players</a>
         <a href="about.html">About</a>
+        <a href="rules.html">Game Rules</a>
         <a href="legal.html">Terms &amp; Privacy</a>
       </div>
     </div>
@@ -128,6 +129,22 @@
 
     <h3>Games</h3>
     <div id="gamesLedger"></div>
+
+    <div id="privacySection" hidden>
+      <h3>Privacy</h3>
+      <label class="privacyRow">
+        <span>Accept challenges from</span>
+        <select id="challengePolicySelect">
+          <option value="everyone">Everyone</option>
+          <option value="friends">Friends only</option>
+        </select>
+      </label>
+      <label class="privacyRow">
+        <span>Show me as online on the <a href="players.html">Players</a> page</span>
+        <input id="showOnlineToggle" type="checkbox">
+      </label>
+      <p id="privacyStatus" role="status"></p>
+    </div>
 
     <div id="dangerZone" hidden>
       <h3>Delete account</h3>

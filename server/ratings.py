@@ -120,16 +120,31 @@ def get_rating_history(uid: str) -> list:
     return out
 
 
+def ranked_uids(all_users: dict) -> list:
+    """uids of every account with at least one rated game, best first. An
+    account that has never played sits at the untested starting rating, so
+    it isn't ranked (the Players page lists it after the ranked players, the
+    Stats page shows "Unranked") - otherwise brand-new accounts at 1200
+    would outrank people who have actually played. Ties: more games first,
+    then username."""
+    rated = [(uid, p) for uid, p in all_users.items()
+             if isinstance(p, dict) and p.get("username") and p.get("games_played", 0) > 0]
+    rated.sort(key=lambda kv: (-kv[1].get("rating", STARTING_RATING),
+                               -kv[1].get("games_played", 0),
+                               kv[1]["username"].lower()))
+    return [uid for uid, _ in rated]
+
+
 def get_rank(uid: str) -> dict:
-    """Global rank + "top N%" among every registered account, by current
-    rating. A full users/ scan per call - perfectly fine at this project's
-    scale, not something to build a maintained sorted index for yet."""
-    all_users = db.reference("users").get() or {}
-    if uid not in all_users:
-        return {"rank": None, "total": 0, "top_percentile": None}
-    order = sorted(all_users.items(), key=lambda kv: -kv[1].get("rating", STARTING_RATING))
+    """Global rank + "top N%" among every account with a rated game, by
+    current rating (see ranked_uids). A full users/ scan per call -
+    perfectly fine at this project's scale, not something to build a
+    maintained sorted index for yet."""
+    order = ranked_uids(db.reference("users").get() or {})
     total = len(order)
-    rank = next(i + 1 for i, (u, _) in enumerate(order) if u == uid)
+    if uid not in order:
+        return {"rank": None, "total": total, "top_percentile": None}
+    rank = order.index(uid) + 1
     # "Top N%" (rank 1 of 100 -> top 1%), floored at 1 so a large user base
     # never rounds a genuinely-elite rank down to "top 0%".
     top_percentile = max(1, round(100 * rank / total))
