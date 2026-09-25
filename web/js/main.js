@@ -25,7 +25,7 @@ import {
     drawScreen, colRowFromPoint, buttonAt, deckCardAt, isPlayableSquare,
     DESIGN_WIDTH, DESIGN_HEIGHT, THEME_PRESETS, setTheme, PIECE_SET_NAMES, setPieceSet,
     triggerLightning, isLightningActive, startHourglass, stopHourglass, isHourglassActive,
-    setFlipped, isFlipped,
+    setFlipped, isFlipped, onImageLoaded,
 } from './render.js';
 
 // Every api.js request fetches a live token right before sending, rather
@@ -219,6 +219,10 @@ syncActiveCanvasResolution();
 new ResizeObserver(() => {
     if (syncActiveCanvasResolution()) drawCanvas();
 }).observe(canvas);
+
+// A piece/board image finishing its download repaints the board from the
+// current state (see render.js's onImageLoaded).
+onImageLoaded(() => drawCanvas());
 
 // The mobile fullscreen button/exit button/rotate hint themselves are pure
 // CSS (see style.css's #boardWrap:fullscreen rules) - this just drives the

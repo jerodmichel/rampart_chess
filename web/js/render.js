@@ -55,10 +55,32 @@ function inRect(x, y, r) {
 
 // ---- image loading (lazy, cached) ----------------------------------------
 
+// A not-yet-loaded image is simply skipped when drawing; once it arrives,
+// the whole canvas is redrawn from the CURRENT state via this callback
+// (main.js registers it). The old approach - queueing a drawImage with the
+// coordinates from the moment it was requested - painted stale pieces onto
+// whatever the canvas showed by then: start a new game (or flip/resize)
+// while images were still downloading and the previous board's pieces got
+// stamped over the new one until the next move redrew it.
+let imageLoadedCallback = null;
+let imageRedrawQueued = false;
+export function onImageLoaded(cb) {
+    imageLoadedCallback = cb;
+}
+function queueImageRedraw() {
+    if (imageRedrawQueued || !imageLoadedCallback) return;
+    imageRedrawQueued = true;
+    requestAnimationFrame(() => {
+        imageRedrawQueued = false;
+        imageLoadedCallback();
+    });
+}
+
 const images = new Map();
 function loadImage(src) {
     if (!images.has(src)) {
         const img = new Image();
+        img.addEventListener('load', queueImageRedraw, { once: true });
         img.src = src;
         images.set(src, img);
     }
@@ -148,13 +170,11 @@ export function getActiveEmblemSrc() {
     return EMBLEM_PRESETS[emblemIdx];
 }
 
-// Exported so render-mobile.js can draw rampartImage without duplicating
-// this "wait for it to finish loading" logic.
+// Exported so render-mobile.js can draw rampartImage the same way. Not
+// loaded yet -> skipped; loadImage's listener redraws everything once it is.
 export function drawImageWhenReady(ctx, img, x, y, w, h) {
     if (img.complete && img.naturalWidth > 0) {
         ctx.drawImage(img, x, y, w, h);
-    } else {
-        img.addEventListener('load', () => ctx.drawImage(img, x, y, w, h), { once: true });
     }
 }
 

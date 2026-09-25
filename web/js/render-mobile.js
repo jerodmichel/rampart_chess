@@ -271,13 +271,7 @@ function drawPieces(ctx, state, cell) {
         if (p.piece === 'king' && state.in_check === p.color) {
             drawCheckHalo(ctx, cx, cy, cell * 0.65);
         }
-        if (img.complete && img.naturalWidth > 0) {
-            ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
-        } else {
-            img.addEventListener('load', () => {
-                ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
-            }, { once: true });
-        }
+        drawImageWhenReady(ctx, img, cx - size / 2, cy - size / 2, size, size);
     }
 }
 
