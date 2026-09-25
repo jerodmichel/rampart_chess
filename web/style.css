@@ -879,6 +879,39 @@ button:disabled { opacity: 0.5; cursor: default; }
     flex: 1;
 }
 
+/* Report/Block/Unblock on another player's profile: small orange text
+   links on their own line above #addFriendRow, so the button row fits
+   on a phone. */
+#moderationLinks:not([hidden]) {
+    display: flex;
+    gap: 14px;
+    margin: 0 0 6px;
+}
+
+#moderationLinks button {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #e8963a;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+
+#moderationLinks button[hidden] {
+    display: none;
+}
+
+#moderationLinks button:hover,
+#moderationLinks button:focus-visible {
+    color: #f5b066;
+    text-decoration: underline;
+}
+
+#moderationLinks button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 #addFriendStatus {
     color: var(--muted);
     font-size: 0.85em;
@@ -2161,7 +2194,7 @@ a.ledgerOpponent:hover {
     #profileInfo {
         width: 100%;
     }
-    #countryRow, #addFriendRow {
+    #countryRow, #addFriendRow, #moderationLinks {
         justify-content: center;
     }
 
@@ -2538,13 +2571,10 @@ a.ledgerOpponent:hover {
 
 /* ---- Report / Block (Google Play user-content policy) ------------------
    Quiet like Remove friend: muted until hovered, red on hover. */
-#reportBtn, #blockBtn, #unblockBtn,
 #threadActions button, #chatReportBtn {
     color: var(--muted);
     background: transparent;
 }
-#reportBtn:not([hidden]):hover, #reportBtn:not([hidden]):focus-visible,
-#blockBtn:not([hidden]):hover, #blockBtn:not([hidden]):focus-visible,
 #threadActions button:hover, #threadActions button:focus-visible,
 #chatReportBtn:hover, #chatReportBtn:focus-visible {
     color: #e5837a;

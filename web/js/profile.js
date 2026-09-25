@@ -42,6 +42,7 @@ const profileFriendsList = document.getElementById('profileFriendsList');
 const playerSearchInput = document.getElementById('playerSearchInput');
 const playerSearchBtn = document.getElementById('playerSearchBtn');
 const addFriendRow = document.getElementById('addFriendRow');
+const moderationLinks = document.getElementById('moderationLinks');
 const messageFriendBtn = document.getElementById('messageFriendBtn');
 const addFriendBtn = document.getElementById('addFriendBtn');
 const removeFriendBtn = document.getElementById('removeFriendBtn');
@@ -708,6 +709,7 @@ async function loadProfile() {
     // viewer (an anonymous visitor has no account to send a request from).
     const viewerToken = await getIdToken();
     addFriendRow.hidden = isOwnProfile || !viewerToken;
+    moderationLinks.hidden = addFriendRow.hidden;
     if (!addFriendRow.hidden) {
         try {
             await refreshFriendStatus();
