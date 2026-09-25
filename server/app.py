@@ -148,6 +148,19 @@ def get_session(game_id: str) -> GameSession:
     raise HTTPException(status_code=404, detail=f"no game with id {game_id}")
 
 
+def _fill_missing_usernames(game) -> None:
+    """Older vs-AI game records were saved with the human's uid but no
+    username, so a game rebuilt from its record (after a restart, or opened
+    from a profile) had no name to show above the human's side of the board.
+    Look any missing name up from the uid, so every viewer sees both names."""
+    for color in ("white", "black"):
+        uid = getattr(game, f"{color}_uid", None)
+        if uid and not getattr(game, f"{color}_username", None):
+            name = db.reference(f"users/{uid}/username").get()
+            if name:
+                setattr(game, f"{color}_username", name)
+
+
 def get_view(game_id: str):
     """For read-only endpoints - a live GameSession if one exists or can
     be rehydrated (see _live_session_or_rehydrate - a read should see
@@ -157,10 +170,13 @@ def get_view(game_id: str):
     endpoints need."""
     session = _live_session_or_rehydrate(game_id)
     if session is not None:
+        _fill_missing_usernames(session)
         return session
     record = game_records.get_game_record(game_id)
     if record is not None:
-        return ReplayOnlyGame(record)
+        view = ReplayOnlyGame(record)
+        _fill_missing_usernames(view)
+        return view
     raise HTTPException(status_code=404, detail=f"no game with id {game_id}")
 
 
@@ -582,7 +598,8 @@ def new_game(request: Request, req: NewGameRequest, uid: Optional[str] = Depends
                            white_uid=white_uid, black_uid=black_uid,
                            white_username=white_username, black_username=black_username)
     GAMES[session.id] = session
-    game_records.save_game_record(session, ai_difficulty=req.ai_difficulty)
+    game_records.save_game_record(session, white_username=white_username, black_username=black_username,
+                                  ai_difficulty=req.ai_difficulty)
     return session.to_dict()
 
 
