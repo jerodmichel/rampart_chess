@@ -296,6 +296,23 @@ export const api = {
         return request(`/players/${encodeURIComponent(username)}/badges`);
     },
 
+    // -- Players page -------------------------------------------------------
+
+    players() {
+        return request('/players');
+    },
+
+    presencePing() {
+        return request('/presence', { method: 'POST' });
+    },
+
+    updatePrivacy(settings) {
+        return request('/profile/privacy', {
+            method: 'POST',
+            body: JSON.stringify(settings),
+        });
+    },
+
     // -- spectating -------------------------------------------------------
 
     liveGames() {

@@ -12,6 +12,7 @@ import {
     RANKS, DECK_SUIT, CARD_SQUARES, CARD_TABLE, ROW_LETTERS,
 } from './constants.js';
 import { drawCardSquare, drawCardBody, drawSuit, roundedRectPath, CARD_FONT_FAMILY } from './cardface.js';
+import { isMobileBoardActive } from './mobile.js';
 
 export const PROMPT_POS = { x: 320, y: 805 + RAMPART_HEIGHT };
 
@@ -129,14 +130,18 @@ function loadImage(src) {
     return images.get(src);
 }
 
-// Selectable piece styles. 'new_kset' has no bishop art, so its bishop
-// falls back to 'default' - same override piece.py's own
-// Bishop.set_texture does. 'new_lset' is the owner's own set (smoothed
-// vector traces rendered to 375px PNGs), bishop included.
+// Selectable piece styles. 'default' is the original set (back as the
+// default 9/26); 'vecteezy' and 'staunton' are licensed stock art cut from
+// their sheets and traced to SVG - each one's svg/ folder holds those
+// masters and the PNGs here are rendered from them.
+// A set flagged noFullscreen draws as 'default' on the phone fullscreen
+// board (Staunton's tall pieces aren't tuned for it yet); it's checked per
+// draw, so leaving fullscreen brings the chosen set straight back.
+// fullscreenScale shrinks a set's pieces on that board only (render-mobile.js).
 export const PIECE_SET_NAMES = [
     { key: 'default', label: 'Default' },
-    { key: 'new_kset', label: 'New', noBishop: true },
-    { key: 'new_lset', label: 'Rampart' },
+    { key: 'vecteezy', label: 'Icon', fullscreenScale: 0.95 },
+    { key: 'staunton', label: 'Staunton', noFullscreen: true },
 ];
 
 let pieceSetKey = 'default';
@@ -145,19 +150,26 @@ export function setPieceSet(key) {
     pieceSetKey = PIECE_SET_NAMES.some((s) => s.key === key) ? key : 'default';
 }
 
-function pieceSetFor(name) {
+function pieceSetFor() {
     const set = PIECE_SET_NAMES.find((s) => s.key === pieceSetKey);
-    return (name === 'bishop' && set.noBishop) ? 'default' : pieceSetKey;
+    return (set.noFullscreen && isMobileBoardActive()) ? 'default' : pieceSetKey;
+}
+
+// For render-mobile.js: the scale of whichever set is actually drawn there
+// (after any noFullscreen fallback).
+export function fullscreenPieceScale() {
+    const key = pieceSetFor();
+    return PIECE_SET_NAMES.find((s) => s.key === key).fullscreenScale ?? 1;
 }
 
 // Exported so render-mobile.js can draw pieces without duplicating the
 // image cache/bishop-override logic.
 export function pieceImage(color, name) {
-    return loadImage(`assets/piece_sets/${pieceSetFor(name)}/${color}_${name}.png`);
+    return loadImage(`assets/piece_sets/${pieceSetFor()}/${color}_${name}.png`);
 }
 
 function deadPieceImage(color, name) {
-    return loadImage(`assets/piece_sets/${pieceSetFor(name)}/dead_${color}_${name}.png`);
+    return loadImage(`assets/piece_sets/${pieceSetFor()}/dead_${color}_${name}.png`);
 }
 
 // Same path formula as deadPieceImage above, but returning the URL string
@@ -165,7 +177,7 @@ function deadPieceImage(color, name) {
 // panels (mobile-panels.js), which are plain <img> elements the browser
 // already loads/caches on its own.
 export function deadPieceImageSrc(color, name) {
-    return `assets/piece_sets/${pieceSetFor(name)}/dead_${color}_${name}.png`;
+    return `assets/piece_sets/${pieceSetFor()}/dead_${color}_${name}.png`;
 }
 
 // Exported so render-mobile.js can draw the real rampart art too, instead

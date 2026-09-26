@@ -19,7 +19,7 @@
 // it too thin to comfortably tap), not just a dimmed/struck-through label.
 
 import { RANKS, DECK_SUIT } from './constants.js';
-import { deadPieceImageSrc, getActiveEmblemSrc, getActiveCardBackSrc, getActiveTheme, isFlipped } from './render.js';
+import { deadPieceImageSrc, getActiveEmblemSrc, getActiveCardBackSrc, deckCardColors, isFlipped } from './render.js';
 
 // #mobileDeckBlack/#mobileGraveBlack are the physically-LEFT panel elements,
 // #mobileDeckWhite/#mobileGraveWhite the physically-RIGHT ones - named for
@@ -61,11 +61,8 @@ export function setDeckCardTapHandler(fn) {
 function renderDeckColumn(el, colorLabel, deckArray, selectedRanks, reversed) {
     el.innerHTML = '';
     const suit = DECK_SUIT[colorLabel];
-    // Matches desktop's drawDecks exactly: white's deck reads as a "card
-    // square" color, black's as a "non-card square" color - not an
-    // arbitrary fixed color of its own.
-    const theme = getActiveTheme();
-    const background = colorLabel === 'white' ? theme.bgDark : theme.bgLight;
+    // Same colors as desktop's drawDecks (render.js's deckCardColors).
+    const { fill: background, ink } = deckCardColors(colorLabel);
     // Matches desktop's own deckSlotPos: the physically-left deck lists
     // rank 0 at the top running down to rank 12 at the bottom, but the
     // physically-right one runs the OTHER way (rank 0 at the bottom, rank
@@ -80,6 +77,7 @@ function renderDeckColumn(el, colorLabel, deckArray, selectedRanks, reversed) {
         row.className = 'mobileDeckCard' + (used ? ' used' : '');
         if (selectedRanks.has(i)) row.classList.add('selected');
         row.style.background = background;
+        row.style.color = ink;
         if (used) {
             // Matches desktop's drawDecks: a used slot shows ONLY the
             // card-back art, no rank/suit text underneath it. A CSS

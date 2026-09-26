@@ -25,7 +25,7 @@ import {
     drawScreen, colRowFromPoint, buttonAt, deckCardAt, isPlayableSquare,
     DESIGN_WIDTH, DESIGN_HEIGHT, THEME_PRESETS, setTheme, PIECE_SET_NAMES, setPieceSet,
     triggerLightning, isLightningActive, startHourglass, stopHourglass, isHourglassActive,
-    setFlipped, isFlipped,
+    setFlipped, isFlipped, onImageLoaded, setCardStyle, setDeckStyle,
 } from './render.js';
 
 // Every api.js request fetches a live token right before sending, rather
@@ -220,6 +220,10 @@ new ResizeObserver(() => {
     if (syncActiveCanvasResolution()) drawCanvas();
 }).observe(canvas);
 
+// A piece/board image finishing its download repaints the board from the
+// current state (see render.js's onImageLoaded).
+onImageLoaded(() => drawCanvas());
+
 // The mobile fullscreen button/exit button/rotate hint themselves are pure
 // CSS (see style.css's #boardWrap:fullscreen rules) - this just drives the
 // actual Fullscreen/Orientation-Lock API calls behind them.
@@ -334,6 +338,29 @@ effectsToggle.checked = effectsEnabled;
 effectsToggle.addEventListener('change', () => {
     effectsEnabled = effectsToggle.checked;
     try { localStorage.setItem('rampart.effectsEnabled', String(effectsEnabled)); } catch (_) { /* ignore */ }
+});
+
+// Card-style squares (see cardface.js) vs the original flat look - also a
+// per-browser display preference. The body class lets style.css round the
+// mobile deck's DOM cards to match.
+const cardStyleToggle = document.getElementById('cardStyleToggle');
+function applyCardStyle(on) {
+    setCardStyle(on);
+    document.body.classList.toggle('cardStyle', on);
+}
+let cardStyleEnabled = true;
+try {
+    const stored = localStorage.getItem('rampart.cardStyle');
+    if (stored !== null) cardStyleEnabled = stored === 'true';
+} catch (_) { /* localStorage unavailable */ }
+cardStyleToggle.checked = cardStyleEnabled;
+applyCardStyle(cardStyleEnabled);
+// Deck card colors (render.js DECK_STYLES) - no UI; 'theme' restores the old look.
+try { setDeckStyle(localStorage.getItem('rampart.deckStyle')); } catch (_) { /* ignore */ }
+cardStyleToggle.addEventListener('change', () => {
+    applyCardStyle(cardStyleToggle.checked);
+    try { localStorage.setItem('rampart.cardStyle', String(cardStyleToggle.checked)); } catch (_) { /* ignore */ }
+    drawCanvas();
 });
 
 const strikeSound = new Audio('assets/sounds/thunder_strike.wav');
@@ -2424,6 +2451,12 @@ document.addEventListener('click', () => closePlayModeMenus());
 document.addEventListener('keydown', (evt) => {
     if (evt.key === 'Escape') closePlayModeMenus();
 });
+
+// index.html?open=human - the Players page's "Go to your challenges" link
+// lands here with the Play vs Human panel (sent/incoming challenges) open.
+if (new URLSearchParams(window.location.search).get('open') === 'human') {
+    playModeMenus[1].btn.click();
+}
 
 historyPrevBtn.addEventListener('click', () => {
     if (!state || busy) return;

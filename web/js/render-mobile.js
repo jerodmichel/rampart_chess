@@ -16,7 +16,7 @@
 // board itself.
 
 import { COLS, ROWS, CARD_SQUARES, CARD_TABLE } from './constants.js';
-import { getActiveTheme, pieceImage, rampartImage, drawImageWhenReady, isFlipped, isCardStyle } from './render.js';
+import { getActiveTheme, pieceImage, rampartImage, drawImageWhenReady, isFlipped, isCardStyle, fullscreenPieceScale } from './render.js';
 import { drawCardSquare } from './cardface.js';
 
 // Same proportion as the old mobile/ prototype's CELL=64/RAMPART_BAND=14
@@ -285,7 +285,7 @@ function drawCheckHalo(ctx, cx, cy, radius) {
 }
 
 function drawPieces(ctx, state, cell) {
-    const size = cell * 0.9;
+    const size = cell * 0.9 * fullscreenPieceScale();
     for (const p of state.pieces) {
         const img = pieceImage(p.color, p.piece);
         const cx = colX(p.col, cell) + cell / 2;

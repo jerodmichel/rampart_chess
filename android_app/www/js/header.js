@@ -129,6 +129,7 @@ if (accountHeader) {
         // the trophy row (see #headerMetaRow in index.html/style.css)
         // instead of getting truncated away along with a long username.
         headerRatingText.textContent = `(${profile.rating ?? 1200})`;
+        window.dispatchEvent(new Event('rampart:headerReady'));
         await loadAvatar(profile.uid);
         await renderNotifications();
         await renderHeaderTrophies(profile.username);
@@ -164,4 +165,14 @@ if (accountHeader) {
     // until something else (e.g. a page refresh) re-triggered it.
     window.addEventListener('rampart:profileClaimed', () => initAccountHeader());
     setInterval(() => { if (!accountHeader.hidden) renderNotifications(); }, 10000);
+
+    // "Online" on the Players page: a ping every minute while a signed-in
+    // player has any page open and visible (server/players.py counts anyone
+    // heard from in the last 2.5 minutes). Skipped for a backgrounded tab.
+    const pingPresence = () => {
+        if (!accountHeader.hidden && !document.hidden) api.presencePing().catch(() => {});
+    };
+    setInterval(pingPresence, 60000);
+    document.addEventListener('visibilitychange', pingPresence);
+    window.addEventListener('rampart:headerReady', pingPresence);
 }
