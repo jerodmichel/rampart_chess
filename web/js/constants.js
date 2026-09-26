@@ -75,8 +75,14 @@ export function buildTable() {
     // const.py's TABLE_DICT exactly (rank/suit are raw indices there;
     // here they're resolved straight to display strings since that's
     // all the client ever needs them for).
+    // `suitIdx` is TABLE_DICT's raw suit index (what the server's Card
+    // objects carry, needed for cast-combo matching); `suit` is the display
+    // symbol. They differ for the top half: TABLE_DICT stores it as 3 (the
+    // spade slot in SUITS) but it's printed as hearts - const.py's separate
+    // display TABLE uses SUITS[1] there, as does the rulebook.
+    const DISPLAY_SUIT = { 2: SUITS[2], 3: SUITS[1] };
     const table = new Map();
-    const set = (x, y, rank, suit) => table.set(`${x},${y}`, { rank: RANKS[rank], suit: SUITS[suit] });
+    const set = (x, y, rank, suit) => table.set(`${x},${y}`, { rank: RANKS[rank], suit: DISPLAY_SUIT[suit], suitIdx: suit });
 
     for (const x of [2, 3, 4]) {
         if (x === 2) set(x, 0, 12, 3);
@@ -112,8 +118,7 @@ export const DECK_SUIT = { black: SUITS[0], white: SUITS[3] };
 export const DECK_SUIT_INDEX = { black: 0, white: 1 };
 
 export function boardCardSuitIndex(col, row) {
-    const symbol = CARD_TABLE.get(`${col},${row}`).suit;
-    return SUITS.indexOf(symbol);
+    return CARD_TABLE.get(`${col},${row}`).suitIdx;
 }
 
 export function boardCardRankIndex(col, row) {

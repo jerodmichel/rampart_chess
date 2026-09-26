@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Learn to Play - RampartChess</title>
+<link rel="icon" href="favicon.ico" />
+<link rel="stylesheet" href="style.css?v=80" />
+</head>
+<body>
+<header>
+  <div id="headerLeft">
+    <div id="navMenu">
+      <button id="navMenuBtn" aria-label="Menu" title="Menu">&#9776;</button>
+      <div id="navMenuDropdown" hidden>
+        <a href="index.html">Home</a>
+        <a href="profile.html">Profile</a>
+        <a href="stats.html">Stats</a>
+        <a href="messages.html">Messages</a>
+        <a href="players.html">Players</a>
+        <a href="about.html">About</a>
+        <a href="rules.html">Game Rules</a>
+        <a href="legal.html">Terms &amp; Privacy</a>
+      </div>
+    </div>
+    <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
+  </div>
+  <div id="accountHeader" hidden>
+    <div id="notifBell">
+      <button id="notifBtn" title="Notifications"><img class="bellIcon" src="assets/misc/bell.png" alt=""><span id="notifBadge" hidden>0</span></button>
+      <div id="notifDropdown" hidden></div>
+    </div>
+    <div id="avatarMenu">
+      <span id="headerUserLabel"></span>
+      <div id="headerMetaRow">
+        <span id="headerRatingText"></span>
+        <span id="headerTrophyRow" class="playerTrophyRow"></span>
+      </div>
+      <button id="avatarMenuBtn" title="Account">
+        <img id="headerAvatarImg" alt="Avatar" hidden>
+        <canvas id="headerAvatarCanvas" width="42" height="42" hidden></canvas>
+      </button>
+      <div id="avatarMenuDropdown" hidden>
+        <a href="profile.html">Profile</a>
+        <button id="headerLogOutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+<main id="tutorialPage">
+  <p class="tutDraftNote">DRAFT - outline with placeholders. Each dashed box is a clip still
+    to be recorded; its id (e.g. <code>raiders-move</code>) is the scene name the recorder
+    will use, and the GIF will land at <code>assets/tutorial/&lt;id&gt;.gif</code>.</p>
+
+  <h2>Learn to Play RampartChess</h2>
+  <p>
+    RampartChess is chess with a deck of cards. You still win by checkmating the enemy
+    king - but along the way you'll slip raiders past the rampart, break into your
+    opponent's houses, and cast cards that add up to 21 to bring back fallen pieces or
+    strike down enemy raiders. Each lesson below takes about a minute.
+  </p>
+
+  <div class="tutClip tutVideo" data-clip="full-tutorial">
+    <span class="tutClipId">VIDEO: full-tutorial</span>
+    <span class="tutClipDesc">The complete narrated tutorial (all lessons stitched together, ~6-8 min).</span>
+  </div>
+
+  <nav class="tutToc" aria-label="Lessons">
+    <ol>
+      <li><a href="#goal">The goal</a></li>
+      <li><a href="#board">The board</a></li>
+      <li><a href="#setup">Your army, deck &amp; graveyard</a></li>
+      <li><a href="#raiders">Raiders &amp; the rampart</a></li>
+      <li><a href="#pieces">The other pieces</a></li>
+      <li><a href="#houses">Houses</a></li>
+      <li><a href="#casting">Casting: making 21</a></li>
+      <li><a href="#raising">Raising a raider</a></li>
+      <li><a href="#striking">Striking</a></li>
+      <li><a href="#queen">The Queen's House &amp; your queen</a></li>
+      <li><a href="#kinghouse">The King's House</a></li>
+      <li><a href="#ending">Winning &amp; draws</a></li>
+      <li><a href="#example">Putting it together</a></li>
+    </ol>
+  </nav>
+
+  <section class="tutLesson" id="goal">
+    <h3>1. The goal</h3>
+    <p>Just like chess: checkmate your opponent's king. White moves first. On each turn you
+      make <em>one</em> move - either a normal piece move, or a <em>cast move</em> using cards.</p>
+    <div class="tutClip" data-clip="goal-checkmate">
+      <span class="tutClipId">GIF: goal-checkmate</span>
+      <span class="tutClipDesc">A short, dramatic checkmate from a late-game position.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="board">
+    <h3>2. The board</h3>
+    <p>The board is 10 columns by 6 rows (rows <em>a</em>-<em>f</em>, columns
+      <em>1</em>-<em>10</em>). The bottom half is diamonds - White's territory; the top half
+      is hearts - Black's. The gap across the middle is the <strong>rampart</strong>.</p>
+    <p>Some squares carry a card (<em>card squares</em>) and some are blank. The cards never
+      move - they're part of the board. The back rows (<em>a</em> and <em>f</em>) are only
+      playable on their three face cards: the Jack, Queen and King - the
+      <strong>houses</strong>.</p>
+    <div class="tutClip" data-clip="board-tour">
+      <span class="tutClipId">GIF: board-tour</span>
+      <span class="tutClipDesc">Highlight in turn: diamond half, heart half, the rampart gap,
+        a few card squares, then the six house squares.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="setup">
+    <h3>3. Your army, deck &amp; graveyard</h3>
+    <p>Each side starts with 4 raiders, a rook, a knight, a bishop and a king on the board.
+      White starts on the diamond side, Black on the heart side.</p>
+    <p>You also hold a <strong>deck</strong> - all the Spades for White, all the Clubs for
+      Black - and a <strong>graveyard</strong> holding 4 more raiders and your queen. Pieces
+      in the graveyard can come back into play later; captured raiders and queens go there
+      too.</p>
+    <div class="tutClip" data-clip="setup">
+      <span class="tutClipId">GIF: setup</span>
+      <span class="tutClipDesc">Starting position; highlight each side's pieces, then each
+        player's deck and graveyard.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="raiders">
+    <h3>4. Raiders &amp; the rampart</h3>
+    <p>Raiders are RampartChess's pawns. A raider moves one square in <em>any</em>
+      direction and captures diagonally.</p>
+    <p>The catch: once a raider crosses the rampart into enemy territory, it can never
+      come back.</p>
+    <div class="tutClip" data-clip="raiders-move">
+      <span class="tutClipId">GIF: raiders-move</span>
+      <span class="tutClipDesc">Select a raider, show its 8 target squares, move it; then a
+        diagonal capture.</span>
+    </div>
+    <div class="tutClip" data-clip="raiders-rampart">
+      <span class="tutClipId">GIF: raiders-rampart</span>
+      <span class="tutClipDesc">A raider crosses the rampart; on its next selection the squares
+        back across are no longer offered.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="pieces">
+    <h3>5. The other pieces</h3>
+    <p>If you know chess, you already know these. The knight, bishop, rook, queen and king move and
+      capture exactly as in chess. No square can hold two pieces, and you capture by moving
+      onto an enemy piece. You can never make a move that leaves your own king in check.</p>
+    <div class="tutClip" data-clip="pieces-move">
+      <span class="tutClipId">GIF: pieces-move</span>
+      <span class="tutClipDesc">Quick montage: knight L-move, bishop diagonal, rook slide, king step, each with
+        its target squares shown.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="houses">
+    <h3>6. Houses</h3>
+    <p>Each side has three houses: a Jack's, a Queen's and a King's. Only raiders can enter
+      a house, and only the <em>enemy's</em> houses. A raider that enters a house stays
+      there for the rest of the game - it can't move, and it can't be captured.</p>
+    <p>Houses are opened in order, and each one gives you a new power:</p>
+    <ul>
+      <li><strong>Jack's House</strong> - you can now cast cards to raise raiders and to
+        strike.</li>
+      <li><strong>Queen's House</strong> - your queen enters the game.</li>
+      <li><strong>King's House</strong> - the enemy king is confined to card squares.</li>
+    </ul>
+    <div class="tutClip" data-clip="houses-jack">
+      <span class="tutClipId">GIF: houses-jack</span>
+      <span class="tutClipDesc">A raider steps into the enemy Jack's House; show that it's now
+        locked in place, and that the cast options unlock.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="casting">
+    <h3>7. Casting: making 21</h3>
+    <p>A cast move always uses exactly <strong>three cards that add up to 21</strong>. Some
+      come from the card squares your raiders are standing on; the rest come from your
+      deck, and you pick which deck cards to use - there's no random draw.</p>
+    <p>Card values work like blackjack: number cards are face value, face cards are 10, and
+      an ace is 1 or 11, your choice. Deck cards you cast are used up. The card squares stay
+      on the board for next time.</p>
+    <div class="tutClip" data-clip="casting-21">
+      <span class="tutClipId">GIF: casting-21</span>
+      <span class="tutClipDesc">Raiders on the 7 and 4 card squares light up, plus a 10 from the
+        deck: 7 + 4 + 10 = 21. The deck card flies to the discard.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="raising">
+    <h3>8. Raising a raider</h3>
+    <p>Once you hold the enemy Jack's House, you can bring raiders back from your graveyard.
+      Make 21 with either:</p>
+    <ul>
+      <li>1 raider on a card square + 2 cards from your deck, or</li>
+      <li>2 raiders on card squares + 1 card from your deck.</li>
+    </ul>
+    <p>(A raider sitting in a house doesn't count - it has to be on an ordinary card square.)
+      Then place the new raider on any empty square in your own territory, except a house.</p>
+    <div class="tutClip" data-clip="raising-raider">
+      <span class="tutClipId">GIF: raising-raider</span>
+      <span class="tutClipDesc">Cast with one raider + two deck cards; a raider rises from the
+        graveyard onto a chosen home square.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="striking">
+    <h3>9. Striking</h3>
+    <p>Holding the enemy Jack's House also lets you <strong>strike</strong>: capture an enemy
+      raider without touching it. Make 21 with 2 of your raiders on card squares + 1 card
+      from your deck, and pick an enemy raider to remove.</p>
+    <p>You can strike only raiders, and only in enemy territory - never in your own half,
+      and never inside a house. (White strikes in rows <em>d</em>-<em>e</em>, Black in rows
+      <em>b</em>-<em>c</em>.)</p>
+    <div class="tutClip" data-clip="striking">
+      <span class="tutClipId">GIF: striking</span>
+      <span class="tutClipDesc">Two raiders + one deck card make 21; an enemy raider is struck
+        from the board and goes to its graveyard.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="queen">
+    <h3>10. The Queen's House &amp; your queen</h3>
+    <p>With the Jack's House taken, you can push a raider into the enemy Queen's House. On
+      that same turn - for free, no cards needed - you place your queen on any empty square
+      in your own territory (not a house).</p>
+    <p>You can only ever have one queen on the board. If she's captured, you can raise her
+      back: 2 raiders on card squares + 1 deck card making 21, just like a strike.</p>
+    <div class="tutClip" data-clip="queen-house">
+      <span class="tutClipId">GIF: queen-house</span>
+      <span class="tutClipDesc">Raider enters the Queen's House, then the queen is placed on a
+        home square in the same turn.</span>
+    </div>
+    <div class="tutClip" data-clip="queen-raise">
+      <span class="tutClipId">GIF: queen-raise</span>
+      <span class="tutClipDesc">Later: a captured queen is raised back from the graveyard with a
+        2-raider + 1-card cast.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="kinghouse">
+    <h3>11. The King's House</h3>
+    <p>After the Queen's House comes the King's House. Once you have a raider in it, the
+      enemy king may stand <em>only</em> on card squares - every blank square is off-limits
+      to it.</p>
+    <p>And if the enemy king is standing on a blank square at the moment you enter the
+      King's House, that's an instant win: <strong>mate by capture</strong>. It's the one
+      time in RampartChess that a king is actually taken.</p>
+    <div class="tutClip" data-clip="king-house-restrict">
+      <span class="tutClipId">GIF: king-house-restrict</span>
+      <span class="tutClipDesc">Raider enters the King's House; the enemy king's reachable
+        squares shrink to card squares only.</span>
+    </div>
+    <div class="tutClip" data-clip="mate-by-capture">
+      <span class="tutClipId">GIF: mate-by-capture</span>
+      <span class="tutClipDesc">Enemy king on a blank square; raider steps into the King's
+        House; the king is captured and the game ends.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="ending">
+    <h3>12. Winning &amp; draws</h3>
+    <p>You win by checkmate (or mate by capture). The game is a draw (stalemate) if the
+      player to move isn't in check but has no legal move. Either player can also claim a
+      draw when the same position occurs three times (not necessarily in a row).</p>
+    <div class="tutClip" data-clip="ending-stalemate">
+      <span class="tutClipId">GIF: ending-stalemate</span>
+      <span class="tutClipDesc">A stalemate position: side to move is not in check and has no
+        legal moves.</span>
+    </div>
+  </section>
+
+  <section class="tutLesson" id="example">
+    <h3>13. Putting it together</h3>
+    <p>A short annotated game showing the usual arc: advance raiders, cross the rampart, take
+      the Jack's House, start casting, bring in the queen, lock down the king.</p>
+    <div class="tutClip" data-clip="example-game">
+      <span class="tutClipId">GIF: example-game</span>
+      <span class="tutClipDesc">Sped-up full game (or key moments) with captions at each
+        milestone.</span>
+    </div>
+    <p>Ready? <a href="index.html">Play a game against the AI</a>, or read the
+      <a href="rules.html">full official rules</a>.</p>
+  </section>
+</main>
+
+<script type="module" src="js/header.js"></script>
+<script type="module">
+  import { initNavMenu } from './js/nav.js';
+  initNavMenu();
+</script>
+</body>
+</html>

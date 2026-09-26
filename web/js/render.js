@@ -11,6 +11,7 @@ import {
     BOARD_X, DESIGN_WIDTH, DESIGN_HEIGHT,
     RANKS, DECK_SUIT, CARD_SQUARES, CARD_TABLE, ROW_LETTERS,
 } from './constants.js';
+import { drawCardSquare, drawCardBody, drawSuit, roundedRectPath, CARD_FONT_FAMILY } from './cardface.js';
 
 export const PROMPT_POS = { x: 320, y: 805 + RAMPART_HEIGHT };
 
@@ -46,6 +47,40 @@ export function getActivePieceSetKey() {
     return pieceSetKey;
 }
 
+// Card-style squares (cardface.js) vs the original flat squares with typed
+// rank/suit - a Display Settings toggle so the two looks can be compared.
+let cardStyle = true;
+
+export function setCardStyle(v) {
+    cardStyle = Boolean(v);
+}
+
+export function isCardStyle() {
+    return cardStyle;
+}
+
+// Deck card colors: each player's deck matches their pieces - ivory cards
+// with black suits for White, charcoal cards with ivory suits for Black.
+// 'theme' is the original look (white's deck = card-square color, black's
+// = plain-square color), kept selectable via localStorage 'rampart.deckStyle'
+// in case we want to go back.
+const IVORY = 'rgb(246, 242, 230)';
+const DECK_STYLES = {
+    charcoal: (c) => (c === 'white'
+        ? { fill: IVORY, ink: 'rgb(20,20,20)' }
+        : { fill: 'rgb(50, 50, 46)', ink: 'rgb(236, 230, 214)' }),
+    theme: (c) => ({ fill: c === 'white' ? THEME.bgDark : THEME.bgLight, ink: 'rgb(0,0,0)' }),
+};
+let deckStyle = 'charcoal';
+
+export function setDeckStyle(name) {
+    deckStyle = DECK_STYLES[name] ? name : 'charcoal';
+}
+
+export function deckCardColors(colorLabel) {
+    return DECK_STYLES[deckStyle](colorLabel);
+}
+
 export const STRIKE_RECT = { x: 102, y: 802 + RAMPART_HEIGHT, w: 100, h: 35 };
 export const RAISE_RECT = { x: 205, y: 802 + RAMPART_HEIGHT, w: 83, h: 35 };
 
@@ -76,6 +111,13 @@ function queueImageRedraw() {
     });
 }
 
+// Canvas text silently falls back to Georgia until the card-index webfont
+// has loaded, and nothing redraws on its own afterward - same deal as a
+// late-arriving image, so reuse that redraw path.
+if (document.fonts && document.fonts.load) {
+    document.fonts.load(`600 20px ${CARD_FONT_FAMILY}`).then(queueImageRedraw, () => {});
+}
+
 const images = new Map();
 function loadImage(src) {
     if (!images.has(src)) {
@@ -87,13 +129,14 @@ function loadImage(src) {
     return images.get(src);
 }
 
-// Two selectable piece styles, matching piece.py's Piece.idx3 exactly:
-// 'new_kset' has no bishop art, so bishop always falls back to 'default'
-// there regardless of which set is active - same override piece.py's own
-// Bishop.set_texture does.
+// Selectable piece styles. 'new_kset' has no bishop art, so its bishop
+// falls back to 'default' - same override piece.py's own
+// Bishop.set_texture does. 'new_lset' is the owner's own set (smoothed
+// vector traces rendered to 375px PNGs), bishop included.
 export const PIECE_SET_NAMES = [
     { key: 'default', label: 'Default' },
-    { key: 'new_kset', label: 'New' },
+    { key: 'new_kset', label: 'New', noBishop: true },
+    { key: 'new_lset', label: 'Rampart' },
 ];
 
 let pieceSetKey = 'default';
@@ -102,16 +145,19 @@ export function setPieceSet(key) {
     pieceSetKey = PIECE_SET_NAMES.some((s) => s.key === key) ? key : 'default';
 }
 
+function pieceSetFor(name) {
+    const set = PIECE_SET_NAMES.find((s) => s.key === pieceSetKey);
+    return (name === 'bishop' && set.noBishop) ? 'default' : pieceSetKey;
+}
+
 // Exported so render-mobile.js can draw pieces without duplicating the
 // image cache/bishop-override logic.
 export function pieceImage(color, name) {
-    const set = (name === 'bishop') ? 'default' : pieceSetKey;
-    return loadImage(`assets/piece_sets/${set}/${color}_${name}.png`);
+    return loadImage(`assets/piece_sets/${pieceSetFor(name)}/${color}_${name}.png`);
 }
 
 function deadPieceImage(color, name) {
-    const set = (name === 'bishop') ? 'default' : pieceSetKey;
-    return loadImage(`assets/piece_sets/${set}/dead_${color}_${name}.png`);
+    return loadImage(`assets/piece_sets/${pieceSetFor(name)}/dead_${color}_${name}.png`);
 }
 
 // Same path formula as deadPieceImage above, but returning the URL string
@@ -119,8 +165,7 @@ function deadPieceImage(color, name) {
 // panels (mobile-panels.js), which are plain <img> elements the browser
 // already loads/caches on its own.
 export function deadPieceImageSrc(color, name) {
-    const set = (name === 'bishop') ? 'default' : pieceSetKey;
-    return `assets/piece_sets/${set}/dead_${color}_${name}.png`;
+    return `assets/piece_sets/${pieceSetFor(name)}/dead_${color}_${name}.png`;
 }
 
 // Exported so render-mobile.js can draw the real rampart art too, instead
@@ -294,7 +339,12 @@ function drawPrompt(ctx, text, color, ui) {
 function drawBoardSquares(ctx) {
     for (let row = 0; row < ROWS; row++) {
         for (let col = 0; col < COLS; col++) {
-            const isCard = CARD_SQUARES.has(`${col},${row}`);
+            const key = `${col},${row}`;
+            const isCard = CARD_SQUARES.has(key);
+            if (isCard && cardStyle) {
+                drawCardSquare(ctx, boardColX(col), rowY(row), RWIDTH - 2, RHEIGHT - 2, THEME.bgDark, CARD_TABLE.get(key));
+                continue;
+            }
             ctx.fillStyle = isCard ? THEME.bgDark : THEME.bgLight;
             ctx.fillRect(boardColX(col), rowY(row), RWIDTH - 2, RHEIGHT - 2);
         }
@@ -315,6 +365,7 @@ function drawEmblems(ctx) {
 }
 
 function drawCardLabels(ctx) {
+    if (cardStyle) return; // drawCardSquare already drew each card's index
     ctx.font = 'bold 20px Georgia, serif';
     ctx.fillStyle = 'rgb(255,0,0)';
     ctx.textBaseline = 'top';
@@ -396,7 +447,12 @@ function drawDecks(ctx, state) {
             const { x, y } = deckSlotPos(colorLabel, rank);
             const used = deckArray[rank];
 
-            ctx.fillStyle = colorLabel === 'white' ? THEME.bgDark : THEME.bgLight;
+            const { fill, ink } = deckCardColors(colorLabel);
+            if (cardStyle) {
+                drawDeckCard(ctx, x, y, fill, ink, used, RANKS[rank], suitSymbol, colorLabel);
+                continue;
+            }
+            ctx.fillStyle = fill;
             ctx.fillRect(x, y, CWIDTH, CHEIGHT - 2);
 
             if (used) {
@@ -404,7 +460,7 @@ function drawDecks(ctx, state) {
                 continue;
             }
             ctx.font = 'bold 16px Georgia, serif';
-            ctx.fillStyle = 'rgb(0,0,0)';
+            ctx.fillStyle = ink;
             ctx.textBaseline = 'middle';
             const textY = y + (CHEIGHT - 2) / 2;
             if (colorLabel === 'black') {
@@ -416,6 +472,34 @@ function drawDecks(ctx, state) {
             }
         }
     }
+}
+
+// Card-style deck slot: same rounded body as the board's card squares
+// (no inner frame - the slots are only ~24px tall), index laid out in one
+// row like the flat version, suit drawn as a vector pip. A used card shows
+// the card-back art clipped to the same rounded shape.
+const DECK_CARD_RADIUS = 3;
+function drawDeckCard(ctx, x, y, fill, ink, used, rank, suit, colorLabel) {
+    const h = CHEIGHT - 2;
+    if (used) {
+        ctx.save();
+        roundedRectPath(ctx, x, y, CWIDTH, h, DECK_CARD_RADIUS);
+        ctx.clip();
+        drawImageWhenReady(ctx, cardBackImage(), x, y, CWIDTH, h + 1);
+        ctx.restore();
+        return;
+    }
+    drawCardBody(ctx, x, y, CWIDTH, h, fill, { radius: DECK_CARD_RADIUS, frameInset: 0 });
+    ctx.save();
+    ctx.font = `600 15px ${CARD_FONT_FAMILY}`;
+    ctx.fillStyle = ink;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    const midY = y + h / 2 + 1;
+    const rankX = colorLabel === 'black' ? x + 16 : x + CWIDTH - 34;
+    ctx.fillText(rank, rankX, midY);
+    ctx.restore();
+    drawSuit(ctx, suit, rankX + 23, y + h / 2, 13, ink);
 }
 
 function drawDeckHover(ctx, ui) {
@@ -744,19 +828,29 @@ function drawCaptureRing(ctx, col, row, color) {
     ctx.stroke();
 }
 
+// Last-move / selection frame. On a card square in card style it follows
+// the card's rounded corners instead of poking out past them.
+function strokeSquareFrame(ctx, col, row, color) {
+    const x = boardColX(col) + 2;
+    const y = rowY(row) + 2;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    if (cardStyle && CARD_SQUARES.has(`${col},${row}`)) {
+        strokeRoundedRect(ctx, x, y, RWIDTH - 6, RHEIGHT - 6, 4);
+    } else {
+        ctx.strokeRect(x, y, RWIDTH - 6, RHEIGHT - 6);
+    }
+}
+
 function drawHighlights(ctx, state, ui) {
     if (ui.lastMoveSquares) {
         for (const [col, row] of ui.lastMoveSquares) {
             const isCard = CARD_SQUARES.has(`${col},${row}`);
-            ctx.strokeStyle = isCard ? THEME.traceLight : THEME.traceDark;
-            ctx.lineWidth = 4;
-            ctx.strokeRect(boardColX(col) + 2, rowY(row) + 2, RWIDTH - 6, RHEIGHT - 6);
+            strokeSquareFrame(ctx, col, row, isCard ? THEME.traceLight : THEME.traceDark);
         }
     }
     if (ui.selected) {
-        ctx.strokeStyle = 'rgba(20, 90, 200, 0.9)';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(boardColX(ui.selected.col) + 2, rowY(ui.selected.row) + 2, RWIDTH - 6, RHEIGHT - 6);
+        strokeSquareFrame(ctx, ui.selected.col, ui.selected.row, 'rgba(20, 90, 200, 0.9)');
     }
     if (ui.legalDestinations) {
         for (const [col, row] of ui.legalDestinations) {

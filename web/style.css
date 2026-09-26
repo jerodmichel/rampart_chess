@@ -2460,6 +2460,15 @@ a.ledgerOpponent:hover {
     background-repeat: no-repeat;
 }
 
+/* Card-style display setting (main.js): round the deck cards like the
+   board's card squares. Used slots are a background-image, so the radius
+   clips the card-back art cleanly (the old nested-<img> problem above
+   doesn't apply). */
+body.cardStyle .mobileDeckCard {
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
 /* Same idea as desktop's drawClickedDeckCards teal glow - a card currently
    in the in-progress cast combo (main.js's clickedCards). */
 .mobileDeckCard.selected {
@@ -3168,3 +3177,72 @@ a.ledgerOpponent:hover {
 .privacyRow a { color: inherit; }
 #showOnlineToggle { width: 18px; height: 18px; accent-color: #8fb56a; }
 #privacyStatus { min-height: 1.2em; color: var(--muted); font-size: 0.85em; }
+
+/* ---- tutorial page ------------------------------------------------------ */
+
+#tutorialPage {
+    max-width: 900px;
+    margin: 30px auto 60px;
+    padding: 0 15px;
+    line-height: 1.5;
+}
+
+#tutorialPage h2 {
+    font-family: 'Cinzel Web', Georgia, serif;
+    color: var(--muted);
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 6px;
+}
+
+#tutorialPage h3 {
+    font-family: 'Cinzel Web', Georgia, serif;
+    margin: 0 0 8px;
+}
+
+.tutDraftNote {
+    background: #3a2f12;
+    border: 1px solid #8a6d1f;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.9em;
+}
+
+.tutToc {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 20px 0;
+}
+.tutToc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 30px; }
+.tutToc a { color: inherit; }
+@media (max-width: 600px) { .tutToc ol { columns: 1; } }
+
+.tutLesson {
+    padding-top: 22px;
+    margin-top: 22px;
+    border-top: 1px solid var(--panel-border);
+    scroll-margin-top: 70px;
+}
+
+/* Placeholder box for a clip not yet recorded; swapped for an <img>/<video>
+   of the same aspect once the recorder produces assets/tutorial/<id>.gif. */
+.tutClip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    aspect-ratio: 16 / 10;
+    max-width: 640px;
+    margin: 14px auto;
+    padding: 16px;
+    border: 2px dashed var(--panel-border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--muted);
+    text-align: center;
+}
+.tutVideo { max-width: 100%; aspect-ratio: 16 / 9; }
+.tutClipId { font-family: monospace; font-weight: bold; color: #8fb56a; }
+.tutClipDesc { font-size: 0.9em; max-width: 440px; }
