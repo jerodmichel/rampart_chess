@@ -2699,47 +2699,67 @@ body.cardStyle .mobileDeckCard {
    (#phoneFullscreenBtn - main.js toggles [hidden]). The small round
    fullscreen button that used to float over the page is retired in favour
    of it (owner, 9/27). Desktop never shows either. */
+#playModeButtons {
+    display: contents;
+}
 #phoneFullscreenBtn {
     display: none;
 }
 @media (pointer: coarse) and (hover: none) {
     #playModes {
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
-        gap: 8px 12px;
+        column-gap: 12px;
     }
-    .playModeBand {
-        grid-column: 1;
+    /* the Play buttons at their natural widths - side by side when they
+       fit, one above the other when not (main.js adds .stacked) */
+    #playModeButtons {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 10px;
+        min-width: 0;
     }
-    .playModeTrigger {
-        width: 100%;
+    #playModes.stacked #playModeButtons {
+        flex-direction: column;
     }
+    /* Old dark panel colour. Short "⛶ Full screen" rectangle beside a single
+       row of Play buttons; a ~72px square beside a stacked pair. */
     #phoneFullscreenBtn:not([hidden]) {
         grid-column: 2;
-        grid-row: 1 / span 2;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        width: 92px;
-        height: 92px;
-        padding: 0;
-        border-radius: 8px;
-        border: 1px solid #aab0b8;
-        color: #fff;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-        background: linear-gradient(#a9afb7, #7b818a 55%, #6c727a);
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        white-space: nowrap;
         cursor: pointer;
     }
+    #playModes.stacked #phoneFullscreenBtn:not([hidden]) {
+        align-self: stretch;
+        flex-direction: column;
+        gap: 3px;
+        width: 72px;
+        min-height: 72px;
+        padding: 4px;
+        white-space: normal;
+    }
     #phoneFullscreenBtn .fsIcon {
-        font-size: 34px;
+        font-size: 18px;
         line-height: 1;
     }
+    #playModes.stacked #phoneFullscreenBtn .fsIcon {
+        font-size: 26px;
+    }
     #phoneFullscreenBtn .fsLabel {
-            font-size: 12px;
-        letter-spacing: 0.5px;
+        font-size: 13px;
+        line-height: 1.1;
+        text-align: center;
     }
     #mobileFullscreenBtn {
         display: none !important;
@@ -3424,21 +3444,10 @@ body.wideLayout .playModeBand {
     width: 100%;
 }
 
-/* Brushed silver, like the Strike / Raise buttons on the board. */
+/* Same dark button look as everywhere else, just full width here. */
 body.wideLayout .playModeTrigger {
     width: 100%;
-    padding: 10px 12px;
-    font-size: 16px;
-    letter-spacing: 1px;
-    color: #fff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-    border: 1px solid #aab0b8;
-    border-radius: 5px;
-    background: linear-gradient(#a9afb7, #7b818a 55%, #6c727a);
-}
-body.wideLayout .playModeTrigger:hover:not(:disabled),
-body.wideLayout .playModeTrigger[aria-expanded="true"] {
-    background: linear-gradient(#b8bec6, #878d96 55%, #767c84);
+    padding: 9px 12px;
 }
 
 /* The options open in place inside the card instead of as a popover. */

@@ -261,8 +261,35 @@ setInterval(updateWatermark, 10 * 1000);
 const phoneFullscreenBtn = document.getElementById('phoneFullscreenBtn');
 function updateFullscreenHint(gameLoaded) {
     const inFullscreen = Boolean(document.fullscreenElement) || isFakeFullscreenActive();
-    phoneFullscreenBtn.hidden = !(gameLoaded && !inFullscreen);
+    const show = gameLoaded && !inFullscreen;
+    if (phoneFullscreenBtn.hidden !== !show) {
+        phoneFullscreenBtn.hidden = !show;
+        updatePlayRowShape();
+    }
 }
+
+// Phones: do the two Play buttons fit side by side (plus the short "Full
+// screen" rectangle, when it's showing)? If not, stack them and let the
+// button become a square beside the pair. Decided by measuring rather than
+// by watching the row wrap, so the button's own width change can't make
+// the layout flip back and forth.
+const playModesEl = document.getElementById('playModes');
+const PHONE_FS_SHORT_W = 130; // "⛶ Full screen" on one line, plus the gap
+function updatePlayRowShape() {
+    const phone = window.matchMedia('(pointer: coarse) and (hover: none)').matches;
+    if (!phone || isWideLayout()) {
+        playModesEl.classList.remove('stacked');
+        return;
+    }
+    const triggers = [...playModesEl.querySelectorAll('.playModeTrigger')];
+    const style = getComputedStyle(playModesEl);
+    const room = playModesEl.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const need = triggers.reduce((w, t) => w + t.offsetWidth, 0) + 10
+        + (phoneFullscreenBtn.hidden ? 0 : PHONE_FS_SHORT_W);
+    playModesEl.classList.toggle('stacked', need > room);
+}
+window.addEventListener('resize', updatePlayRowShape);
+document.fonts.ready.then(updatePlayRowShape);
 phoneFullscreenBtn.addEventListener('click', () => {
     enterMobileFullscreen(boardWrap).catch(() => {});
 });

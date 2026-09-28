@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>RampartChess</title>
 <link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=102" />
+<link rel="stylesheet" href="style.css?v=103" />
 </head>
 <body>
 <header>
@@ -74,6 +74,10 @@
 </div>
 
 <div id="playModes">
+  <!-- The two Play buttons as one unit, so on phones they can sit side by
+       side or stack (main.js updatePlayRowShape) beside #phoneFullscreenBtn.
+       Elsewhere this wrapper is display:contents - no layout of its own. -->
+  <div id="playModeButtons">
   <section class="playModeBand">
     <button type="button" class="playModeTrigger" id="aiMenuBtn" aria-expanded="false">Play vs Computer &#9662;</button>
     <div class="playModePanel" id="aiMenuPanel" hidden>
@@ -119,6 +123,7 @@
     <p id="humanSignedOutNote">Log in to challenge another player.</p>
     </div>
   </section>
+  </div>
   <!-- Phones only (style.css), while a game is being played or viewed: a big
        square way into fullscreen, beside the stacked Play buttons (owner,
        9/27 - replaces the old hint laid over the board's top-right squares,
@@ -274,6 +279,6 @@
 </div>
 
 <script type="module" src="js/header.js"></script>
-<script type="module" src="js/main.js?v=76"></script>
+<script type="module" src="js/main.js?v=77"></script>
 </body>
 </html>
