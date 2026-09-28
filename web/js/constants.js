@@ -37,15 +37,12 @@ export const GRAVES = 9;
 export const GWIDTH = CWIDTH;
 export const GHEIGHT = Math.floor((CEM_HEIGHT - 150) / GRAVES);
 
-// Phones (same test as style.css's `(pointer: coarse) and (hover: none)`
-// blocks) keep the original layout for now - owner, 9/26: the phone web
-// version is undecided. Everywhere else, the pygame client's 40px
-// prompt/button strip below the board is gone: Strike/Raise sit on the
-// bottom-left dead squares and the prompt is a banner over the top-right
-// ones (render.js), same idea as the phone fullscreen board. Fixed at load;
-// a device doesn't switch between the two.
-export const LEGACY_STRIP = typeof matchMedia === 'function'
-    && matchMedia('(pointer: coarse) and (hover: none)').matches;
+// The pygame client's 40px prompt/button strip below the board is gone on
+// every device: Strike/Raise sit on the bottom-left dead squares and the
+// prompt is a banner over the top-right ones (render.js). Phones kept the
+// strip until 9/27 (owner: now the same as desktop, nothing enlarged -
+// fullscreen is for play). The old strip code paths still key off this.
+export const LEGACY_STRIP = false;
 
 // Design resolution: 100px deck/grave margins each side of the board, the
 // board's own height plus the rampart band, plus the strip on phones.

@@ -255,40 +255,18 @@ new Image().src = 'assets/misc/queen_alchemy.png'; // preload so the swap is ins
 updateWatermark();
 setInterval(updateWatermark, 10 * 1000);
 
-// Standing "try full screen" nudge for phones (#fullscreenHint; CSS only ever
-// displays it on touch devices). It sits over the blank top-right squares of
-// the normal board - top row, display columns 5-9, which are blank whichever
-// way the board is flipped (a 180-degree turn maps blank squares onto blank
-// squares) - and is shown whenever a game is loaded and fullscreen is not
-// active. Deliberately no "already used it" memory: it is always there on the
-// normal board, and only absent while actually in fullscreen.
+// Phones' big square fullscreen button (#phoneFullscreenBtn, in the Play row;
+// CSS only ever displays it on touch devices): shown while a game is being
+// played or viewed and fullscreen is not active.
+const phoneFullscreenBtn = document.getElementById('phoneFullscreenBtn');
 function updateFullscreenHint(gameLoaded) {
-    const hint = document.getElementById('fullscreenHint');
-    if (!hint) return;
     const inFullscreen = Boolean(document.fullscreenElement) || isFakeFullscreenActive();
-    const show = gameLoaded && !inFullscreen;
-    hint.hidden = !show;
-    if (!show) return;
-    const scale = canvas.getBoundingClientRect().width / DESIGN_WIDTH;
-    const cellH = RHEIGHT * scale;
-    // 2px in from the covered squares' edges on every side, so the label
-    // never touches the grid lines around them.
-    const INSET = 2;
-    hint.style.left = `${canvas.offsetLeft + (BOARD_X + 5 * RWIDTH) * scale + INSET}px`;
-    hint.style.top = `${canvas.offsetTop + INSET}px`;
-    hint.style.width = `${5 * RWIDTH * scale - INSET * 2}px`;
-    hint.style.height = `${cellH - INSET * 2}px`;
-    hint.style.fontSize = `${Math.max(8, cellH * 0.32)}px`;
+    phoneFullscreenBtn.hidden = !(gameLoaded && !inFullscreen);
 }
-document.getElementById('fullscreenHint').addEventListener('click', () => {
+phoneFullscreenBtn.addEventListener('click', () => {
     enterMobileFullscreen(boardWrap).catch(() => {});
 });
 onLayoutModeChange(() => updateFullscreenHint(Boolean(activeState())));
-// The player-names bar (and anything else above the canvas) appears AFTER the
-// first draw and shifts the canvas down without resizing it, which the canvas
-// ResizeObserver above never sees - so re-place the hint whenever #boardWrap
-// itself changes size.
-new ResizeObserver(() => updateFullscreenHint(Boolean(activeState()))).observe(document.getElementById('boardWrap'));
 
 const statusLine = document.getElementById('statusLine');
 const statusLineTextEl = document.getElementById('statusLineText');
@@ -422,6 +400,20 @@ let currentProfile = null; // {uid, username} once signed in AND registered
 // interrupted before the username was claimed on a previous visit.
 let pendingUsernameClaim = false;
 
+// Phones: the sign-in fields live in a drop-down under the header's Log In
+// button (style.css #authPanel.phoneOpen). Desktop ignores all of this.
+const phoneLogInBtn = document.getElementById('phoneLogInBtn');
+function setPhoneAuthOpen(open) {
+    authPanel.classList.toggle('phoneOpen', open);
+    phoneLogInBtn.setAttribute('aria-expanded', String(open));
+    phoneLogInBtn.classList.toggle('active', open);
+}
+phoneLogInBtn.addEventListener('click', () => {
+    const open = !authPanel.classList.contains('phoneOpen');
+    setPhoneAuthOpen(open);
+    if (open) authEmail.focus();
+});
+
 function renderAuthUI(message) {
     const signedIn = currentProfile !== null || pendingUsernameClaim;
     // Once fully signed in (a real username claimed), the whole sign-in
@@ -429,6 +421,8 @@ function renderAuthUI(message) {
     // (header.js) covers "who's signed in" and Sign Out now. Still shown
     // during pendingUsernameClaim, since that step still needs authUsername.
     authPanel.hidden = currentProfile !== null;
+    phoneLogInBtn.hidden = currentProfile !== null;
+    if (currentProfile !== null) setPhoneAuthOpen(false);
     authEmail.hidden = signedIn;
     authPassword.hidden = signedIn;
     signUpBtn.hidden = signedIn;
@@ -909,12 +903,29 @@ PIECE_SET_NAMES.forEach(({ key, label }) => {
     opt.textContent = label;
     pieceSetSelect.appendChild(opt);
 });
+// Board style and piece style survive a refresh, like the two checkboxes
+// above: a per-browser display preference in localStorage. The theme is
+// stored by name, so it still resolves if THEME_PRESETS is ever reordered.
+try {
+    const savedTheme = THEME_PRESETS.findIndex((t) => t.name === localStorage.getItem('rampart.theme'));
+    if (savedTheme >= 0) {
+        setTheme(savedTheme);
+        themeSelect.value = String(savedTheme);
+    }
+    const savedPieceSet = localStorage.getItem('rampart.pieceSet');
+    if (PIECE_SET_NAMES.some((s) => s.key === savedPieceSet)) {
+        setPieceSet(savedPieceSet);
+        pieceSetSelect.value = savedPieceSet;
+    }
+} catch (_) { /* localStorage unavailable */ }
 themeSelect.addEventListener('change', () => {
     setTheme(Number(themeSelect.value));
+    try { localStorage.setItem('rampart.theme', THEME_PRESETS[Number(themeSelect.value)].name); } catch (_) { /* ignore */ }
     drawCanvas();
 });
 pieceSetSelect.addEventListener('change', () => {
     setPieceSet(pieceSetSelect.value);
+    try { localStorage.setItem('rampart.pieceSet', pieceSetSelect.value); } catch (_) { /* ignore */ }
     drawCanvas();
 });
 flipBoardBtn.addEventListener('click', () => {
@@ -976,6 +987,44 @@ let clickedCards = []; // {source:'deck', color, rank} | {source:'board', col, r
 let committedButton = null; // 'strike' | 'raise' | null
 let castDestinations = []; // [{col, row, category, index}] once committed
 let transientMessage = null; // e.g. "No eligible raider to strike."
+
+// "Necromancer": a player raises on two of their own consecutive turns.
+// Shown in the banner for NECROMANCER_MS, at most once per game per player,
+// and only for moves arriving live - a page load or history browsing never
+// replays it. move_log alternates, White at even indices.
+const NECROMANCER_MS = 4000;
+let necromancer = null; // { color, until }
+let necroGameId = null;
+let necroSeenLength = 0;
+let necroShown = new Set();
+
+function checkNecromancer() {
+    if (!state || !gameId) {
+        necroGameId = null;
+        necromancer = null;
+        return;
+    }
+    const history = state.history || [];
+    if (gameId !== necroGameId) {
+        // a game just loaded: its past moves are history, not news
+        necroGameId = gameId;
+        necroSeenLength = history.length;
+        necroShown = new Set();
+        necromancer = null;
+        return;
+    }
+    for (let i = necroSeenLength; i < history.length; i++) {
+        const color = i % 2 === 0 ? 'white' : 'black';
+        if (i >= 2 && !necroShown.has(color)
+            && castKindFromNotation(history[i]) === 'raise'
+            && castKindFromNotation(history[i - 2]) === 'raise') {
+            necroShown.add(color);
+            necromancer = { color, until: Date.now() + NECROMANCER_MS };
+            setTimeout(() => drawCanvas(), NECROMANCER_MS + 50);
+        }
+    }
+    necroSeenLength = history.length;
+}
 
 function squaresEqual(a, b) {
     if (!a && !b) return true;
@@ -1305,7 +1354,7 @@ function computeStatusInfo(s) {
                     // dripping from the title (render.js drawBloodTitle)
                     return {
                         kind: 'result',
-                        title: 'King Killer',
+                        title: 'Regicide',
                         effect: 'blood',
                         text: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`,
                         bannerText: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')} by capture.`,
@@ -1330,6 +1379,16 @@ function computeStatusInfo(s) {
             default:
                 return { kind: 'result', title: 'Stalemate', text: s.result.stalemated_color ? `${cap(s.result.stalemated_color)} stalemated` : 'Stalemate.' };
         }
+    }
+    // Necromancer takes the banner for its few seconds (even over a check
+    // it may have given - the check message returns right after).
+    if (necromancer && Date.now() < necromancer.until) {
+        return {
+            kind: 'result',
+            title: 'Necromancer',
+            effect: 'electric',
+            text: `${cap(necromancer.color)} raises the dead twice in a row.`,
+        };
     }
     if (s.in_check) {
         // The trailing " -- " is game.py's; the banner shows a clean sentence.
@@ -1433,6 +1492,13 @@ function currentDeckCardAt(x, y) {
 
 function drawCanvas() {
     const s = activeState();
+    // Empty board -> the taller watermark box (style.css #boardCanvas.noGame).
+    // Re-sync straight away when it flips, so the board is drawn into the
+    // right-sized backing store on this same call.
+    if (canvas.classList.contains('noGame') === Boolean(s)) {
+        canvas.classList.toggle('noGame', !s);
+        syncActiveCanvasResolution();
+    }
     updateFullscreenHint(Boolean(s));
     if (!s) return;
     updateNamesClocksOrder();
@@ -1631,6 +1697,7 @@ function updateMovesPanel() {
         moveLabels = null;
         moveLabelsForLength = -1;
     }
+    openMovesForWide(); // wide desktop layout: the list is always on show
 }
 
 function renderMovesList() {
@@ -1982,6 +2049,7 @@ async function refreshPlayerLabels() {
 
 function renderAll() {
     clockSyncedAt = Date.now(); // state.*_time_ms above is only ever fresh right here
+    checkNecromancer();
     drawCanvas();
     updateHistoryButtons();
     updateGameActionButtons();
@@ -2674,6 +2742,121 @@ document.addEventListener('visibilitychange', () => {
     pollActiveGame();
     pollChat();
 });
+
+// ---- wide desktop layout (panels on both sides of the board) ------------
+//
+// On a wide desktop window the page otherwise leaves big empty margins while
+// the controls sit below the board, off the bottom of the screen. From
+// WIDE_QUERY up, the SAME elements (so every listener keeps working) are
+// moved into the two side rails (#wideLeft/#wideRight, index.html):
+//   left  - Play buttons, Chat (human games) / Live Games, Display + Flip
+//   right - Moves + history arrows, then Abort / Resign / Draw buttons
+// and moved back to their original spots, via comment-node anchors, when the
+// window narrows again. Styling lives in style.css under body.wideLayout;
+// below the breakpoint nothing here touches the page at all.
+const WIDE_QUERY = window.matchMedia('(min-width: 1500px) and (hover: hover) and (pointer: fine)');
+const wideStage = document.getElementById('stage');
+const wideLeft = document.getElementById('wideLeft');
+const wideRight = document.getElementById('wideRight');
+const wideMovesCard = document.getElementById('wideMovesCard');
+const wideMovesPlaceholder = document.getElementById('wideMovesPlaceholder');
+const wideActionsCard = document.getElementById('wideActionsCard');
+// [element, where it goes in wide mode] in the order they're placed.
+const WIDE_MOVES = [
+    [document.getElementById('playModes'), (el) => wideLeft.appendChild(el)],
+    [chatPanel, (el) => wideLeft.appendChild(el)],
+    [document.getElementById('liveGamesPanel'), (el) => wideLeft.appendChild(el)],
+    [document.getElementById('displayPanel'), (el) => wideLeft.appendChild(el)],
+    [movesPanel, (el) => wideMovesCard.insertBefore(el, wideMovesPlaceholder)],
+    [document.getElementById('historyControls'), (el) => wideMovesCard.appendChild(el)],
+    [quickActions, (el) => wideActionsCard.appendChild(el)],
+    [gameActions, (el) => wideActionsCard.appendChild(el)],
+];
+const wideAnchors = WIDE_MOVES.map(([el]) => {
+    const anchor = document.createComment(`wide-layout home of #${el.id}`);
+    el.parentNode.insertBefore(anchor, el);
+    return anchor;
+});
+
+// Room kept above the canvas for the names row + clocks row even while they
+// are hidden, so the board never changes size when a game starts.
+const WIDE_NAME_ROWS_RESERVE = 96;
+const WIDE_BOTTOM_MARGIN = 16;
+
+function isWideLayout() {
+    return document.body.classList.contains('wideLayout');
+}
+
+// The Moves list normally only fetches while its dropdown is open; in wide
+// mode it's always on show, so open it whenever it's visible.
+function openMovesForWide() {
+    if (!isWideLayout() || movesPanel.hidden || movesOpen) return;
+    movesOpen = true;
+    movesListEl.hidden = false;
+    movesToggleBtn.setAttribute('aria-expanded', 'true');
+    movesToggleArrow.textContent = '▴';
+    refreshMovesIfOpen();
+}
+
+// Board width: its normal 1000px at most, never bigger - smaller only if the
+// window is too short (or too narrow beside the rails) to show all of it.
+// Sized against the taller empty-board box (1000/860) so the width stays put
+// when a game starts. Then the rails are lined up with the canvas's own top
+// and bottom edges.
+function sizeWideLayout() {
+    if (!isWideLayout()) return;
+    const stageStyle = getComputedStyle(wideStage);
+    const railW = wideLeft.getBoundingClientRect().width;
+    const gap = parseFloat(stageStyle.columnGap) || 0;
+    const padX = parseFloat(stageStyle.paddingLeft) + parseFloat(stageStyle.paddingRight);
+    const availW = document.documentElement.clientWidth - 2 * railW - 2 * gap - padX;
+    const wrapTop = boardWrap.getBoundingClientRect().top + window.scrollY;
+    const availH = window.innerHeight - wrapTop - WIDE_NAME_ROWS_RESERVE - WIDE_BOTTOM_MARGIN;
+    const width = Math.max(560, Math.min(1000, availW, availH * 1000 / 860));
+    boardWrap.style.width = `${Math.floor(width)}px`;
+    alignWideRails();
+}
+
+function alignWideRails() {
+    if (!isWideLayout()) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    const stageTop = wideStage.getBoundingClientRect().top + parseFloat(getComputedStyle(wideStage).paddingTop);
+    for (const rail of [wideLeft, wideRight]) {
+        rail.style.marginTop = `${Math.max(0, canvasRect.top - stageTop)}px`;
+        rail.style.height = `${canvasRect.height}px`;
+    }
+}
+
+function applyWideLayout() {
+    const on = WIDE_QUERY.matches;
+    if (on === isWideLayout()) return;
+    document.body.classList.toggle('wideLayout', on);
+    wideLeft.hidden = !on;
+    wideRight.hidden = !on;
+    if (on) {
+        for (const [el, place] of WIDE_MOVES) place(el);
+        openMovesForWide();
+        sizeWideLayout();
+    } else {
+        WIDE_MOVES.forEach(([el], i) => wideAnchors[i].after(el));
+        boardWrap.style.width = '';
+        for (const rail of [wideLeft, wideRight]) {
+            rail.style.marginTop = '';
+            rail.style.height = '';
+        }
+    }
+}
+
+WIDE_QUERY.addEventListener('change', applyWideLayout);
+window.addEventListener('resize', sizeWideLayout);
+// The names/clocks rows appearing, the status line wrapping, or the canvas
+// switching between its empty (860) and in-game (820) box all move or resize
+// the canvas without a window resize.
+new ResizeObserver(() => alignWideRails()).observe(canvas);
+for (const id of ['playerNames', 'clocks', 'statusLine']) {
+    new ResizeObserver(() => sizeWideLayout()).observe(document.getElementById(id));
+}
+applyWideLayout();
 
 // ---- opening a game linked from the Profile page's ledger ----------------
 

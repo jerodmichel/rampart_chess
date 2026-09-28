@@ -37,7 +37,7 @@ export const THEME_PRESETS = [
     { name: 'Green', bgLight: 'rgb(234, 235, 200)', bgDark: 'rgb(119, 154, 88)', traceLight: 'rgb(244, 247, 116)', traceDark: 'rgb(172, 195, 51)' },
     { name: 'Brown', bgLight: 'rgb(235, 209, 166)', bgDark: 'rgb(165, 117, 80)', traceLight: 'rgb(245, 234, 100)', traceDark: 'rgb(209, 185, 59)' },
     { name: 'Blue', bgLight: 'rgb(229, 228, 200)', bgDark: 'rgb(60, 95, 135)', traceLight: 'rgb(123, 187, 227)', traceDark: 'rgb(43, 119, 191)' },
-    { name: 'Gray', bgLight: 'rgb(120, 119, 118)', bgDark: 'rgb(86, 85, 84)', traceLight: 'rgb(99, 126, 143)', traceDark: 'rgb(82, 102, 128)' },
+    { name: 'Gray', bgLight: 'rgb(222, 219, 210)', bgDark: 'rgb(86, 85, 84)', traceLight: 'rgb(99, 126, 143)', traceDark: 'rgb(82, 102, 128)' },
 ];
 
 let THEME = THEME_PRESETS[0];
@@ -487,7 +487,8 @@ function drawBanner(ctx, info, ui) {
         bannerKey = key;
         bannerChangedAt = now;
     }
-    const accent = info && info.effect === 'blood' ? BLOOD_ACCENT : spec.accent;
+    const accent = info && info.effect === 'blood' ? BLOOD_ACCENT
+        : info && info.effect === 'electric' ? ELECTRIC_ACCENT : spec.accent;
     if (kind !== bannerKind || accent !== accentTo) {
         accentFrom = currentAccent(now);
         accentTo = accent;
@@ -564,6 +565,13 @@ function drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still) {
         const fit = fitText(ctx, text, BANNER_BODY_FONT, BANNER_BODY_PX, right - left, areaH - titleH - 2, 1);
         const blockH = titleH + 2 + fit.lineH;
         const top = areaTop + (areaH - blockH) / 2;
+        if (info.effect === 'electric') {
+            drawElectricTitle(ctx, title, big, left, top + titleH / 2, titleH, now, still);
+            ctx.font = BANNER_BODY_FONT(fit.size);
+            ctx.fillStyle = 'rgb(255, 255, 255)';
+            ctx.fillText(fit.lines[0], left, top + titleH + 2 + fit.lineH / 2);
+            return;
+        }
         if (info.effect === 'blood') {
             drawBloodTitle(ctx, r, title, big, left, top + titleH / 2, titleH, now, still);
             ctx.font = BANNER_BODY_FONT(fit.size);
@@ -609,6 +617,99 @@ function drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still) {
     fit.lines.forEach((l, i) => ctx.fillText(l, left, top + headerH + fit.lineH * (i + 0.5)));
 }
 
+// ---- Necromancer: electricity jumping around the letters -------------------
+//
+// Shown when a player raises on two consecutive turns (main.js). A silver
+// title with electric-blue arcs leaping between neighbouring letters and
+// sparking off their tops, re-forking every ~90ms. Procedural, no art.
+const ELECTRIC_ACCENT = [111, 208, 255];
+const ELECTRIC_REFORK_MS = 90;
+
+// Small deterministic PRNG, so each ~90ms bucket keeps the same arcs for
+// every redraw inside it (a steady flicker, not per-frame noise).
+function seededRandom(seed) {
+    let t = seed >>> 0;
+    return () => {
+        t += 0x6D2B79F5;
+        let x = Math.imul(t ^ (t >>> 15), 1 | t);
+        x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// Jagged path from a to b by midpoint displacement.
+function boltPoints(a, b, rand, depth, spread) {
+    if (depth === 0) return [a, b];
+    const mid = {
+        x: (a.x + b.x) / 2 + (rand() - 0.5) * spread,
+        y: (a.y + b.y) / 2 + (rand() - 0.5) * spread,
+    };
+    return [...boltPoints(a, mid, rand, depth - 1, spread / 2).slice(0, -1), ...boltPoints(mid, b, rand, depth - 1, spread / 2)];
+}
+
+function strokeBolt(ctx, pts) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (const p of pts.slice(1)) ctx.lineTo(p.x, p.y);
+    // wide soft glow, then a thin white-hot core
+    ctx.strokeStyle = 'rgba(111, 208, 255, 0.45)';
+    ctx.lineWidth = 3.5;
+    ctx.shadowColor = 'rgba(111, 208, 255, 0.9)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(235, 250, 255, 0.95)';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+}
+
+function drawElectricTitle(ctx, title, big, x, cy, titleH, now, still) {
+    ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+    // letter boxes, for where arcs start and land
+    const letters = [];
+    let lx = x;
+    for (const ch of title) {
+        const w = ctx.measureText(ch).width;
+        if (ch !== ' ') letters.push({ x: lx, w });
+        lx += w;
+    }
+    const tw = lx - x;
+    const capTop = cy - big * 0.36;
+    const capBot = cy + big * 0.34;
+
+    // the silver title, faintly lit blue from behind
+    ctx.save();
+    ctx.shadowColor = 'rgba(111, 208, 255, 0.55)';
+    ctx.shadowBlur = still ? 6 : 8 + 4 * Math.sin(now / 70);
+    ctx.fillStyle = still ? 'rgb(216, 216, 207)'
+        : sweepGradient(ctx, x, tw, now, 2600, 'rgb(196, 204, 214)', 'rgb(255, 255, 255)');
+    ctx.fillText(title, x, cy);
+    ctx.restore();
+
+    if (letters.length < 2) return;
+    const rand = seededRandom(still ? 7 : Math.floor(now / ELECTRIC_REFORK_MS));
+    const pointOn = (l) => ({ x: l.x + l.w * (0.2 + rand() * 0.6), y: capTop + rand() * (capBot - capTop) });
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // arcs between neighbouring letters (sometimes skipping one)
+    const arcs = still ? 3 : 3 + Math.floor(rand() * 3);
+    for (let i = 0; i < arcs; i++) {
+        const a = Math.floor(rand() * (letters.length - 1));
+        const b = Math.min(letters.length - 1, a + 1 + (rand() < 0.3 ? 1 : 0));
+        strokeBolt(ctx, boltPoints(pointOn(letters[a]), pointOn(letters[b]), rand, 4, big * 0.5));
+    }
+    // sparks leaping up off the tops of a couple of letters
+    const sparks = still ? 1 : 1 + Math.floor(rand() * 2);
+    for (let i = 0; i < sparks; i++) {
+        const l = letters[Math.floor(rand() * letters.length)];
+        const from = { x: l.x + l.w * (0.3 + rand() * 0.4), y: capTop };
+        const to = { x: from.x + (rand() - 0.5) * big * 0.9, y: capTop - titleH * (0.25 + rand() * 0.2) };
+        strokeBolt(ctx, boltPoints(from, to, rand, 3, big * 0.35));
+    }
+    ctx.restore();
+}
+
 // ---- mate by capture: the title bleeds and drips ---------------------------
 //
 // Ported from the Banner Type Lab prototype the owner approved (9/26): the
@@ -616,7 +717,7 @@ function drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still) {
 // undersides of the actual letters and drips, a few beads break off and
 // fall, and afterwards one bead falls every few seconds. All drawn here;
 // the sentence is drawn over it afterwards so it always reads.
-const BLOOD_ACCENT = [176, 20, 28];
+const BLOOD_ACCENT = [128, 10, 16]; // 'Darker' oxblood (owner, 9/27; was 176,20,28)
 const BLOOD_DRIPS = 9;
 const BLOOD_MAX_LEN = 24;
 let blood = null; // { key, drips, drops, nextIdle, moving }
@@ -683,7 +784,7 @@ function drawDrip(ctx, d, len) {
     ctx.closePath();
     ctx.fill();
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 190, 190, 0.35)'; // wet glint on the bead
+    ctx.fillStyle = 'rgba(255, 190, 190, 0.28)'; // wet glint on the bead
     ctx.beginPath();
     ctx.ellipse(d.x - r * 0.35, tipY - r * 0.45, r * 0.28, r * 0.4, -0.4, 0, Math.PI * 2);
     ctx.fill();
@@ -720,14 +821,14 @@ function drawBloodTitle(ctx, r, title, big, x, cy, titleH, now, still) {
         ctx.rect(r.x, r.y - 10, r.w, lerp(tTop - 2, tBot + 4, ease(bleed)) - (r.y - 10));
         ctx.clip();
         const g = ctx.createLinearGradient(0, tTop, 0, tBot);
-        g.addColorStop(0, 'rgb(176, 20, 28)');
-        g.addColorStop(1, 'rgb(104, 6, 12)');
+        g.addColorStop(0, 'rgb(128, 10, 16)');
+        g.addColorStop(1, 'rgb(72, 3, 7)');
         ctx.fillStyle = g;
         ctx.fillText(title, x, cy);
         ctx.restore();
     }
 
-    ctx.fillStyle = 'rgb(112, 8, 14)';
+    ctx.fillStyle = 'rgb(80, 4, 9)';
     let settled = bleed >= 1;
     for (const d of blood.drips) {
         const p = Math.min(1, Math.max(0, (t - d.start) / d.dur));
@@ -1337,10 +1438,12 @@ function drawButtonHover(ctx, ui) {
     // A deep blue ring just outside the button, with a soft glow, reads on
     // light squares; a thin pale line on the button's own edge reads on
     // dark ones (Gray).
+    // Lighter sky blue on Green and Brown (owner, 9/27); deep blue elsewhere.
+    const lightRing = THEME.name === 'Green' || THEME.name === 'Brown';
     ctx.save();
-    ctx.shadowColor = 'rgba(20, 70, 160, 0.55)';
+    ctx.shadowColor = lightRing ? 'rgba(70, 140, 215, 0.55)' : 'rgba(20, 70, 160, 0.55)';
     ctx.shadowBlur = 10;
-    ctx.strokeStyle = 'rgb(22, 78, 170)';
+    ctx.strokeStyle = lightRing ? 'rgb(70, 140, 215)' : 'rgb(22, 78, 170)';
     ctx.lineWidth = 3.5;
     roundedRectPath(ctx, rect.x - 2.5, rect.y - 2.5, rect.w + 5, rect.h + 5, 6);
     ctx.stroke();
@@ -1354,12 +1457,15 @@ function drawButtonHover(ctx, ui) {
 // Brushed silver on every board (owner, 9/26 - first tried on Gray, where
 // the old olive read as green), rounded, magenta while committed. Phones
 // (LEGACY_STRIP) keep the original flat dark buttons in the strip.
+// Green and Brown get a deeper silver (owner, 9/27) - the standard one read
+// too pale against their lighter boards.
 function castButtonFill(ctx, rect) {
+    const deep = THEME.name === 'Green' || THEME.name === 'Brown';
     const g = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-    g.addColorStop(0, 'rgb(158, 160, 164)');
-    g.addColorStop(0.5, 'rgb(128, 130, 134)');
-    g.addColorStop(1, 'rgb(104, 106, 110)');
-    return { fill: g, edge: 'rgb(178, 180, 184)' };
+    g.addColorStop(0, deep ? 'rgb(128, 130, 135)' : 'rgb(158, 160, 164)');
+    g.addColorStop(0.5, deep ? 'rgb(100, 102, 107)' : 'rgb(128, 130, 134)');
+    g.addColorStop(1, deep ? 'rgb(80, 82, 87)' : 'rgb(104, 106, 110)');
+    return { fill: g, edge: deep ? 'rgb(150, 152, 156)' : 'rgb(178, 180, 184)' };
 }
 
 function drawCastButtons(ctx, ui) {

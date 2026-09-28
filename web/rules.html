@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Rules - RampartChess</title>
 <link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=84" />
+<link rel="stylesheet" href="style.css?v=102" />
 </head>
 <body>
 <header>
@@ -54,7 +54,7 @@
 </header>
 
 <main id="rulesPage">
-  <h2>About RampartChess</h2>
+  <h2>How to Play</h2>
   <p>
     RampartChess is a strategic hybrid of chess and cardplay, where two players compete
     to checkmate their opponent's king using a combination of tactical piece movement
@@ -82,13 +82,18 @@
   </ul>
 
   <h2>Official Rulebook</h2>
-  <p>
-    <a href="https://apecrank.net/rampart_rulebook/" target="_blank" rel="noopener">
+  <p id="rulebookIntro">
+    <a href="https://apecrank.net/rampart_rulebook.pdf" target="_blank" rel="noopener">
       Open the full rulebook in a new tab &#8599;
     </a>
     - or read it right here:
   </p>
-  <iframe id="rulebookFrame" src="https://apecrank.net/rampart_rulebook/"
+  <!-- Phones (and the Android app's WebView) can't show a PDF inside a
+       page - the frame just stays blank - so there the frame is swapped
+       for a plain button that opens the PDF itself (see script below). -->
+  <a id="rulebookButton" href="https://apecrank.net/rampart_rulebook.pdf"
+     target="_blank" rel="noopener" hidden>Open the Official Rulebook (PDF)</a>
+  <iframe id="rulebookFrame" src="https://apecrank.net/rampart_rulebook.pdf"
           title="Official RampartChess Rulebook"></iframe>
 </main>
 
@@ -96,6 +101,15 @@
 <script type="module">
   import { initNavMenu } from './js/nav.js';
   initNavMenu();
+  // pdfViewerEnabled is false on phones/WebViews; touch-only devices are
+  // covered too, since some mobile browsers claim a viewer but still show a
+  // blank frame.
+  const touchOnly = matchMedia('(pointer: coarse) and (hover: none)').matches;
+  if (navigator.pdfViewerEnabled === false || touchOnly) {
+    document.getElementById('rulebookFrame').remove();
+    document.getElementById('rulebookIntro').hidden = true;
+    document.getElementById('rulebookButton').hidden = false;
+  }
 </script>
 </body>
 </html>
