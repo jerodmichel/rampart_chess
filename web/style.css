@@ -4,6 +4,14 @@
     font-weight: 600;
 }
 
+/* Desktop prompt banner's headers and big moments (render.js). SIL OFL 1.1,
+   license alongside in assets/fonts/CinzelDecorative-OFL.txt. */
+@font-face {
+    font-family: 'Cinzel Decorative Web';
+    src: url('assets/fonts/CinzelDecorative-Bold.ttf') format('truetype');
+    font-weight: 700;
+}
+
 :root {
     color-scheme: dark;
     --bg: #141410;
@@ -485,7 +493,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     height: auto;
     cursor: pointer;
     margin-top: 8px;
-    aspect-ratio: 1000 / 860;
+    aspect-ratio: 1000 / 820; /* DESIGN_WIDTH / DESIGN_HEIGHT (constants.js) */
     /* Only ever visible with no game loaded - drawScreen() (render.js)
        opaquely fills the whole canvas the instant a game exists, painting
        right over this; it's only ever showing through on the actual
@@ -765,10 +773,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 /* Sits directly under #chatPanel, same visual family (border/background/
    margin) so it reads as a continuation of it - collapsed, it's just
    #movesToggleBtn, sized to roughly match #chatInputRow's own height/
-   width; open, #movesList drops down from it as an overlay (same
-   absolute-positioned-dropdown pattern #navMenuDropdown/
-   #displaySettingsDropdown already use) rather than pushing
-   #liveGamesPanel down the page. */
+   width; open, #movesList expands inside the panel, in normal page flow,
+   pushing #liveGamesPanel down. (It used to drop down as an absolute
+   overlay, but near the bottom of the page the document never grew to
+   include it, so the last moves couldn't be scrolled into view - 9/26.) */
 #movesPanel {
     position: relative;
     margin: 10px 15px 0;
@@ -797,22 +805,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 #movesList {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    margin-top: 4px;
-    max-height: 220px;
+    max-height: 320px;
     overflow-y: auto;
     grid-template-columns: auto 1fr 1fr;
     align-content: start;
     gap: 3px 8px;
     padding: 8px 12px;
     font-size: 0.9em;
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    z-index: 20;
+    border-top: 1px solid var(--panel-border);
 }
 
 /* `display` must live here, not on the unconditional rule above - see
@@ -2326,16 +2326,10 @@ a.ledgerOpponent:hover {
            across all 13 cards - guaranteed to fit exactly, on any device,
            rather than a fixed guessed pixel height that happened to work
            for one screen size and overflowed on another. aspect-ratio then
-           derives each card's WIDTH from that computed height - matched to
-           card_back.png's own real 680x336 (2.02:1) ratio specifically,
-           since that's CARD_BACK_PRESETS[0], the default theme's (Green)
-           card back, not an in-between guess. The other card-back art
-           (dead_card0.png, 881x561, ~1.57:1 - shown on the Brown/Gray
-           themes) will letterbox a bit more via object-fit:contain since
-           it doesn't match this ratio as closely, but that trades off
-           correctness for the theme most people will actually see by
-           default against a theme most won't, rather than fitting neither
-           particularly well. */
+           derives each card's WIDTH from that computed height at 680:336
+           (2.02:1) - the exact shape every theme's 'wide' card back
+           (assets/misc/card_backs/*_wide.png, render.js CARD_BACK_PRESETS)
+           is cut to, so a used card's back fills it without stretching. */
         #boardWrap:fullscreen .mobileDeckCard,
         #boardWrap.fakeFullscreen .mobileDeckCard {
             flex: 1;
@@ -3246,3 +3240,12 @@ body.cardStyle .mobileDeckCard {
 .tutVideo { max-width: 100%; aspect-ratio: 16 / 9; }
 .tutClipId { font-family: monospace; font-weight: bold; color: #8fb56a; }
 .tutClipDesc { font-size: 0.9em; max-width: 440px; }
+
+/* Phones keep the original 40px prompt/button strip under the board for now
+   (constants.js LEGACY_STRIP - same media test), so their canvas keeps the
+   original design aspect. */
+@media (pointer: coarse) and (hover: none) {
+    #boardCanvas {
+        aspect-ratio: 1000 / 860;
+    }
+}

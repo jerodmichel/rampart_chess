@@ -25,7 +25,7 @@ import {
     drawScreen, colRowFromPoint, buttonAt, deckCardAt, isPlayableSquare,
     DESIGN_WIDTH, DESIGN_HEIGHT, THEME_PRESETS, setTheme, PIECE_SET_NAMES, setPieceSet,
     triggerLightning, isLightningActive, startHourglass, stopHourglass, isHourglassActive,
-    setFlipped, isFlipped, onImageLoaded, setCardStyle, setDeckStyle,
+    setFlipped, isFlipped, onImageLoaded, setCardStyle, setDeckStyle, bannerAnimationState,
 } from './render.js';
 
 // Every api.js request fetches a live token right before sending, rather
@@ -1276,9 +1276,14 @@ async function commitCastButton(button) {
     }
 }
 
-function computeStatus(s) {
+// The prompt text plus what kind of message it is, for the desktop banner
+// (render.js drawBanner): 'turn' | 'think' | 'casting' | 'check' | 'herald'
+// | 'result' | 'plain', a big-moment title for results, and whose king to
+// show for turn/think. Phones' strip and fullscreen prompt only use .text
+// (computeStatus below), so their wording is untouched.
+function computeStatusInfo(s) {
     if (isBrowsingHistory()) {
-        return `Viewing move ${viewIndex} of ${state.history.length}.`;
+        return { kind: 'plain', text: `Viewing move ${viewIndex} of ${state.history.length}.` };
     }
     if (s.result) {
         const { winner, reason } = s.result;
@@ -1295,62 +1300,85 @@ function computeStatus(s) {
             // fragment - not an intentional style match.
             case 'checkmate':
             case 'mate_by_capture':
-                return `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`;
-            case 'resignation': return `${cap(winner === 'white' ? 'black' : 'white')} resigned - ${cap(winner)} wins!`;
-            case 'draw_agreement': return 'Draw by agreement.';
-            case 'timeout': return `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!`;
+                if (reason === 'mate_by_capture') {
+                    // desktop banner only: its own sentence, and blood
+                    // dripping from the title (render.js drawBloodTitle)
+                    return {
+                        kind: 'result',
+                        title: 'King Killer',
+                        effect: 'blood',
+                        text: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`,
+                        bannerText: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')} by capture.`,
+                    };
+                }
+                return {
+                    kind: 'result',
+                    title: 'Checkmate',
+                    text: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`,
+                };
+            case 'resignation': return { kind: 'result', title: 'Resignation', text: `${cap(winner === 'white' ? 'black' : 'white')} resigned - ${cap(winner)} wins!` };
+            case 'draw_agreement': return { kind: 'result', title: 'Draw', text: 'Draw by agreement.' };
+            case 'timeout': return { kind: 'result', title: 'Time', text: `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!` };
             // Matches game.py's set_repetition_prompt/is_draw_by_
             // insufficient_material wording exactly.
-            case 'repetition': return 'Draw by repetition';
-            case 'insufficient_material': return 'Draw by insufficient material';
+            case 'repetition': return { kind: 'result', title: 'Draw', text: 'Draw by repetition' };
+            case 'insufficient_material': return { kind: 'result', title: 'Draw', text: 'Draw by insufficient material' };
             // Matches game.py's set_mated_prompt('stale-mated', ...)
             // wording exactly - stalemated_color is missing only for a
             // persisted game recorded before the server tracked it.
             case 'stalemate':
             default:
-                return s.result.stalemated_color ? `${cap(s.result.stalemated_color)} stalemated` : 'Stalemate.';
+                return { kind: 'result', title: 'Stalemate', text: s.result.stalemated_color ? `${cap(s.result.stalemated_color)} stalemated` : 'Stalemate.' };
         }
     }
     if (s.in_check) {
-        return `${cap(s.in_check)}'s king is in check -- `;
+        // The trailing " -- " is game.py's; the banner shows a clean sentence.
+        return { kind: 'check', text: `${cap(s.in_check)}'s king is in check -- `, bannerText: `${cap(s.in_check)}'s king is in check.` };
     }
     // Below result/in_check (a known, correctly-synced fact always wins)
     // but above everything else, since a stalled poll makes every one of
     // those messages potentially stale too.
     if (reconnecting) {
-        return 'Reconnecting...';
+        return { kind: 'herald', text: 'Reconnecting...' };
     }
     if (s.draw_offered_by && s.draw_offered_by !== humanColor()) {
-        return `${cap(s.draw_offered_by)} has offered a draw.`;
+        return { kind: 'herald', text: `${cap(s.draw_offered_by)} has offered a draw.` };
     }
     if (aiThinking) {
-        return `${cap(s.next_player)} (AI) is thinking...`;
+        return { kind: 'think', player: s.next_player, text: `${cap(s.next_player)} (AI) is thinking...` };
     }
     if (transientMessage) {
-        return transientMessage;
+        return { kind: 'herald', text: transientMessage };
     }
     if (pendingQueenMove) {
-        return 'Choose a tile where you want to place the queen.';
+        return { kind: 'casting', text: 'Choose a tile where you want to place the queen.' };
     }
     if (committedButton === 'strike') {
-        return 'Choose a raider to send to the grave.';
+        return { kind: 'casting', text: 'Choose a raider to send to the grave.' };
     }
     if (committedButton === 'raise') {
         const hasQueen = castDestinations.some((d) => d.category === 'raise_queen');
-        return hasQueen
-            ? 'Choose a tile where you want to place the queen.'
-            : 'Choose a tile where you want to place a raider.';
+        return {
+            kind: 'casting',
+            text: hasQueen
+                ? 'Choose a tile where you want to place the queen.'
+                : 'Choose a tile where you want to place a raider.',
+        };
     }
     if (s.next_player === humanColor() && jackHouseOccupiedBy(s, s.next_player)) {
         if (clickedCards.length === 0) {
-            return 'To begin casting, click on a card in your deck.';
+            return { kind: 'casting', text: 'To begin casting, click on a card in your deck.' };
         }
         if (handSum21(clickedCards)) {
-            return 'Click one of the "strike" or "raise" buttons.';
+            return { kind: 'casting', text: 'Click one of the "strike" or "raise" buttons.' };
         }
-        return 'Choose cards from your deck and from the board that sum to 21.';
+        return { kind: 'casting', text: 'Choose cards from your deck and from the board that sum to 21.' };
     }
-    return `${cap(s.next_player)} to move.`;
+    return { kind: 'turn', player: s.next_player, text: `${cap(s.next_player)} to move.` };
+}
+
+function computeStatus(s) {
+    return computeStatusInfo(s).text;
 }
 
 // ---- canvas <-> page coordinate conversion (canvas is CSS-scaled) --------
@@ -1409,6 +1437,7 @@ function drawCanvas() {
     if (!s) return;
     updateNamesClocksOrder();
     const browsing = isBrowsingHistory();
+    const statusInfo = computeStatusInfo(s);
     const ui = {
         selected: browsing ? null : selected,
         legalDestinations: browsing ? [] : legalDestinations,
@@ -1426,7 +1455,8 @@ function drawCanvas() {
         hoverDeckCard: browsing ? null : hoverDeckCard,
         clickedCards: browsing ? [] : clickedCards,
         aiThinking: !browsing && aiThinking,
-        promptText: computeStatus(s),
+        promptText: statusInfo.text,
+        promptInfo: statusInfo,
         // matches game.py's in-check prompt, rendered in red instead of
         // the default white - only while it's actually the live reason
         // for the prompt (not overridden by a higher-priority message
@@ -1450,6 +1480,10 @@ function drawCanvas() {
         mobileRaiseBtn.classList.toggle('active', ui.committedButton === 'raise');
     } else {
         drawScreen(ctx, s, ui);
+        // a new banner message fades in, and check/AI-thinking/results keep
+        // a pulse or shimmer going - both need the redraw loop below
+        const banner = bannerAnimationState();
+        if (banner.fullRate || banner.ambient) ensureAnimationLoop();
     }
     // The capture-ring/move-dot/clicked-card highlights (render.js) now
     // breathe with a wall-clock pulse - keep the rAF loop below alive
@@ -1481,8 +1515,11 @@ let lastPulseFrameTime = 0;
 function animationTick(now) {
     const pulsingHighlights = !isBrowsingHistory()
         && (selected || legalDestinations.length || castDestinations.length || clickedCards.length);
-    const activeEffect = isLightningActive() || isLightningActiveMobile() || isHourglassActive();
-    if (activeEffect || pulsingHighlights) {
+    // the desktop prompt banner: fades at full rate, pulses/shimmers at the
+    // capped rate like the highlight pulse
+    const banner = isMobileBoardActive() ? { fullRate: false, ambient: false } : bannerAnimationState(now);
+    const activeEffect = isLightningActive() || isLightningActiveMobile() || isHourglassActive() || banner.fullRate;
+    if (activeEffect || pulsingHighlights || banner.ambient) {
         if (activeEffect || now - lastPulseFrameTime >= PULSE_FRAME_INTERVAL_MS) {
             drawCanvas();
             lastPulseFrameTime = now;

@@ -1,5 +1,6 @@
-// Canvas rendering of the whole game screen, at the same 1000x860 design
-// resolution and pixel positions as the pygame client's game.py (flipped
+// Canvas rendering of the whole game screen, at the same design resolution
+// (1000x860; 1000x820 off phones, where the strip below the board is gone -
+// see constants.js) and pixel positions as the pygame client's game.py (flipped
 // board perspective isn't implemented yet - always drawn as white-at-bottom,
 // matching Board(flipped=False)). Ported directly from game.py's
 // show_bg/show_pieces/show_dead/show_dead_cards/show_cast_buttons/
@@ -8,13 +9,24 @@
 import {
     COLS, ROWS, WIDTH, HEIGHT, RWIDTH, RHEIGHT, RAMPART_HEIGHT, DECK, GRAVES,
     CEM_HEIGHT, CWIDTH, CHEIGHT, GWIDTH, GHEIGHT,
-    BOARD_X, DESIGN_WIDTH, DESIGN_HEIGHT,
+    BOARD_X, DESIGN_WIDTH, DESIGN_HEIGHT, LEGACY_STRIP,
     RANKS, DECK_SUIT, CARD_SQUARES, CARD_TABLE, ROW_LETTERS,
 } from './constants.js';
 import { drawCardSquare, drawCardBody, drawSuit, roundedRectPath, CARD_FONT_FAMILY } from './cardface.js';
 import { isMobileBoardActive } from './mobile.js';
 
-export const PROMPT_POS = { x: 320, y: 805 + RAMPART_HEIGHT };
+// The prompt banner covers the top-right dead squares (display row 0,
+// display cols 5-9) and Strike/Raise sit on the bottom-left ones (display
+// row 5, cols 0-4) - the same spots the phone fullscreen board uses. Both
+// are display positions, not board squares, and the board is symmetric
+// under a 180 flip, so they stay on dead squares whichever way it faces.
+const DEAD_W = 5 * RWIDTH - 2;          // five squares, minus the grid gap
+const DEAD_H = RHEIGHT - 2;
+const BOTTOM_ROW_Y = 5 * RHEIGHT + RAMPART_HEIGHT;
+// 95 tall (owner, 9/26: no message needs the full square height), centered
+// in the row like the Strike/Raise pair on the opposite corner.
+const BANNER_H = 95;
+export const BANNER_RECT = { x: BOARD_X + 5 * RWIDTH + 6, y: Math.round((DEAD_H - BANNER_H) / 2), w: DEAD_W - 12, h: BANNER_H };
 
 export { DESIGN_WIDTH, DESIGN_HEIGHT };
 
@@ -34,7 +46,7 @@ export function setTheme(index) {
     const clamped = THEME_PRESETS[index] ? index : 0;
     THEME = THEME_PRESETS[clamped];
     emblemIdx = EMBLEM_PRESETS[clamped] ? clamped : 0;
-    cardBackIdx = clamped % CARD_BACK_PRESETS.length;
+    cardBackIdx = CARD_BACK_PRESETS[clamped] ? clamped : 0;
 }
 
 // So render-mobile.js's own board-square/highlight drawing can match
@@ -82,8 +94,22 @@ export function deckCardColors(colorLabel) {
     return DECK_STYLES[deckStyle](colorLabel);
 }
 
-export const STRIKE_RECT = { x: 102, y: 802 + RAMPART_HEIGHT, w: 100, h: 35 };
-export const RAISE_RECT = { x: 205, y: 802 + RAMPART_HEIGHT, w: 83, h: 35 };
+// The pair is centered on the five bottom-left squares, both ways - at
+// this height they still clear the row letter / column numbers along
+// those squares' bottom edge.
+const CAST_BTN_W = 150;
+const CAST_BTN_H = 46;
+const CAST_BTN_GAP = 16;
+const CAST_BTN_X = BOARD_X + Math.round((DEAD_W - (2 * CAST_BTN_W + CAST_BTN_GAP)) / 2);
+const CAST_BTN_Y = BOTTOM_ROW_Y + Math.round((DEAD_H - CAST_BTN_H) / 2);
+export const STRIKE_RECT = LEGACY_STRIP
+    ? { x: 102, y: 802 + RAMPART_HEIGHT, w: 100, h: 35 }
+    : { x: CAST_BTN_X, y: CAST_BTN_Y, w: CAST_BTN_W, h: CAST_BTN_H };
+export const RAISE_RECT = LEGACY_STRIP
+    ? { x: 205, y: 802 + RAMPART_HEIGHT, w: 83, h: 35 }
+    : { x: CAST_BTN_X + CAST_BTN_W + CAST_BTN_GAP, y: CAST_BTN_Y, w: CAST_BTN_W, h: CAST_BTN_H };
+// Phones' original prompt spot in the strip (LEGACY_STRIP).
+const PROMPT_POS = { x: 320, y: 805 + RAMPART_HEIGHT };
 
 function inRect(x, y, r) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
@@ -117,6 +143,8 @@ function queueImageRedraw() {
 // late-arriving image, so reuse that redraw path.
 if (document.fonts && document.fonts.load) {
     document.fonts.load(`600 20px ${CARD_FONT_FAMILY}`).then(queueImageRedraw, () => {});
+    // the prompt banner's header/big-moment face (drawBanner)
+    document.fonts.load('700 20px "Cinzel Decorative Web"').then(queueImageRedraw, () => {});
 }
 
 const images = new Map();
@@ -184,36 +212,40 @@ export function deadPieceImageSrc(color, name) {
 // of a flat color fill standing in for it.
 export const rampartImage = loadImage('assets/misc/rampart.png');
 
-// Card-back and emblem art ride along with the theme, exactly like desktop's
-// K_t handler: pressing "T" there always calls change_theme() +
-// change_emblem() + change_dead_card() together (main.py, all three call
-// sites) - so despite Config tracking three separate indices, in practice
-// they only ever advance in lockstep. CARD_BACK_PRESETS has 2 real images
-// where desktop's 4-entry dead_cards list alternates card_back/dead_card0/
-// card_back/dead_card0 - `% 2` below reproduces that exactly.
-const CARD_BACK_PRESETS = [
-    'assets/misc/card_back.png',
-    'assets/misc/dead_card0.png',
-];
+// Card-back and emblem art ride along with the theme, like desktop's K_t
+// handler (change_theme() + change_emblem() + change_dead_card() together).
+// One back per theme, in THEME_PRESETS order - licensed stock card backs
+// (9/26, replacing the earlier two), each cut twice from the card's middle
+// band with its own frame kept on all four sides: 'strip' for the desktop
+// canvas deck slot (90x25, 3x) and 'wide' for the phone fullscreen deck
+// (style.css's 680:336), so neither is ever stretched.
+const CARD_BACK_PRESETS = ['green', 'brown', 'blue', 'gray'].map((t) => ({
+    strip: `assets/misc/card_backs/${t}_strip.png`,
+    wide: `assets/misc/card_backs/${t}_wide.png`,
+}));
+// One per theme, in THEME_PRESETS order. Brown and Gray share the licensed
+// gold-and-silver Alpha Omega (Vecteezy 2125552, cut out of its navy
+// background); Blue's is traced to SVG (emblems/svg/) and squared so the
+// 80x80 slot no longer squeezes it.
 const EMBLEM_PRESETS = [
     'assets/misc/alpha_omega88.png',
-    'assets/misc/alpha-omega1.png',
-    'assets/misc/alpha_omega.png',
-    'assets/misc/alpha-omega2.png',
+    'assets/misc/emblems/alpha_omega_gold.png',
+    'assets/misc/emblems/alpha_omega_blue.png',
+    'assets/misc/emblems/alpha_omega_gold.png',
 ];
 
 let cardBackIdx = 0;
 let emblemIdx = 0;
 
 function cardBackImage() {
-    return loadImage(CARD_BACK_PRESETS[cardBackIdx]);
+    return loadImage(CARD_BACK_PRESETS[cardBackIdx].strip);
 }
 
-// Same card-back art the desktop canvas draws over a used deck slot
-// (drawDecks below), as a URL string rather than a canvas-cache Image
-// object - for the mobile deck list's plain <img> elements.
+// Same card-back art as the desktop canvas's used deck slots (drawDecks
+// below), in the phone fullscreen deck's shape and as a URL string - for
+// mobile-panels.js's plain DOM deck rows.
 export function getActiveCardBackSrc() {
-    return CARD_BACK_PRESETS[cardBackIdx];
+    return CARD_BACK_PRESETS[cardBackIdx].wide;
 }
 
 function emblemImage() {
@@ -333,10 +365,15 @@ export function drawScreen(ctx, state, ui) {
     drawPieces(ctx, state);
     drawCastButtons(ctx, ui);
     drawButtonHover(ctx, ui);
-    if (ui.promptText) drawPrompt(ctx, ui.promptText, ui.promptColor, ui);
+    if (LEGACY_STRIP) {
+        if (ui.promptText) drawPrompt(ctx, ui.promptText, ui.promptColor, ui);
+    } else {
+        drawBanner(ctx, ui.promptInfo || { kind: 'plain', text: ui.promptText }, ui);
+    }
     drawLightning(ctx); // drawn last so the glow overlays everything else
 }
 
+// Phones' original one-line prompt in the strip below the board.
 function drawPrompt(ctx, text, color, ui) {
     ctx.font = 'bold 20px Georgia, serif';
     ctx.fillStyle = color || 'rgb(255,255,255)';
@@ -346,6 +383,393 @@ function drawPrompt(ctx, text, color, ui) {
         const width = ctx.measureText(text).width;
         drawHourglass(ctx, PROMPT_POS.x + width + 18, PROMPT_POS.y + 10, 9);
     }
+}
+
+// ---- desktop prompt banner --------------------------------------------------
+//
+// Owner's picks (9/26, from the Banner Type Lab): Cinzel Decorative for
+// headers and big moments, Georgia bold for sentences; 20 / 15 / 45px;
+// silver sweep as the shimmer. Every effect is drawn here in code - no
+// images. Message kinds come from main.js's computeStatusInfo.
+const BANNER_DISPLAY_FONT = '"Cinzel Decorative Web", "Cinzel Web", Georgia, serif';
+const BANNER_BODY_FONT = (size) => `bold ${size}px Georgia, serif`;
+const BANNER_BODY_PX = 20;
+const BANNER_HEADER_PX = 15;
+const BANNER_BIG_PX = 45;
+const BANNER_KINDS = {
+    turn:    { accent: [232, 228, 208] },
+    think:   { accent: [143, 143, 132] },
+    casting: { accent: [159, 43, 104], header: 'Casting', headerColor: 'rgb(228, 111, 174)' },
+    check:   { accent: [255, 40, 40], header: 'Check', headerColor: 'rgb(255, 40, 40)' },
+    herald:  { accent: [201, 201, 184], header: 'Herald', headerColor: 'rgb(201, 201, 184)' },
+    result:  { accent: [216, 216, 207] },
+    plain:   { accent: [110, 110, 100] },
+};
+const BANNER_FADE_MS = 280;
+const BANNER_ACCENT_MS = 450;
+const reducedMotion = typeof matchMedia === 'function'
+    ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+
+let bannerKey = null;
+let bannerChangedAt = -Infinity;
+let bannerKind = 'plain';
+let accentFrom = BANNER_KINDS.plain.accent;
+let accentTo = BANNER_KINDS.plain.accent;
+let accentChangedAt = -Infinity;
+
+// For main.js's redraw loop: fullRate while a message is fading in or the
+// accent bar is gliding; ambient (fine at the loop's capped rate) while a
+// pulse or shimmer is on screen. Phones (LEGACY_STRIP) have no banner.
+export function bannerAnimationState(now = performance.now()) {
+    if (LEGACY_STRIP || reducedMotion.matches) return { fullRate: false, ambient: false };
+    return {
+        fullRate: now - bannerChangedAt < BANNER_FADE_MS || now - accentChangedAt < BANNER_ACCENT_MS
+            || Boolean(blood && blood.key === bannerKey && blood.moving),
+        ambient: bannerKind === 'check' || bannerKind === 'think' || bannerKind === 'result',
+    };
+}
+
+// Greedy word wrap at the largest size (maxSize down to 12px) where the
+// text fits maxW x maxH in at most maxLines lines.
+function fitText(ctx, text, fontFor, maxSize, maxW, maxH, maxLines) {
+    const words = text.trim().split(/\s+/);
+    for (let size = maxSize; size >= 12; size--) {
+        ctx.font = fontFor(size);
+        const lines = [];
+        let line = '';
+        for (const w of words) {
+            const next = line ? `${line} ${w}` : w;
+            if (line && ctx.measureText(next).width > maxW) {
+                lines.push(line);
+                line = w;
+            } else {
+                line = next;
+            }
+        }
+        if (line) lines.push(line);
+        const lineH = Math.round(size * 1.22);
+        const fits = lines.length <= maxLines && lines.length * lineH <= maxH
+            && lines.every((l) => ctx.measureText(l).width <= maxW);
+        if (fits || size === 12) return { size, lines: lines.slice(0, maxLines), lineH };
+    }
+    return null;
+}
+
+// Canvas letterSpacing isn't everywhere yet, so space the caps by hand.
+function fillSpaced(ctx, text, x, y, spacing) {
+    for (const ch of text) {
+        ctx.fillText(ch, x, y);
+        x += ctx.measureText(ch).width + spacing;
+    }
+}
+
+// A bright band sweeping left to right across [x, x + w] once per period.
+function sweepGradient(ctx, x, w, now, period, base, hi) {
+    const p = ((now % period) / period) * 1.6 - 0.3;
+    const g = ctx.createLinearGradient(x, 0, x + w, 0);
+    const stops = [[0, base], [p - 0.18, base], [p, hi], [p + 0.18, base], [1, base]]
+        .filter(([o]) => o >= 0 && o <= 1)
+        .sort((m, n) => m[0] - n[0]);
+    for (const [o, c] of stops) g.addColorStop(o, c);
+    return g;
+}
+
+function drawBanner(ctx, info, ui) {
+    const r = BANNER_RECT;
+    const now = performance.now();
+    const still = reducedMotion.matches;
+    const kind = BANNER_KINDS[info && info.kind] ? info.kind : 'plain';
+    const spec = BANNER_KINDS[kind];
+    const text = info ? (info.bannerText || info.text || '') : '';
+
+    const key = `${kind}|${info && info.title}|${text}|${info && info.player}`;
+    if (key !== bannerKey) {
+        bannerKey = key;
+        bannerChangedAt = now;
+    }
+    const accent = info && info.effect === 'blood' ? BLOOD_ACCENT : spec.accent;
+    if (kind !== bannerKind || accent !== accentTo) {
+        accentFrom = currentAccent(now);
+        accentTo = accent;
+        accentChangedAt = now;
+        bannerKind = kind;
+    }
+
+    ctx.save();
+    roundedRectPath(ctx, r.x, r.y, r.w, r.h, 4);
+    ctx.fillStyle = 'rgb(52, 52, 52)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgb(80, 80, 80)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.clip();
+    const [ar, ag, ab] = still ? accentTo : currentAccent(now);
+    ctx.fillStyle = `rgb(${ar}, ${ag}, ${ab})`;
+    ctx.fillRect(r.x, r.y, 5, r.h);
+
+    if (text) {
+        const t = still ? 1 : Math.min(1, (now - bannerChangedAt) / BANNER_FADE_MS);
+        const ease = 1 - (1 - t) ** 3;
+        ctx.globalAlpha = ease;
+        ctx.translate(0, 8 * (1 - ease));
+        drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still);
+    }
+    ctx.restore();
+}
+
+function currentAccent(now) {
+    const t = Math.min(1, (now - accentChangedAt) / BANNER_ACCENT_MS);
+    return accentFrom.map((v, i) => Math.round(v + (accentTo[i] - v) * t));
+}
+
+function drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still) {
+    const left = r.x + 20;
+    const right = r.x + r.w - 14;
+    const areaTop = r.y + 6;
+    const areaH = r.h - 12;
+    ctx.textBaseline = 'middle';
+
+    // Turn / AI thinking: the current set's king, then the sentence.
+    if (kind === 'turn' || kind === 'think') {
+        const ICON = 34;
+        const img = pieceImage(info.player || 'white', 'king');
+        drawImageWhenReady(ctx, img, left - 4, r.y + (r.h - ICON) / 2, ICON, ICON);
+        const tx = left + ICON + 6;
+        const hourglassW = kind === 'think' && ui && ui.aiThinking ? 30 : 0;
+        const fit = fitText(ctx, text, BANNER_BODY_FONT, BANNER_BODY_PX, right - tx - hourglassW, areaH, 3);
+        ctx.font = BANNER_BODY_FONT(fit.size);
+        const top = areaTop + (areaH - fit.lines.length * fit.lineH) / 2;
+        const widest = Math.max(...fit.lines.map((l) => ctx.measureText(l).width));
+        ctx.fillStyle = kind === 'think' && !still
+            ? sweepGradient(ctx, tx, widest, now, 1900, 'rgb(207, 207, 196)', 'rgb(255, 255, 255)')
+            : 'rgb(255, 255, 255)';
+        fit.lines.forEach((l, i) => ctx.fillText(l, tx, top + fit.lineH * (i + 0.5)));
+        if (hourglassW) {
+            const last = fit.lines[fit.lines.length - 1];
+            drawHourglass(ctx, tx + ctx.measureText(last).width + 18, top + fit.lineH * (fit.lines.length - 0.5), 9);
+        }
+        return;
+    }
+
+    // Big moment: a silver-sweep title over the result sentence.
+    if (kind === 'result') {
+        const title = info.title || '';
+        let big = BANNER_BIG_PX;
+        ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+        while (big > 24 && ctx.measureText(title).width > right - left) {
+            big -= 1;
+            ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+        }
+        const titleH = Math.round(big * 1.05);
+        const fit = fitText(ctx, text, BANNER_BODY_FONT, BANNER_BODY_PX, right - left, areaH - titleH - 2, 1);
+        const blockH = titleH + 2 + fit.lineH;
+        const top = areaTop + (areaH - blockH) / 2;
+        if (info.effect === 'blood') {
+            drawBloodTitle(ctx, r, title, big, left, top + titleH / 2, titleH, now, still);
+            ctx.font = BANNER_BODY_FONT(fit.size);
+            ctx.fillStyle = 'rgb(255, 255, 255)';
+            ctx.fillText(fit.lines[0], left, top + titleH + 2 + fit.lineH / 2);
+            return;
+        }
+        ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+        const tw = ctx.measureText(title).width;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = still ? 'rgb(216, 216, 207)'
+            : sweepGradient(ctx, left, tw, now, 3600, 'rgb(190, 190, 181)', 'rgb(255, 255, 255)');
+        ctx.fillText(title, left, top + titleH / 2);
+        ctx.shadowColor = 'transparent';
+        ctx.font = BANNER_BODY_FONT(fit.size);
+        ctx.fillStyle = 'rgb(255, 255, 255)';
+        ctx.fillText(fit.lines[0], left, top + titleH + 2 + fit.lineH / 2);
+        return;
+    }
+
+    // Casting / Check / Herald: small caps header over the sentence; plain:
+    // the sentence alone.
+    const header = spec.header ? spec.header.toUpperCase() : '';
+    const headerH = header ? Math.round(BANNER_HEADER_PX * 1.25) + 3 : 0;
+    const fit = fitText(ctx, text, BANNER_BODY_FONT, BANNER_BODY_PX, right - left, areaH - headerH, 3);
+    const blockH = headerH + fit.lines.length * fit.lineH;
+    const top = areaTop + (areaH - blockH) / 2;
+    if (header) {
+        ctx.font = `700 ${BANNER_HEADER_PX}px ${BANNER_DISPLAY_FONT}`;
+        ctx.fillStyle = spec.headerColor;
+        if (kind === 'check' && !still) {
+            const pulse = 0.5 - 0.5 * Math.cos((2 * Math.PI * now) / 1800);
+            ctx.shadowColor = `rgba(255, 40, 40, ${0.25 + 0.6 * pulse})`;
+            ctx.shadowBlur = 2 + 9 * pulse;
+        }
+        fillSpaced(ctx, header, left, top + (headerH - 3) / 2, BANNER_HEADER_PX * 0.14);
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+    }
+    ctx.font = BANNER_BODY_FONT(fit.size);
+    ctx.fillStyle = 'rgb(255, 255, 255)';
+    fit.lines.forEach((l, i) => ctx.fillText(l, left, top + headerH + fit.lineH * (i + 0.5)));
+}
+
+// ---- mate by capture: the title bleeds and drips ---------------------------
+//
+// Ported from the Banner Type Lab prototype the owner approved (9/26): the
+// silver title fills with crimson from the top, then blood gathers on the
+// undersides of the actual letters and drips, a few beads break off and
+// fall, and afterwards one bead falls every few seconds. All drawn here;
+// the sentence is drawn over it afterwards so it always reads.
+const BLOOD_ACCENT = [176, 20, 28];
+const BLOOD_DRIPS = 9;
+const BLOOD_MAX_LEN = 24;
+let blood = null; // { key, drips, drops, nextIdle, moving }
+
+// Undersides of the letters: an opaque pixel with clear air right below.
+function bloodSources(r, title, big, x, cy) {
+    const k = 2;
+    const m = document.createElement('canvas');
+    m.width = r.w * k;
+    m.height = r.h * k;
+    const mc = m.getContext('2d');
+    mc.scale(k, k);
+    mc.translate(-r.x, -r.y);
+    mc.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+    mc.textBaseline = 'middle';
+    mc.fillText(title, x, cy);
+    const a = mc.getImageData(0, 0, m.width, m.height).data;
+    const at = (px, py) => a[(py * m.width + px) * 4 + 3];
+    const pts = [];
+    for (let px = 0; px < m.width; px += 2) {
+        for (let py = 2; py < m.height - 2; py++) {
+            if (at(px, py) > 160 && at(px, py - 2) > 160 && at(px, py + 1) < 60 && at(px, py + 2) < 30) {
+                pts.push({ x: r.x + px / k, y: r.y + py / k });
+            }
+        }
+    }
+    return pts;
+}
+
+function makeDrips(pts, cy, titleH) {
+    // favour the lower edges (baseline, serifs) but let a few arms drip too
+    const lowCut = cy + titleH * 0.15;
+    const ordered = pts.map((p) => ({ p, s: Math.random() * (p.y > lowCut ? 1 : 0.35) }))
+        .sort((m, n) => n.s - m.s).map((q) => q.p);
+    const picked = [];
+    for (const p of ordered) {
+        if (picked.length >= BLOOD_DRIPS) break;
+        if (picked.every((q) => Math.abs(q.x - p.x) > 10)) picked.push(p);
+    }
+    return picked.map((p) => ({
+        x: p.x,
+        y: p.y,
+        w: 2.2 + Math.random() * 2.2,
+        len: Math.max(5, BLOOD_MAX_LEN * (0.25 + 0.75 * Math.random() ** 1.8)),
+        start: 900 + Math.random() * 900,
+        dur: 900 + Math.random() * 1100,
+        drops: Math.random() < 0.45,
+        dropped: false,
+        regrowAt: 0,
+        cur: 0,
+    }));
+}
+
+function drawDrip(ctx, d, len) {
+    if (len <= 0.3) return;
+    const r = d.w * (0.5 + 0.3 * Math.min(1, len / d.len)); // the bead swells as it sags
+    const top = d.y - 1.5;                                  // tucked into the letter
+    const tipY = d.y + len;
+    ctx.beginPath();
+    ctx.moveTo(d.x - d.w / 2, top);
+    ctx.bezierCurveTo(d.x - d.w / 2, top + len * 0.5, d.x - d.w * 0.3, tipY - r * 1.6, d.x - r * 0.8, tipY - r * 0.6);
+    ctx.arc(d.x, tipY - r * 0.2, r, Math.PI * 0.95, Math.PI * 0.05, true);
+    ctx.bezierCurveTo(d.x + d.w * 0.3, tipY - r * 1.6, d.x + d.w / 2, top + len * 0.5, d.x + d.w / 2, top);
+    ctx.closePath();
+    ctx.fill();
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 190, 190, 0.35)'; // wet glint on the bead
+    ctx.beginPath();
+    ctx.ellipse(d.x - r * 0.35, tipY - r * 0.45, r * 0.28, r * 0.4, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawBloodTitle(ctx, r, title, big, x, cy, titleH, now, still) {
+    if (!blood || blood.key !== bannerKey) {
+        blood = {
+            key: bannerKey,
+            drips: makeDrips(bloodSources(r, title, big, x, cy), cy, titleH),
+            drops: [],
+            nextIdle: 0,
+            moving: true,
+        };
+    }
+    const t = still ? 1e9 : now - bannerChangedAt;
+    const ease = (v) => 1 - (1 - v) ** 3;
+    const lerp = (m, n, v) => m + (n - m) * v;
+    const tTop = cy - titleH / 2;
+    const tBot = cy + titleH / 2;
+
+    // silver first, then crimson seeping down from the top
+    ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowOffsetY = 1;
+    ctx.fillStyle = 'rgb(216, 216, 207)';
+    ctx.fillText(title, x, cy);
+    ctx.shadowColor = 'transparent';
+    const bleed = Math.min(1, Math.max(0, (t - 250) / 700));
+    if (bleed > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(r.x, r.y - 10, r.w, lerp(tTop - 2, tBot + 4, ease(bleed)) - (r.y - 10));
+        ctx.clip();
+        const g = ctx.createLinearGradient(0, tTop, 0, tBot);
+        g.addColorStop(0, 'rgb(176, 20, 28)');
+        g.addColorStop(1, 'rgb(104, 6, 12)');
+        ctx.fillStyle = g;
+        ctx.fillText(title, x, cy);
+        ctx.restore();
+    }
+
+    ctx.fillStyle = 'rgb(112, 8, 14)';
+    let settled = bleed >= 1;
+    for (const d of blood.drips) {
+        const p = Math.min(1, Math.max(0, (t - d.start) / d.dur));
+        if (p < 1) settled = false;
+        let len = d.len * ease(p);
+        if (p >= 1 && d.drops && !d.dropped && !still) {
+            d.dropped = true;
+            blood.drops.push({ x: d.x, y: d.y + d.len, r: d.w * 0.7, born: now });
+            d.regrowAt = now;
+        }
+        if (d.regrowAt) { // the bead that fell regathers slowly
+            len = d.len * lerp(0.72, 1, ease(Math.min(1, (now - d.regrowAt) / 1400)));
+        }
+        d.cur = len;
+        drawDrip(ctx, d, len);
+    }
+
+    // after it settles, one drip lets a bead go every few seconds
+    if (settled && !still && blood.drips.length) {
+        if (!blood.nextIdle) blood.nextIdle = now + 1500 + Math.random() * 2500;
+        if (now >= blood.nextIdle) {
+            const d = blood.drips[Math.floor(Math.random() * blood.drips.length)];
+            blood.drops.push({ x: d.x, y: d.y + d.cur, r: d.w * 0.7, born: now });
+            d.regrowAt = now;
+            blood.nextIdle = now + 2500 + Math.random() * 3000;
+        }
+    }
+
+    // falling drops, stretched by their speed
+    const bottom = r.y + r.h + 20;
+    blood.drops = blood.drops.filter((dr) => {
+        const dt = (now - dr.born) / 1000;
+        const y = dr.y + 350 * dt * dt;
+        if (y > bottom) return false;
+        const stretch = 1 + Math.min(1.6, (700 * dt) / 250);
+        ctx.beginPath();
+        ctx.ellipse(dr.x, y, dr.r, dr.r * stretch, 0, 0, Math.PI * 2);
+        ctx.fill();
+        return true;
+    });
+    const regathering = blood.drips.some((d) => d.regrowAt && now - d.regrowAt < 1400);
+    blood.moving = !still && (!settled || blood.drops.length > 0 || regathering);
 }
 
 function drawBoardSquares(ctx) {
@@ -903,16 +1327,57 @@ function drawButtonHover(ctx, ui) {
     // would otherwise completely hide a border drawn underneath them.
     if (!ui.hoverButton) return;
     const rect = ui.hoverButton === 'strike' ? STRIKE_RECT : RAISE_RECT;
-    ctx.strokeStyle = 'rgb(173, 216, 230)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    if (LEGACY_STRIP) {
+        ctx.strokeStyle = 'rgb(173, 216, 230)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+        return;
+    }
+    // The old pale blue vanished on the cream dead squares (Green/Brown/Blue).
+    // A deep blue ring just outside the button, with a soft glow, reads on
+    // light squares; a thin pale line on the button's own edge reads on
+    // dark ones (Gray).
+    ctx.save();
+    ctx.shadowColor = 'rgba(20, 70, 160, 0.55)';
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = 'rgb(22, 78, 170)';
+    ctx.lineWidth = 3.5;
+    roundedRectPath(ctx, rect.x - 2.5, rect.y - 2.5, rect.w + 5, rect.h + 5, 6);
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = 'rgb(190, 225, 245)';
+    ctx.lineWidth = 1.5;
+    roundedRectPath(ctx, rect.x + 0.75, rect.y + 0.75, rect.w - 1.5, rect.h - 1.5, 4);
+    ctx.stroke();
+}
+
+// Brushed silver on every board (owner, 9/26 - first tried on Gray, where
+// the old olive read as green), rounded, magenta while committed. Phones
+// (LEGACY_STRIP) keep the original flat dark buttons in the strip.
+function castButtonFill(ctx, rect) {
+    const g = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+    g.addColorStop(0, 'rgb(158, 160, 164)');
+    g.addColorStop(0.5, 'rgb(128, 130, 134)');
+    g.addColorStop(1, 'rgb(104, 106, 110)');
+    return { fill: g, edge: 'rgb(178, 180, 184)' };
 }
 
 function drawCastButtons(ctx, ui) {
-    ctx.font = '600 20px "Cinzel Web", Georgia, serif';
+    ctx.font = LEGACY_STRIP ? '600 20px "Cinzel Web", Georgia, serif' : '600 25px "Cinzel Web", Georgia, serif';
     for (const [rect, label, key] of [[STRIKE_RECT, 'STRIKE', 'strike'], [RAISE_RECT, 'RAISE', 'raise']]) {
-        ctx.fillStyle = ui.committedButton === key ? 'rgb(159, 43, 104)' : 'rgb(40, 40, 40)';
-        ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+        const active = ui.committedButton === key;
+        if (LEGACY_STRIP) {
+            ctx.fillStyle = active ? 'rgb(159, 43, 104)' : 'rgb(40, 40, 40)';
+            ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+        } else {
+            const look = castButtonFill(ctx, rect);
+            roundedRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 4);
+            ctx.fillStyle = active ? 'rgb(159, 43, 104)' : look.fill;
+            ctx.fill();
+            ctx.strokeStyle = active ? 'rgb(159, 43, 104)' : look.edge;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
         if (ui.disabledButtons && ui.disabledButtons.has(key)) {
             ctx.fillStyle = 'rgba(255,255,255,0.35)';
         } else {
