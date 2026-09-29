@@ -538,12 +538,11 @@ function drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still) {
     const areaH = r.h - 12;
     ctx.textBaseline = 'middle';
 
-    // Turn / AI thinking: the current set's king, then the sentence.
+    // Turn / AI thinking: just the sentence (the king icon in front of it
+    // was dropped as clutter - owner, 9/29), plus the hourglass while the
+    // AI thinks.
     if (kind === 'turn' || kind === 'think') {
-        const ICON = 34;
-        const img = pieceImage(info.player || 'white', 'king');
-        drawImageWhenReady(ctx, img, left - 4, r.y + (r.h - ICON) / 2, ICON, ICON);
-        const tx = left + ICON + 6;
+        const tx = left;
         const hourglassW = kind === 'think' && ui && ui.aiThinking ? 30 : 0;
         const fit = fitText(ctx, text, BANNER_BODY_FONT, BANNER_BODY_PX, right - tx - hourglassW, areaH, 3);
         ctx.font = BANNER_BODY_FONT(fit.size);
