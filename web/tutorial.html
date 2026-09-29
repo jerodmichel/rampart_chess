@@ -4,8 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Learn to Play - RampartChess</title>
-<link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=103" />
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="style.css?v=108" />
 </head>
 <body>
 <header>
@@ -85,8 +86,7 @@
 
   <section class="tutLesson" id="goal">
     <h3>1. The goal</h3>
-    <p>Just like chess: checkmate your opponent's king. White moves first. On each turn you
-      make <em>one</em> move - either a normal piece move, or a <em>cast move</em> using cards.</p>
+    <p>Just like in traditional chess, your primary objective is to checkmate your opponent's king. White always moves first, followed by Black. On each turn, you are allowed to make exactly <em>one</em> move. This can be either a standard piece movement on the board, or a <em>cast move</em> using the cards from your deck.</p>
     <div class="tutClip" data-clip="goal-checkmate">
       <span class="tutClipId">GIF: goal-checkmate</span>
       <span class="tutClipDesc">A short, dramatic checkmate from a late-game position.</span>
@@ -95,13 +95,8 @@
 
   <section class="tutLesson" id="board">
     <h3>2. The board</h3>
-    <p>The board is 10 columns by 6 rows (rows <em>a</em>-<em>f</em>, columns
-      <em>1</em>-<em>10</em>). The bottom half is diamonds - White's territory; the top half
-      is hearts - Black's. The gap across the middle is the <strong>rampart</strong>.</p>
-    <p>Some squares carry a card (<em>card squares</em>) and some are blank. The cards never
-      move - they're part of the board. The back rows (<em>a</em> and <em>f</em>) are only
-      playable on their three face cards: the Jack, Queen and King - the
-      <strong>houses</strong>.</p>
+    <p>The board consists of 10 columns (numbered <em>1</em>-<em>10</em>) and 6 rows (lettered <em>a</em>-<em>f</em>). The bottom half is made up of diamonds and is White's territory, while the top half is made up of hearts and belongs to Black. The gap dividing the middle of the board is called the <strong>rampart</strong>.</p>
+    <p>The board features a mix of blank squares and permanent <em>card squares</em>. These card squares never move; they are a permanent part of the battlefield. The back rows (<em>a</em> and <em>f</em>) are entirely off-limits, except for the three face cards—the Jack, Queen, and King. These face cards act as the <strong>houses</strong>.</p>
     <div class="tutClip" data-clip="board-tour">
       <span class="tutClipId">GIF: board-tour</span>
       <span class="tutClipDesc">Highlight in turn: diamond half, heart half, the rampart gap,
@@ -111,12 +106,8 @@
 
   <section class="tutLesson" id="setup">
     <h3>3. Your army, deck &amp; graveyard</h3>
-    <p>Each side starts with 4 raiders, a rook, a knight, a bishop and a king on the board.
-      White starts on the diamond side, Black on the heart side.</p>
-    <p>You also hold a <strong>deck</strong> - all the Spades for White, all the Clubs for
-      Black - and a <strong>graveyard</strong> holding 4 more raiders and your queen. Pieces
-      in the graveyard can come back into play later; captured raiders and queens go there
-      too.</p>
+    <p>Each side starts with 4 raiders, a rook, a knight, a bishop, and a king on the board. White begins on the diamond side, and Black begins on the heart side.</p>
+    <p>You also hold a <strong>deck</strong> of cards. White holds all the Spades, and Black holds the Clubs. Each player also has a <strong>graveyard</strong> which, initially, holds 4 more raiders and a queen. The graveyard is where captured raiders and queens go, and pieces in the graveyard can potentially be brought back into play by using cast moves later in the game.</p>
     <div class="tutClip" data-clip="setup">
       <span class="tutClipId">GIF: setup</span>
       <span class="tutClipDesc">Starting position; highlight each side's pieces, then each
@@ -126,10 +117,8 @@
 
   <section class="tutLesson" id="raiders">
     <h3>4. Raiders &amp; the rampart</h3>
-    <p>Raiders are RampartChess's pawns. A raider moves one square in <em>any</em>
-      direction and captures diagonally.</p>
-    <p>The catch: once a raider crosses the rampart into enemy territory, it can never
-      come back.</p>
+    <p>Raiders are the pawns of RampartChess, but much more flexible. A raider may move one space in <em>any</em> direction (horizontally, vertically, or diagonally). They capture diagonally into any adjacent square.</p>
+    <p>The catch is the rampart. Once a raider crosses the diamond-heart barrier into enemy territory (moving from row <em>c</em> to <em>d</em>, or vice versa), it can never return to its own side. Furthermore, raiders are the <em>only</em> pieces allowed to enter houses—and only opponent houses. Once a raider has occupied a house it must remain there for the remainder of the game, nor can it be captured.</p>
     <div class="tutClip" data-clip="raiders-move">
       <span class="tutClipId">GIF: raiders-move</span>
       <span class="tutClipDesc">Select a raider, show its 8 target squares, move it; then a
@@ -143,10 +132,8 @@
   </section>
 
   <section class="tutLesson" id="pieces">
-    <h3>5. The other pieces</h3>
-    <p>If you know chess, you already know these. The knight, bishop, rook, queen and king move and
-      capture exactly as in chess. No square can hold two pieces, and you capture by moving
-      onto an enemy piece. You can never make a move that leaves your own king in check.</p>
+    <h3>5. Other pieces</h3>
+    <p>The knight, bishop, rook, queen, and king move and capture exactly as in standard chess. No single square may ever be occupied by more than one piece, and captures are executed by displacement. Furthermore, a player is strictly prohibited from making any move—whether it be a standard move or a cast move—that places their own king in check.</p>
     <div class="tutClip" data-clip="pieces-move">
       <span class="tutClipId">GIF: pieces-move</span>
       <span class="tutClipDesc">Quick montage: knight L-move, bishop diagonal, rook slide, king step, each with
@@ -156,15 +143,12 @@
 
   <section class="tutLesson" id="houses">
     <h3>6. Houses</h3>
-    <p>Each side has three houses: a Jack's, a Queen's and a King's. Only raiders can enter
-      a house, and only the <em>enemy's</em> houses. A raider that enters a house stays
-      there for the rest of the game - it can't move, and it can't be captured.</p>
-    <p>Houses are opened in order, and each one gives you a new power:</p>
+    <p>Each player possesses three houses: a Jack's House, a Queen's House, and a King's House. Raiders are the only pieces permitted to enter houses, and they may only occupy opponent houses. Once a raider occupies a house, it must remain there indefinitely; it cannot move again, nor can it be captured.</p>
+    <p>Securing houses unlocks sequential tactical advantages:</p>
     <ul>
-      <li><strong>Jack's House</strong> - you can now cast cards to raise raiders and to
-        strike.</li>
-      <li><strong>Queen's House</strong> - your queen enters the game.</li>
-      <li><strong>King's House</strong> - the enemy king is confined to card squares.</li>
+      <li><strong>Jack's House</strong> - Allows a player to begin casting cards from the deck raise raiders from the dead (i.e., to take a raider from the graveyard and place it onto the board) or strike enemy raiders (i.e., to take an enemy raider off the board and put it into the graveyeard).</li>
+      <li><strong>Queen's House</strong> - Allows a player to spawn their queen onto the board.</li>
+      <li><strong>King's House</strong> - Restricts the opponent's king exclusively to card squares, making non-card squares off-limits to it.</li>
     </ul>
     <div class="tutClip" data-clip="houses-jack">
       <span class="tutClipId">GIF: houses-jack</span>
@@ -175,29 +159,23 @@
 
   <section class="tutLesson" id="casting">
     <h3>7. Casting: making 21</h3>
-    <p>A cast move always uses exactly <strong>three cards that add up to 21</strong>. Some
-      come from the card squares your raiders are standing on; the rest come from your
-      deck, and you pick which deck cards to use - there's no random draw.</p>
-    <p>Card values work like blackjack: number cards are face value, face cards are 10, and
-      an ace is 1 or 11, your choice. Deck cards you cast are used up. The card squares stay
-      on the board for next time.</p>
+    <p>A cast move always requires exactly three cards that combine to equal a sum of 21. These three cards are formed by a combination of the stationary card squares currently occupied by a player's raiders, plus cards chosen directly from the player's deck. A player may select specific cards from the deck; they do not need to be drawn at random.</p>
+    <p>Card values function identically to Blackjack: number cards hold their face value, all face cards are worth 10, and aces act as either 1 or 11 at the player's discretion. While the board's card squares remain permanently stationary during a cast move, any deck cards used are immediately removed and cast into the graveyard, never to be used again.</p>
     <div class="tutClip" data-clip="casting-21">
       <span class="tutClipId">GIF: casting-21</span>
       <span class="tutClipDesc">Raiders on the 7 and 4 card squares light up, plus a 10 from the
-        deck: 7 + 4 + 10 = 21. The deck card flies to the discard.</span>
+        deck: 7 + 4 + 10 = 21. The deck card flips over, and cannot be used again.</span>
     </div>
   </section>
 
   <section class="tutLesson" id="raising">
     <h3>8. Raising a raider</h3>
-    <p>Once you hold the enemy Jack's House, you can bring raiders back from your graveyard.
-      Make 21 with either:</p>
+    <p>Once a player secures the opponent's Jack's House, they unlock the ability to spawn new raiders from the graveyard. To execute a raise, a player must form a sum of 21 using either:</p>
     <ul>
-      <li>1 raider on a card square + 2 cards from your deck, or</li>
-      <li>2 raiders on card squares + 1 card from your deck.</li>
+      <li>One raider occupying a non-house card square, combined with exactly two cards from the deck, or,</li>
+      <li>Two raiders occupying non-house card squares, combined with exactly one card from the deck.</li>
     </ul>
-    <p>(A raider sitting in a house doesn't count - it has to be on an ordinary card square.)
-      Then place the new raider on any empty square in your own territory, except a house.</p>
+    <p>After successfully casting, the player may take a raider from the graveyard and place it onto any empty square within their own territory, excluding house squares.</p>
     <div class="tutClip" data-clip="raising-raider">
       <span class="tutClipId">GIF: raising-raider</span>
       <span class="tutClipDesc">Cast with one raider + two deck cards; a raider rises from the
@@ -207,12 +185,8 @@
 
   <section class="tutLesson" id="striking">
     <h3>9. Striking</h3>
-    <p>Holding the enemy Jack's House also lets you <strong>strike</strong>: capture an enemy
-      raider without touching it. Make 21 with 2 of your raiders on card squares + 1 card
-      from your deck, and pick an enemy raider to remove.</p>
-    <p>You can strike only raiders, and only in enemy territory - never in your own half,
-      and never inside a house. (White strikes in rows <em>d</em>-<em>e</em>, Black in rows
-      <em>b</em>-<em>c</em>.)</p>
+    <p>Occupying the opponent's Jack's House also allows a player to execute a strike, which captures an enemy raider via casting. To strike, a player must form a sum of 21 using exactly two of their own raiders occupying card squares on the board, combined with exactly one card from the deck.</p>
+    <p>Strikes exclusively target enemy raiders, and they may only be executed in enemy territory (rows <em>d</em> and <em>e</em> for White, and rows <em>b</em> and <em>c</em> for Black). A player is never permitted to strike within their own territory, nor can they strike a raider that is occupying a house.</p>
     <div class="tutClip" data-clip="striking">
       <span class="tutClipId">GIF: striking</span>
       <span class="tutClipDesc">Two raiders + one deck card make 21; an enemy raider is struck
@@ -221,12 +195,9 @@
   </section>
 
   <section class="tutLesson" id="queen">
-    <h3>10. The Queen's House &amp; your queen</h3>
-    <p>With the Jack's House taken, you can push a raider into the enemy Queen's House. On
-      that same turn - for free, no cards needed - you place your queen on any empty square
-      in your own territory (not a house).</p>
-    <p>You can only ever have one queen on the board. If she's captured, you can raise her
-      back: 2 raiders on card squares + 1 deck card making 21, just like a strike.</p>
+    <h3>10. The Queen's House &amp; the Queen</h3>
+    <p>Once a player holds the opponent's Jack's House, advancing a raider into the opponent's Queen's House becomes legal. Entering this house triggers an immediate deployment: on that same turn, the player places their queen onto any unoccupied square within their home territory, excluding houses. Unlike casting, this initial deployment requires no cards from the deck.</p>
+    <p>A player may never have more than one queen on the board simultaneously. Should the queen be captured, she returns to the graveyard and can later be raised back onto the board. Raising a fallen queen follows the same requirements as a strike: the player must combine two raiders stationed on card squares with one card from their deck to total 21.</p>
     <div class="tutClip" data-clip="queen-house">
       <span class="tutClipId">GIF: queen-house</span>
       <span class="tutClipDesc">Raider enters the Queen's House, then the queen is placed on a
@@ -241,12 +212,8 @@
 
   <section class="tutLesson" id="kinghouse">
     <h3>11. The King's House</h3>
-    <p>After the Queen's House comes the King's House. Once you have a raider in it, the
-      enemy king may stand <em>only</em> on card squares - every blank square is off-limits
-      to it.</p>
-    <p>And if the enemy king is standing on a blank square at the moment you enter the
-      King's House, that's an instant win: <strong>mate by capture</strong>. It's the one
-      time in RampartChess that a king is actually taken.</p>
+    <p>Occupying the opponent's Queen's House unlocks access to their King's House. Moving a raider into the King's House imposes severe restrictions on the defending monarch's movements: all blank, non-card squares immediately become illegal terrain for the enemy king, confining its steps strictly to card squares.</p>
+    <p>Furthermore, if the opponent's king happens to be resting on a non-card square at the moment a raider enters the King's House, the game ends immediately as <strong>mate by capture</strong>. This represents the sole condition in RampartChess where a king is physically removed from the board rather than forced into conventional checkmate.</p>
     <div class="tutClip" data-clip="king-house-restrict">
       <span class="tutClipId">GIF: king-house-restrict</span>
       <span class="tutClipDesc">Raider enters the King's House; the enemy king's reachable
@@ -260,10 +227,8 @@
   </section>
 
   <section class="tutLesson" id="ending">
-    <h3>12. Winning &amp; draws</h3>
-    <p>You win by checkmate (or mate by capture). The game is a draw (stalemate) if the
-      player to move isn't in check but has no legal move. Either player can also claim a
-      draw when the same position occurs three times (not necessarily in a row).</p>
+    <h3>12. Winning &amp; Draws</h3>
+    <p>Victory is achieved primarily through standard checkmate, or instantly via mate by capture upon entering the King's House. If a player whose turn it is to move is not in check but has no legal move available—neither a board step nor a cast move—the game concludes in a draw by stalemate. Either player may also claim a draw if an identical board position occurs three times over the course of the game.</p>
     <div class="tutClip" data-clip="ending-stalemate">
       <span class="tutClipId">GIF: ending-stalemate</span>
       <span class="tutClipDesc">A stalemate position: side to move is not in check and has no
@@ -272,16 +237,14 @@
   </section>
 
   <section class="tutLesson" id="example">
-    <h3>13. Putting it together</h3>
-    <p>A short annotated game showing the usual arc: advance raiders, cross the rampart, take
-      the Jack's House, start casting, bring in the queen, lock down the king.</p>
+    <h3>13. Putting It Together</h3>
+    <p>A typical match follows a distinct strategic arc: advancing raiders toward key card squares, breaching the rampart, securing the Jack's House to open casting channels, deploying the queen, and finally infiltrating the King's House to suffocate the enemy monarch's escape routes. Note also that it is not required to enter any house to checkmate the opposing king; if an opportunity for checkmate occurs anywhere throughout the game, this would count as victory just the same.</p>
     <div class="tutClip" data-clip="example-game">
       <span class="tutClipId">GIF: example-game</span>
       <span class="tutClipDesc">Sped-up full game (or key moments) with captions at each
         milestone.</span>
     </div>
-    <p>Ready? <a href="index.html">Play a game against the AI</a>, or read the
-      <a href="rules.html">full official rules</a>.</p>
+    <p>Ready to test these tactics? Play a match against the AI, or consult the complete official rulebook for full technical specifications.</p>
   </section>
 </main>
 

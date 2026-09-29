@@ -35,7 +35,7 @@ export { DESIGN_WIDTH, DESIGN_HEIGHT };
 // ported as-is (light bg, dark bg, light trace, dark trace).
 export const THEME_PRESETS = [
     { name: 'Green', bgLight: 'rgb(234, 235, 200)', bgDark: 'rgb(119, 154, 88)', traceLight: 'rgb(244, 247, 116)', traceDark: 'rgb(172, 195, 51)' },
-    { name: 'Brown', bgLight: 'rgb(235, 209, 166)', bgDark: 'rgb(165, 117, 80)', traceLight: 'rgb(245, 234, 100)', traceDark: 'rgb(209, 185, 59)' },
+    { name: 'Brown', bgLight: 'rgb(241, 222, 188)', bgDark: 'rgb(165, 117, 80)', traceLight: 'rgb(245, 234, 100)', traceDark: 'rgb(209, 185, 59)' },
     { name: 'Blue', bgLight: 'rgb(229, 228, 200)', bgDark: 'rgb(60, 95, 135)', traceLight: 'rgb(123, 187, 227)', traceDark: 'rgb(43, 119, 191)' },
     { name: 'Gray', bgLight: 'rgb(222, 219, 210)', bgDark: 'rgb(86, 85, 84)', traceLight: 'rgb(99, 126, 143)', traceDark: 'rgb(82, 102, 128)' },
 ];
@@ -145,6 +145,12 @@ if (document.fonts && document.fonts.load) {
     document.fonts.load(`600 20px ${CARD_FONT_FAMILY}`).then(queueImageRedraw, () => {});
     // the prompt banner's header/big-moment face (drawBanner)
     document.fonts.load('700 20px "Cinzel Decorative Web"').then(queueImageRedraw, () => {});
+    // the Necromancer title (drawElectricTitle)
+    document.fonts.load('400 20px "October Crow Web"').then(queueImageRedraw, () => {});
+    // the Regicide title (drawBloodTitle)
+    document.fonts.load('400 20px "Ghastly Panic Web"').then(queueImageRedraw, () => {});
+    // the Out of Time title (drawSteelTitle)
+    document.fonts.load('400 20px "Dystopian Canticle Web"').then(queueImageRedraw, () => {});
 }
 
 const images = new Map();
@@ -355,6 +361,7 @@ export function drawScreen(ctx, state, ui) {
     drawCardLabels(ctx);
     drawRowLetters(ctx);
     drawColumnNumbers(ctx);
+    drawBoardLighting(ctx);
     drawDecks(ctx, state);
     drawDeckHover(ctx, ui);
     drawClickedDeckCards(ctx, ui);
@@ -488,7 +495,8 @@ function drawBanner(ctx, info, ui) {
         bannerChangedAt = now;
     }
     const accent = info && info.effect === 'blood' ? BLOOD_ACCENT
-        : info && info.effect === 'electric' ? ELECTRIC_ACCENT : spec.accent;
+        : info && info.effect === 'electric' ? ELECTRIC_ACCENT
+        : kind === 'result' ? STEEL_ACCENT : spec.accent;
     if (kind !== bannerKind || accent !== accentTo) {
         accentFrom = currentAccent(now);
         accentTo = accent;
@@ -552,44 +560,46 @@ function drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still) {
         return;
     }
 
-    // Big moment: a silver-sweep title over the result sentence.
+    // Big moment: a title over the result sentence - its own effect for
+    // Necromancer and Regicide, cold steel for the rest.
     if (kind === 'result') {
         const title = info.title || '';
+        const titleFont = info.effect === 'electric' ? ELECTRIC_TITLE_FONT
+            : info.effect === 'blood' ? bloodTitleFont
+            : STEEL_TITLE_FONT;
         let big = BANNER_BIG_PX;
-        ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+        ctx.font = titleFont(big);
         while (big > 24 && ctx.measureText(title).width > right - left) {
             big -= 1;
-            ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+            ctx.font = titleFont(big);
         }
         const titleH = Math.round(big * 1.05);
         const fit = fitText(ctx, text, BANNER_BODY_FONT, BANNER_BODY_PX, right - left, areaH - titleH - 2, 1);
         const blockH = titleH + 2 + fit.lineH;
         const top = areaTop + (areaH - blockH) / 2;
         if (info.effect === 'electric') {
-            drawElectricTitle(ctx, title, big, left, top + titleH / 2, titleH, now, still);
+            drawElectricTitle(ctx, title, big, left, top + titleH / 2, titleH, now, still, right - left);
             ctx.font = BANNER_BODY_FONT(fit.size);
             ctx.fillStyle = 'rgb(255, 255, 255)';
             ctx.fillText(fit.lines[0], left, top + titleH + 2 + fit.lineH / 2);
             return;
         }
         if (info.effect === 'blood') {
-            drawBloodTitle(ctx, r, title, big, left, top + titleH / 2, titleH, now, still);
+            drawBloodTitle(ctx, r, title, big, left, top + titleH / 2, titleH, now, still, right - left);
             ctx.font = BANNER_BODY_FONT(fit.size);
             ctx.fillStyle = 'rgb(255, 255, 255)';
             ctx.fillText(fit.lines[0], left, top + titleH + 2 + fit.lineH / 2);
             return;
         }
-        ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
-        const tw = ctx.measureText(title).width;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-        ctx.shadowOffsetY = 1;
-        ctx.fillStyle = still ? 'rgb(216, 216, 207)'
-            : sweepGradient(ctx, left, tw, now, 3600, 'rgb(190, 190, 181)', 'rgb(255, 255, 255)');
-        ctx.fillText(title, left, top + titleH / 2);
-        ctx.shadowColor = 'transparent';
+        // Every other result (Checkmate, Out of Time, Resignation, Draw,
+        // Stalemate): cold steel, centered, title and sentence both
+        // (owner, 9/28; was a left-aligned silver-sweep Cinzel Decorative).
+        drawSteelTitle(ctx, r, title, big, top + titleH / 2, now, still);
         ctx.font = BANNER_BODY_FONT(fit.size);
         ctx.fillStyle = 'rgb(255, 255, 255)';
-        ctx.fillText(fit.lines[0], left, top + titleH + 2 + fit.lineH / 2);
+        ctx.textAlign = 'center';
+        ctx.fillText(fit.lines[0], r.x + r.w / 2, top + titleH + 2 + fit.lineH / 2);
+        ctx.textAlign = 'left';
         return;
     }
 
@@ -619,10 +629,13 @@ function drawBannerContent(ctx, r, kind, spec, info, text, ui, now, still) {
 
 // ---- Necromancer: electricity jumping around the letters -------------------
 //
-// Shown when a player raises on two consecutive turns (main.js). A silver
-// title with electric-blue arcs leaping between neighbouring letters and
+// Shown when a player raises on two consecutive turns (main.js). A dark
+// storm-gray October Crow title (owner, 9/28; was silver Cinzel Decorative),
+// backlit electric blue, with arcs leaping between neighbouring letters and
 // sparking off their tops, re-forking every ~90ms. Procedural, no art.
 const ELECTRIC_ACCENT = [111, 208, 255];
+const ELECTRIC_TITLE_FONT = (size) => `400 ${size}px "October Crow Web", ${BANNER_DISPLAY_FONT}`;
+const ELECTRIC_TITLE_COLOR = 'rgb(72, 88, 110)'; // 'storm'
 const ELECTRIC_REFORK_MS = 90;
 
 // Small deterministic PRNG, so each ~90ms bucket keeps the same arcs for
@@ -663,27 +676,38 @@ function strokeBolt(ctx, pts) {
     ctx.stroke();
 }
 
-function drawElectricTitle(ctx, title, big, x, cy, titleH, now, still) {
-    ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+function drawElectricTitle(ctx, title, big, x, cy, titleH, now, still, maxW) {
+    ctx.font = ELECTRIC_TITLE_FONT(big);
+    // Stretched sideways to span the banner (owner, 9/28) - October Crow is
+    // narrow and only filled ~60% of it. Only the letters are scaled; the
+    // arcs are drawn unscaled between the stretched letter boxes.
+    const sx = Math.max(1, maxW / ctx.measureText(title).width);
     // letter boxes, for where arcs start and land
     const letters = [];
     let lx = x;
     for (const ch of title) {
-        const w = ctx.measureText(ch).width;
+        const w = ctx.measureText(ch).width * sx;
         if (ch !== ' ') letters.push({ x: lx, w });
         lx += w;
     }
-    const tw = lx - x;
     const capTop = cy - big * 0.36;
     const capBot = cy + big * 0.34;
 
-    // the silver title, faintly lit blue from behind
+    // the dark title, lit blue from behind - the glow is what makes dark
+    // letters read on the dark banner, so it's stronger than the old
+    // silver title's and laid down twice, then the letters go on top with
+    // no shadow so the glow never fogs them (owner, 9/28)
     ctx.save();
-    ctx.shadowColor = 'rgba(111, 208, 255, 0.55)';
-    ctx.shadowBlur = still ? 6 : 8 + 4 * Math.sin(now / 70);
-    ctx.fillStyle = still ? 'rgb(216, 216, 207)'
-        : sweepGradient(ctx, x, tw, now, 2600, 'rgb(196, 204, 214)', 'rgb(255, 255, 255)');
-    ctx.fillText(title, x, cy);
+    ctx.translate(x, 0);
+    ctx.scale(sx, 1);
+    ctx.shadowColor = 'rgba(111, 208, 255, 0.95)';
+    ctx.shadowBlur = still ? 10 : 12 + 4 * Math.sin(now / 70);
+    ctx.fillStyle = ELECTRIC_TITLE_COLOR;
+    ctx.fillText(title, 0, cy);
+    ctx.fillText(title, 0, cy);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.fillText(title, 0, cy);
     ctx.restore();
 
     if (letters.length < 2) return;
@@ -710,6 +734,44 @@ function drawElectricTitle(ctx, title, big, x, cy, titleH, now, still) {
     ctx.restore();
 }
 
+// ---- results: a cold steel title ---------------------------------------------
+//
+// First built for "Out of Time", then given to every result except
+// Necromancer and Regicide (owner, 9/28): Dystopian Canticle, centered and stretched
+// to 90% of the banner, dark blue steel with a slow cold glint crossing it.
+// No other motion.
+const STEEL_ACCENT = [96, 128, 168];
+const STEEL_TITLE_FONT = (size) => `400 ${size}px "Dystopian Canticle Web", ${BANNER_DISPLAY_FONT}`;
+const STEEL_GLINT_MS = 4200;
+
+function drawSteelTitle(ctx, r, title, big, cy, now, still) {
+    ctx.font = STEEL_TITLE_FONT(big);
+    const nativeW = ctx.measureText(title).width;
+    const targetW = r.w * 0.9;
+    const sx = targetW / nativeW;
+    const tTop = cy - big * 0.5;
+    const tBot = cy + big * 0.5;
+    ctx.save();
+    ctx.translate(r.x + (r.w - targetW) / 2, 0);
+    ctx.scale(sx, 1);
+    const g = ctx.createLinearGradient(0, tTop, 0, tBot);
+    g.addColorStop(0, 'rgb(138, 160, 188)');
+    g.addColorStop(1, 'rgb(62, 82, 110)');
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowOffsetY = 1;
+    ctx.fillStyle = g;
+    ctx.fillText(title, 0, cy);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowOffsetY = 0;
+    if (!still) {
+        // the glint: a pale band laid over the letters, crossing left to right
+        ctx.fillStyle = sweepGradient(ctx, 0, nativeW, now, STEEL_GLINT_MS,
+            'rgba(210, 228, 250, 0)', 'rgba(210, 228, 250, 0.6)');
+        ctx.fillText(title, 0, cy);
+    }
+    ctx.restore();
+}
+
 // ---- mate by capture: the title bleeds and drips ---------------------------
 //
 // Ported from the Banner Type Lab prototype the owner approved (9/26): the
@@ -722,8 +784,12 @@ const BLOOD_DRIPS = 9;
 const BLOOD_MAX_LEN = 24;
 let blood = null; // { key, drips, drops, nextIdle, moving }
 
+// Ghastly Panic (owner, 9/28; was Cinzel Decorative) - picked over
+// Dystopian Canticle side by side.
+const bloodTitleFont = (size) => `400 ${size}px "Ghastly Panic Web", ${BANNER_DISPLAY_FONT}`;
+
 // Undersides of the letters: an opaque pixel with clear air right below.
-function bloodSources(r, title, big, x, cy) {
+function bloodSources(r, title, big, x, cy, sx) {
     const k = 2;
     const m = document.createElement('canvas');
     m.width = r.w * k;
@@ -731,9 +797,11 @@ function bloodSources(r, title, big, x, cy) {
     const mc = m.getContext('2d');
     mc.scale(k, k);
     mc.translate(-r.x, -r.y);
-    mc.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+    mc.translate(x, 0);
+    mc.scale(sx, 1);
+    mc.font = bloodTitleFont(big);
     mc.textBaseline = 'middle';
-    mc.fillText(title, x, cy);
+    mc.fillText(title, 0, cy);
     const a = mc.getImageData(0, 0, m.width, m.height).data;
     const at = (px, py) => a[(py * m.width + px) * 4 + 3];
     const pts = [];
@@ -791,11 +859,16 @@ function drawDrip(ctx, d, len) {
     ctx.restore();
 }
 
-function drawBloodTitle(ctx, r, title, big, x, cy, titleH, now, still) {
+function drawBloodTitle(ctx, r, title, big, x, cy, titleH, now, still, maxW) {
+    // Stretched sideways to span the banner, like Necromancer (owner, 9/28).
+    // Only the letters are scaled - the drips are found on the stretched
+    // letters but drawn unscaled, so they keep their shape.
+    ctx.font = bloodTitleFont(big);
+    const sx = Math.max(1, maxW / ctx.measureText(title).width);
     if (!blood || blood.key !== bannerKey) {
         blood = {
             key: bannerKey,
-            drips: makeDrips(bloodSources(r, title, big, x, cy), cy, titleH),
+            drips: makeDrips(bloodSources(r, title, big, x, cy, sx), cy, titleH),
             drops: [],
             nextIdle: 0,
             moving: true,
@@ -808,23 +881,27 @@ function drawBloodTitle(ctx, r, title, big, x, cy, titleH, now, still) {
     const tBot = cy + titleH / 2;
 
     // silver first, then crimson seeping down from the top
-    ctx.font = `700 ${big}px ${BANNER_DISPLAY_FONT}`;
+    ctx.save();
+    ctx.translate(x, 0);
+    ctx.scale(sx, 1);
     ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
     ctx.shadowOffsetY = 1;
     ctx.fillStyle = 'rgb(216, 216, 207)';
-    ctx.fillText(title, x, cy);
-    ctx.shadowColor = 'transparent';
+    ctx.fillText(title, 0, cy);
+    ctx.restore();
     const bleed = Math.min(1, Math.max(0, (t - 250) / 700));
     if (bleed > 0) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(r.x, r.y - 10, r.w, lerp(tTop - 2, tBot + 4, ease(bleed)) - (r.y - 10));
         ctx.clip();
+        ctx.translate(x, 0);
+        ctx.scale(sx, 1);
         const g = ctx.createLinearGradient(0, tTop, 0, tBot);
         g.addColorStop(0, 'rgb(128, 10, 16)');
         g.addColorStop(1, 'rgb(72, 3, 7)');
         ctx.fillStyle = g;
-        ctx.fillText(title, x, cy);
+        ctx.fillText(title, 0, cy);
         ctx.restore();
     }
 
@@ -873,19 +950,92 @@ function drawBloodTitle(ctx, r, title, big, x, cy, titleH, now, still) {
     blood.moving = !still && (!settled || blood.drops.length > 0 || regathering);
 }
 
+// ---- depth (owner's picks, 9/28) --------------------------------------------
+//
+// Subtle 3D touches: board cards cast a soft shadow down-right like real
+// cards, deck cards do too (face-down ones show a pile edge), plain squares
+// get a light top/left and dark bottom/right bevel, and faint light falls
+// across the whole board from the top left. (A board drop shadow and piece
+// contact shadows were offered too - not wanted for now.)
+
 function drawBoardSquares(ctx) {
+    const cards = [];
     for (let row = 0; row < ROWS; row++) {
         for (let col = 0; col < COLS; col++) {
             const key = `${col},${row}`;
             const isCard = CARD_SQUARES.has(key);
             if (isCard && cardStyle) {
-                drawCardSquare(ctx, boardColX(col), rowY(row), RWIDTH - 2, RHEIGHT - 2, THEME.bgDark, CARD_TABLE.get(key));
+                cards.push({ x: boardColX(col), y: rowY(row), card: CARD_TABLE.get(key) });
                 continue;
             }
+            const x = boardColX(col);
+            const y = rowY(row);
             ctx.fillStyle = isCard ? THEME.bgDark : THEME.bgLight;
-            ctx.fillRect(boardColX(col), rowY(row), RWIDTH - 2, RHEIGHT - 2);
+            ctx.fillRect(x, y, RWIDTH - 2, RHEIGHT - 2);
+            drawSquareBevel(ctx, x, y, RWIDTH - 2, RHEIGHT - 2);
         }
     }
+    // Cards go down after every plain square, so a card's shadow can fall
+    // onto the squares to its right and below (and never on another card).
+    const w = RWIDTH - 2;
+    const h = RHEIGHT - 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(BOARD_X, 0, WIDTH, HEIGHT + RAMPART_HEIGHT);
+    ctx.clip();
+    for (const c of cards) castCardShadow(ctx, c.x, c.y, w, h, Math.max(2, Math.min(w, h) * 0.07), 2, 3, 7, 0.38);
+    ctx.restore();
+    for (const c of cards) drawCardSquare(ctx, c.x, c.y, w, h, THEME.bgDark, c.card);
+}
+
+// A soft shadow shaped like the card, offset down-right. Only the shadow is
+// painted: the shape itself is drawn far off to the left and the shadow is
+// offset back by the same amount. Shadow offsets and blur ignore the
+// canvas transform (they're in device pixels), so they're scaled by hand -
+// otherwise any window size but 1:1 threw the shadows hundreds of pixels
+// sideways, onto the board's cards.
+function castCardShadow(ctx, x, y, w, h, radius, dx, dy, blur, alpha) {
+    const FAR = 4000;
+    const { a: sx, d: sy } = ctx.getTransform();
+    ctx.save();
+    ctx.shadowColor = `rgba(0, 0, 0, ${alpha})`;
+    ctx.shadowBlur = blur * sx;
+    ctx.shadowOffsetX = (FAR + dx) * sx;
+    ctx.shadowOffsetY = dy * sy;
+    roundedRectPath(ctx, x - FAR, y, w, h, radius);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawSquareBevel(ctx, x, y, w, h) {
+    // 2px edges: warm light top/left, shade bottom/right (a 1px white one
+    // didn't show on the cream squares at all)
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 252, 240, 0.7)';
+    ctx.beginPath();
+    ctx.moveTo(x + 1, y + h - 1);
+    ctx.lineTo(x + 1, y + 1);
+    ctx.lineTo(x + w - 1, y + 1);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+    ctx.beginPath();
+    ctx.moveTo(x + w - 1, y + 1);
+    ctx.lineTo(x + w - 1, y + h - 1);
+    ctx.lineTo(x + 1, y + h - 1);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawBoardLighting(ctx) {
+    const H = HEIGHT + RAMPART_HEIGHT;
+    const g = ctx.createLinearGradient(BOARD_X, 0, BOARD_X + WIDTH, H);
+    g.addColorStop(0, 'rgba(255, 250, 235, 0.10)');
+    g.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0.12)');
+    ctx.fillStyle = g;
+    ctx.fillRect(BOARD_X, 0, WIDTH, H);
 }
 
 function drawRampart(ctx) {
@@ -977,6 +1127,24 @@ export function deckCardAt(x, y) {
 }
 
 function drawDecks(ctx, state) {
+    // shadows (and pile edges) for every slot first, so none lands on a card
+    if (cardStyle) {
+        for (const colorLabel of ['black', 'white']) {
+            const deckArray = colorLabel === 'black' ? state.black_deck : state.white_deck;
+            for (let rank = 0; rank < DECK; rank++) {
+                const { x, y } = deckSlotPos(colorLabel, rank);
+                const h = CHEIGHT - 2;
+                castCardShadow(ctx, x, y, CWIDTH, h, DECK_CARD_RADIUS, 1.5, 2, 4, 0.45);
+                if (deckArray[rank]) { // face down: two card edges peeking out below
+                    for (const k of [2, 1]) {
+                        roundedRectPath(ctx, x + k * 0.5, y + k, CWIDTH, h, DECK_CARD_RADIUS);
+                        ctx.fillStyle = k === 2 ? 'rgb(150, 146, 136)' : 'rgb(205, 201, 190)';
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+    }
     for (const colorLabel of ['black', 'white']) {
         const deckArray = colorLabel === 'black' ? state.black_deck : state.white_deck;
         const suitSymbol = DECK_SUIT[colorLabel];
@@ -1415,10 +1583,15 @@ function drawHighlights(ctx, state, ui) {
     }
     if (ui.hoverSquare) {
         // matches show_hover's hovered_sqr
+        // A shade darker and a pixel thicker on the plain squares (owner,
+        // 9/28) - the bevel's edges run right where this ring does and had
+        // swallowed it. Card squares keep the original ring.
         const { col, row } = ui.hoverSquare;
-        ctx.strokeStyle = 'rgb(180, 180, 180)';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(boardColX(col) + 1, rowY(row) + 1, RWIDTH - 4, RHEIGHT - 4);
+        const plain = !CARD_SQUARES.has(`${col},${row}`);
+        ctx.strokeStyle = plain ? 'rgb(150, 150, 150)' : 'rgb(180, 180, 180)';
+        ctx.lineWidth = plain ? 4 : 3;
+        const inset = plain ? 2 : 1;
+        ctx.strokeRect(boardColX(col) + inset, rowY(row) + inset, RWIDTH - 2 - 2 * inset, RHEIGHT - 2 - 2 * inset);
     }
 }
 
@@ -1458,14 +1631,26 @@ function drawButtonHover(ctx, ui) {
 // the old olive read as green), rounded, magenta while committed. Phones
 // (LEGACY_STRIP) keep the original flat dark buttons in the strip.
 // Green and Brown get a deeper silver (owner, 9/27) - the standard one read
-// too pale against their lighter boards.
+// too pale against their lighter boards. Darkened again to a gunmetal
+// (owner, 9/28), with a bright band near the top to keep it reading metallic.
 function castButtonFill(ctx, rect) {
     const deep = THEME.name === 'Green' || THEME.name === 'Brown';
     const g = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
-    g.addColorStop(0, deep ? 'rgb(128, 130, 135)' : 'rgb(158, 160, 164)');
-    g.addColorStop(0.5, deep ? 'rgb(100, 102, 107)' : 'rgb(128, 130, 134)');
-    g.addColorStop(1, deep ? 'rgb(80, 82, 87)' : 'rgb(104, 106, 110)');
-    return { fill: g, edge: deep ? 'rgb(150, 152, 156)' : 'rgb(178, 180, 184)' };
+    if (deep) {
+        g.addColorStop(0, 'rgb(112, 115, 121)');
+        g.addColorStop(0.18, 'rgb(140, 143, 149)');
+        g.addColorStop(0.5, 'rgb(82, 85, 91)');
+        g.addColorStop(1, 'rgb(58, 60, 65)');
+        return { fill: g, edge: 'rgb(132, 135, 141)' };
+    }
+    // Blue and Gray: a step darker too (owner, 9/28), with the same sheen
+    // band - stops short of gunmetal so it doesn't sink into Gray's dark
+    // squares.
+    g.addColorStop(0, 'rgb(128, 131, 137)');
+    g.addColorStop(0.18, 'rgb(154, 157, 163)');
+    g.addColorStop(0.5, 'rgb(100, 103, 109)');
+    g.addColorStop(1, 'rgb(76, 78, 83)');
+    return { fill: g, edge: 'rgb(150, 153, 159)' };
 }
 
 function drawCastButtons(ctx, ui) {

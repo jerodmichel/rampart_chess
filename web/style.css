@@ -12,6 +12,33 @@
     font-weight: 700;
 }
 
+/* The Necromancer banner title (render.js drawElectricTitle). October Crow
+   by Chad Savage - free for any use; its Read Me is alongside in
+   assets/fonts/OctoberCrow-ReadMe.txt. */
+@font-face {
+    font-family: 'October Crow Web';
+    src: url('assets/fonts/OctoberCrow.ttf') format('truetype');
+    font-weight: 400;
+}
+
+/* The Regicide banner title (render.js drawBloodTitle). Ghastly Panic by
+   Chad Savage - free for any use; its Read Me is alongside in
+   assets/fonts/GhastlyPanic-ReadMe.txt. */
+@font-face {
+    font-family: 'Ghastly Panic Web';
+    src: url('assets/fonts/GhastlyPanic.ttf') format('truetype');
+    font-weight: 400;
+}
+
+/* The Out of Time banner title (render.js drawSteelTitle). Dystopian
+   Canticle by Scapholene, SIL OFL 1.1 - license alongside in
+   assets/fonts/DystopianCanticle-OFL.txt. */
+@font-face {
+    font-family: 'Dystopian Canticle Web';
+    src: url('assets/fonts/DystopianCanticle-Regular.otf') format('opentype');
+    font-weight: 400;
+}
+
 :root {
     color-scheme: dark;
     --bg: #141410;
@@ -1905,9 +1932,10 @@ a.ledgerOpponent:hover {
     #boardWrap.fakeFullscreen #mobilePrompt {
         transform: translate(-7px, 7px);
     }
-    /* Strike/Raise keep their original rounded shape - lightened a step
-       past var(--panel) (the same lighter olive used for ordinary
-       dropdowns), and always kept lighter than #mobilePrompt below. */
+    /* Strike/Raise keep their original rounded shape - a neutral gray a
+       couple of steps lighter than the #mobilePrompt console below (owner,
+       9/28: the old olive rgb(88,91,73) read as green), and always kept
+       lighter than it. */
     #boardWrap:fullscreen #mobileStrikeBtn,
     #boardWrap.fakeFullscreen #mobileStrikeBtn,
     #boardWrap:fullscreen #mobileRaiseBtn,
@@ -1916,8 +1944,8 @@ a.ledgerOpponent:hover {
         text-align: center;
         white-space: nowrap;
         border-radius: 4px;
-        background: rgb(88, 91, 73);
-        border: 1px solid rgb(110, 113, 95);
+        background: rgb(74, 74, 74);
+        border: 1px solid rgb(100, 100, 100);
         /* Same font/weight/color as desktop's own canvas-drawn Strike/
            Raise buttons (render.js's drawCastButtons: '600 20px "Cinzel
            Web", Georgia, serif', pure white) - main.js sets an actual px
@@ -1930,7 +1958,7 @@ a.ledgerOpponent:hover {
     /* Console-panel look: sharp corners, and left-justified text with a
        little padding after the left edge instead of centered. Lightened a
        step from its original near-black, but stays deliberately darker
-       than the Strike/Raise buttons above (rgb(88,91,73)) regardless of
+       than the Strike/Raise buttons above (rgb(74,74,74)) regardless of
        any further tweak to either - that contrast is the point of the
        "console" look. */
     #boardWrap:fullscreen #mobilePrompt,

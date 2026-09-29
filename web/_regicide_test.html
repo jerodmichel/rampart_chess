@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Regicide test</title>
+<link rel="stylesheet" href="style.css?v=108">
+<style>
+  body { margin: 0; padding: 24px; background: #141410; color: #ddd; font: 16px Georgia, serif; }
+  /* show just the banner corner of the full board canvas, at 1.5x */
+  .win { width: 780px; height: 180px; overflow: hidden; position: relative; border: 1px solid #333; }
+  .win canvas { position: absolute; left: -740px; top: 0; width: 1500px; height: 1230px; }
+  button { margin-top: 18px; padding: 8px 16px; font: 600 15px 'Cinzel Web', Georgia, serif; }
+</style></head>
+<body>
+<!-- Temporary preview of the desktop Regicide banner (not part of the game). -->
+<div class="win"><canvas id="c" width="1000" height="820"></canvas></div>
+<button id="replay">Replay</button> <span style="color:#888">(also replays itself every 9s)</span>
+<script type="module">
+const R = await import('./js/render.js');
+await document.fonts.load('400 45px "Ghastly Panic Web"');
+const ctx = document.getElementById('c').getContext('2d');
+const regicide = { kind: 'result', title: 'Regicide', effect: 'blood', text: 'White mated Black.', bannerText: 'White mated Black by capture.' };
+const ui = { promptInfo: regicide, disabledButtons: new Set() };
+const state = { pieces: [], black_deck: Array(13).fill(false), white_deck: Array(13).fill(false), black_grave: [], white_grave: [] };
+function replay() {
+    // one frame of an empty banner, so the next one starts the effect over
+    ui.promptInfo = { kind: 'plain', text: '' };
+    R.drawScreen(ctx, state, ui);
+    ui.promptInfo = regicide;
+}
+document.getElementById('replay').onclick = replay;
+setInterval(replay, 9000);
+function frame() {
+    try { R.drawScreen(ctx, state, ui); } catch (e) { document.body.dataset.err = e.message + ' @ ' + (e.stack || '').split(String.fromCharCode(10))[1]; return; }
+    requestAnimationFrame(frame);
+}
+frame();
+</script></body></html>

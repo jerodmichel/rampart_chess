@@ -1394,7 +1394,7 @@ function computeStatusInfo(s) {
                 };
             case 'resignation': return { kind: 'result', title: 'Resignation', text: `${cap(winner === 'white' ? 'black' : 'white')} resigned - ${cap(winner)} wins!` };
             case 'draw_agreement': return { kind: 'result', title: 'Draw', text: 'Draw by agreement.' };
-            case 'timeout': return { kind: 'result', title: 'Time', text: `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!` };
+            case 'timeout': return { kind: 'result', title: 'Out of Time', text: `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!` };
             // Matches game.py's set_repetition_prompt/is_draw_by_
             // insufficient_material wording exactly.
             case 'repetition': return { kind: 'result', title: 'Draw', text: 'Draw by repetition' };

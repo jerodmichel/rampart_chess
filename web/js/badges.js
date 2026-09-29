@@ -13,7 +13,7 @@
 
 export const BADGE_CATEGORIES = [
     {
-        name: 'The Ladder Trophies',
+        name: 'Ladder Trophies',
         subtitle: 'Rating milestones - permanent once reached, even if your rating later drops.',
         badges: [
             { id: 'adept', name: 'Adept', description: 'Reached a peak rating of 1500.', image: 'assets/badges/adept.png' },
@@ -23,7 +23,7 @@ export const BADGE_CATEGORIES = [
         ],
     },
     {
-        name: 'The Slayer Trophies',
+        name: 'Slayer Trophies',
         subtitle: 'Matchup feats.',
         badges: [
             { id: 'giant_slayer', name: 'Giant Slayer', description: 'Defeated an opponent rated 150+ points higher than you.', image: 'assets/badges/giant_slayer.png' },
@@ -33,7 +33,7 @@ export const BADGE_CATEGORIES = [
         ],
     },
     {
-        name: 'The Execution Medals',
+        name: 'Execution Medals',
         subtitle: 'Tactical feats.',
         badges: [
             { id: 'first_blood', name: 'First Blood', description: 'Delivered checkmate to win a rated game for the first time.', image: 'assets/badges/first_blood.png' },
@@ -42,7 +42,7 @@ export const BADGE_CATEGORIES = [
         ],
     },
     {
-        name: 'The Tenure Badges',
+        name: 'Tenure Badges',
         subtitle: 'Volume and dedication.',
         badges: [
             { id: 'centurion', name: 'Centurion', description: 'Completed 100 rated matches.', image: 'assets/badges/centurion.png' },
