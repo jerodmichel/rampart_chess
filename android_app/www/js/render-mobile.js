@@ -16,7 +16,7 @@
 // board itself.
 
 import { COLS, ROWS, CARD_SQUARES, CARD_TABLE } from './constants.js';
-import { getActiveTheme, pieceImage, rampartImage, drawImageWhenReady, isFlipped, isCardStyle, fullscreenPieceScale } from './render.js';
+import { getActiveTheme, darkenRgb, pieceImage, rampartImage, drawImageWhenReady, isFlipped, isCardStyle, fullscreenPieceScale } from './render.js';
 import { drawCardSquare } from './cardface.js';
 
 // Same proportion as the old mobile/ prototype's CELL=64/RAMPART_BAND=14
@@ -214,8 +214,12 @@ function drawHighlights(ctx, state, ui, theme, cell) {
     const lineWidth = Math.max(2, cell * 0.06);
     if (ui.lastMoveSquares) {
         for (const [col, row] of ui.lastMoveSquares) {
-            const isCard = CARD_SQUARES.has(`${col},${row}`);
-            strokeSquare(ctx, col, row, cell, isCard ? theme.traceLight : theme.traceDark, lineWidth);
+            // same as desktop: bolder, darker frame on plain squares
+            if (CARD_SQUARES.has(`${col},${row}`)) {
+                strokeSquare(ctx, col, row, cell, theme.traceLight, lineWidth);
+            } else {
+                strokeSquare(ctx, col, row, cell, darkenRgb(theme.traceDark, 0.2), lineWidth * 1.5);
+            }
         }
     }
     if (ui.selected) {

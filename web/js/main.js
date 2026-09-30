@@ -374,6 +374,13 @@ cardStyleToggle.addEventListener('change', () => {
 const strikeSound = new Audio('assets/sounds/thunder_strike_new.mp3');
 const gameStartSound = new Audio('assets/sounds/thunder_strike.wav');
 const raiseSound = new Audio('assets/sounds/thunder_raise.mp3');
+// A tolling bell as any game ends - checkmate, mate by capture, resignation,
+// a draw, time or stalemate (owner, 9/30) - DRAGON-STUDIO on Pixabay, the second toll with
+// its full ring (source kept as scary_bells_src.mp3), +5 dB to sit with the
+// thunders. Deliberately the only "event" sound - Necromancer already has
+// its raise thunder; a serious strategy game shouldn't pile on effects.
+const gameEndSound = new Audio('assets/sounds/draw_resign_checkmate.mp3');
+let gameEndSoundedFor = null; // the game whose ending has already been sounded (or that loaded already over)
 // Matches game.py's play_sound(captured) - the plain move/capture click,
 // independent of (and gated by the same effectsEnabled toggle as) the
 // cast thunder above.
@@ -1083,10 +1090,12 @@ function parseSquareToken(token) {
 function parseLastMoveSquares(notation) {
     if (!notation) return [];
     if (notation.includes('/')) {
-        const spawnPart = notation.split('/')[1];
+        // a raider entering the Queen's house plus the queen it places:
+        // highlight the raider's move (into the house) AND the queen square
+        const [movePart, spawnPart] = notation.split('/');
         const target = spawnPart.split('@')[1];
         const sq = target ? parseSquareToken(target) : null;
-        return sq ? [sq] : [];
+        return [...parseLastMoveSquares(movePart), ...(sq ? [sq] : [])];
     }
     if (notation.includes('++') || notation.includes('--')) {
         const targetPart = notation.split('@')[1].split('(')[0];
@@ -1562,7 +1571,11 @@ function drawCanvas() {
     const ui = {
         selected: browsing ? null : selected,
         legalDestinations: browsing ? [] : legalDestinations,
-        lastMoveSquares: browsing ? historyLastMoveSquares(viewIndex) : lastMoveSquares,
+        // Live view takes the last move straight from the game's history
+        // too - lastMoveSquares is only set by moves made in this session,
+        // so a game reopened from a profile showed no last move at all (e.g.
+        // a final mate-by-capture into the King's house; owner, 9/30).
+        lastMoveSquares: historyLastMoveSquares(browsing ? viewIndex : s0.history.length),
         committedButton: browsing ? null : committedButton,
         // Reuses the same cast-destination dot styling for the queen-
         // placement picker (step 2.5 in the click handler) - visually the
@@ -2102,9 +2115,23 @@ async function refreshPlayerLabels() {
     playerNamesBar.hidden = !whiteHasContent && !blackHasContent;
 }
 
+// Once, at the moment a game ends while it's on screen - never for a game
+// that was already over when it was opened.
+function checkGameEndSound() {
+    if (!state || !gameId || !isGameOver(state) || gameEndSoundedFor === gameId) return;
+    gameEndSoundedFor = gameId;
+    if (effectsEnabled) {
+        try {
+            gameEndSound.currentTime = 0;
+            gameEndSound.play().catch(() => {});
+        } catch (_) { /* ignore */ }
+    }
+}
+
 function renderAll() {
     clockSyncedAt = Date.now(); // state.*_time_ms above is only ever fresh right here
     checkNecromancer();
+    checkGameEndSound();
     drawCanvas();
     updateHistoryButtons();
     updateGameActionButtons();
@@ -2183,6 +2210,7 @@ async function triggerAiMove() {
 function loadGame(newState) {
     state = newState;
     gameId = state.id;
+    gameEndSoundedFor = isGameOver(state) ? state.id : null;
     selected = null;
     legalDestinations = [];
     lastMoveSquares = [];

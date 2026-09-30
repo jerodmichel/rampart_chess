@@ -1534,23 +1534,36 @@ function drawCaptureRing(ctx, col, row, color) {
 
 // Last-move / selection frame. On a card square in card style it follows
 // the card's rounded corners instead of poking out past them.
-function strokeSquareFrame(ctx, col, row, color) {
-    const x = boardColX(col) + 2;
-    const y = rowY(row) + 2;
+function strokeSquareFrame(ctx, col, row, color, width = 4) {
+    const inset = width / 2;
+    const x = boardColX(col) + inset;
+    const y = rowY(row) + inset;
     ctx.strokeStyle = color;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = width;
     if (cardStyle && CARD_SQUARES.has(`${col},${row}`)) {
-        strokeRoundedRect(ctx, x, y, RWIDTH - 6, RHEIGHT - 6, 4);
+        strokeRoundedRect(ctx, x, y, RWIDTH - 2 - width, RHEIGHT - 2 - width, 4);
     } else {
-        ctx.strokeRect(x, y, RWIDTH - 6, RHEIGHT - 6);
+        ctx.strokeRect(x, y, RWIDTH - 2 - width, RHEIGHT - 2 - width);
     }
+}
+
+// 'rgb(r, g, b)' scaled toward black by f (0-1)
+export function darkenRgb(rgb, f) {
+    const [r, g, b] = rgb.match(/\d+/g).map(Number);
+    return `rgb(${Math.round(r * (1 - f))}, ${Math.round(g * (1 - f))}, ${Math.round(b * (1 - f))})`;
 }
 
 function drawHighlights(ctx, state, ui) {
     if (ui.lastMoveSquares) {
         for (const [col, row] of ui.lastMoveSquares) {
-            const isCard = CARD_SQUARES.has(`${col},${row}`);
-            strokeSquareFrame(ctx, col, row, isCard ? THEME.traceLight : THEME.traceDark);
+            // Plain squares: a bolder, darker frame (owner, 9/30) - the
+            // theme's trace color at 4px vanished on the cream squares and
+            // under the bevel. Card squares keep the original yellow frame.
+            if (CARD_SQUARES.has(`${col},${row}`)) {
+                strokeSquareFrame(ctx, col, row, THEME.traceLight);
+            } else {
+                strokeSquareFrame(ctx, col, row, darkenRgb(THEME.traceDark, 0.2), 6);
+            }
         }
     }
     if (ui.selected) {
