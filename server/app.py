@@ -464,6 +464,7 @@ class CastComboMoveRequest(BaseModel):
     kind: str  # 'strike' | 'raise'
     to_col: int
     to_row: int
+    piece: Optional[str] = None  # raises: 'raider' | 'queen' (the graveyard piece chosen)
 
 
 def _serialize_cast_moves(moves_by_category: dict) -> dict:
@@ -745,7 +746,7 @@ def cast_combo_move(game_id: str, req: CastComboMoveRequest, uid: Optional[str] 
     _authorize_mover(session, uid)
     card_specs = [c.model_dump() for c in req.cards]
     try:
-        notation = session.apply_cast_combo_move(card_specs, req.kind, req.to_col, req.to_row)
+        notation = session.apply_cast_combo_move(card_specs, req.kind, req.to_col, req.to_row, req.piece)
     except IllegalMoveError as e:
         raise HTTPException(status_code=400, detail=str(e))
     game_records.save_game_record(session)

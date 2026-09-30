@@ -58,6 +58,13 @@ export function setDeckCardTapHandler(fn) {
     deckCardTapHandler = fn;
 }
 
+// Same idea for a cemetery slot - called with (color, idx) while the player
+// is choosing which piece to raise (main.js handleGraveTap).
+let graveTapHandler = null;
+export function setGraveTapHandler(fn) {
+    graveTapHandler = fn;
+}
+
 function renderDeckColumn(el, colorLabel, deckArray, selectedRanks, reversed) {
     el.innerHTML = '';
     const suit = DECK_SUIT[colorLabel];
@@ -101,11 +108,15 @@ function renderDeckColumn(el, colorLabel, deckArray, selectedRanks, reversed) {
     });
 }
 
-function renderGraveGrid(el, color, graveArray) {
+function renderGraveGrid(el, color, graveArray, choice) {
     el.innerHTML = '';
-    for (const name of graveArray) {
+    graveArray.forEach((name, idx) => {
         const slot = document.createElement('div');
         slot.className = 'mobileGraveSlot';
+        if (choice && choice.color === color && choice.selectable.includes(idx)) {
+            slot.classList.add(idx === choice.chosenIdx ? 'chosen' : 'selectable');
+            slot.addEventListener('click', () => graveTapHandler && graveTapHandler(color, idx));
+        }
         if (name) {
             const img = document.createElement('img');
             img.src = deadPieceImageSrc(color, name);
@@ -113,7 +124,7 @@ function renderGraveGrid(el, color, graveArray) {
             slot.appendChild(img);
         }
         el.appendChild(slot);
-    }
+    });
 }
 
 // Same emblem the desktop canvas shows (render.js's drawEmblems), one at
@@ -130,7 +141,7 @@ function renderMobileEmblems() {
     emblemTopRightEl.src = src;
 }
 
-export function renderMobilePanels(state, clickedCards) {
+export function renderMobilePanels(state, clickedCards, graveChoice = null) {
     renderMobileEmblems();
     const blackSelected = new Set(
         clickedCards.filter((c) => c.source === 'deck' && c.color === 'black').map((c) => c.rank));
@@ -159,14 +170,15 @@ export function renderMobilePanels(state, clickedCards) {
         lastWhiteDeckKey = whiteDeckKey;
     }
 
-    const blackGraveKey = `${state.black_grave.join(',')}|${flipTag}`;
-    const whiteGraveKey = `${state.white_grave.join(',')}|${flipTag}`;
+    const choiceTag = graveChoice ? `${graveChoice.color}:${graveChoice.selectable.join('.')}:${graveChoice.chosenIdx}` : '-';
+    const blackGraveKey = `${state.black_grave.join(',')}|${flipTag}|${choiceTag}`;
+    const whiteGraveKey = `${state.white_grave.join(',')}|${flipTag}|${choiceTag}`;
     if (blackGraveKey !== lastBlackGraveKey) {
-        renderGraveGrid(blackGraveEl, 'black', state.black_grave);
+        renderGraveGrid(blackGraveEl, 'black', state.black_grave, graveChoice);
         lastBlackGraveKey = blackGraveKey;
     }
     if (whiteGraveKey !== lastWhiteGraveKey) {
-        renderGraveGrid(whiteGraveEl, 'white', state.white_grave);
+        renderGraveGrid(whiteGraveEl, 'white', state.white_grave, graveChoice);
         lastWhiteGraveKey = whiteGraveKey;
     }
 }

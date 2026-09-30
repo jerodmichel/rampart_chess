@@ -518,11 +518,20 @@ class GameSession:
         raise_raider = [m for m in raise_candidates
                          if not self.board.cast_in_check(player, Raider(color), m)]
         raise_queen = [m for m in raise_candidates
-                        if queen_eligible and
+                        if queen_eligible and self._is_queen_combo(m.cards) and
                         not self.board.cast_in_check(player, Queen(color), m)] \
             if queen_eligible else []
 
         return {"strike": strikes, "raise_raider": raise_raider, "raise_queen": raise_queen}
+
+    @staticmethod
+    def _is_queen_combo(cards):
+        """Rulebook, Raising a Queen: two board card squares (with the
+        player's own raiders) plus exactly one deck card - the same check
+        the desktop client makes (main.py, has_2_raider_cards) before it
+        offers the queen, and the combo the AI itself uses (combo B)."""
+        board = sum(1 for c in cards if c.suit in (2, 3))
+        return board == 2 and len(cards) - board == 1
 
     def _resolve_card(self, spec, color):
         """spec: {'rank': int, 'suit': int}, as returned by this same
@@ -607,8 +616,10 @@ class GameSession:
             if m.cast_type == 1 and not any(m == existing for existing in raise_candidates):
                 raise_candidates.append(m)
 
+        # the queen also needs exactly two board cards + one deck card
         queen_eligible = self.board._queen_isdead(color) and \
-            self.board._enemy_queen_house_occupied(color)
+            self.board._enemy_queen_house_occupied(color) and \
+            self._is_queen_combo(cards)
 
         raise_raider = [m for m in raise_candidates
                          if not self.board.cast_in_check(player, Raider(color), m)]
@@ -619,12 +630,16 @@ class GameSession:
 
         return {"strike": [], "raise_raider": raise_raider, "raise_queen": raise_queen}
 
-    def apply_cast_combo_move(self, card_specs, kind, to_col, to_row):
+    def apply_cast_combo_move(self, card_specs, kind, to_col, to_row, piece=None):
         """Execute a cast using a manually-selected combo rather than a
         (category, index) pair into legal_cast_moves(). Re-derives the
         legal destinations for this exact combo fresh - never trusts the
         client's claim that `to` is a valid destination for it - before
-        executing, same principle as apply_cast_move()."""
+        executing, same principle as apply_cast_move().
+
+        piece ('raider' | 'queen', raises only): which graveyard piece the
+        player chose, like the desktop client's grave click. None keeps the
+        old behaviour (a raider where one can go, else the queen)."""
         self._check_timeout()
         if self.is_game_over():
             raise IllegalMoveError("the game is already over")
@@ -637,20 +652,29 @@ class GameSession:
                 raise IllegalMoveError("no such strike destination for this combo")
             return self._execute_cast_move(match, None)
 
-        # raise: prefer raider, fall back to queen where only queen is
-        # safe there - matches the browser client's own simplification of
-        # not yet offering an explicit "choose a piece" UI when both are
-        # legal at the same square.
+        if piece not in (None, "raider", "queen"):
+            raise IllegalMoveError("piece must be 'raider' or 'queen'")
         raider_match = next((m for m in destinations["raise_raider"]
                              if m.final.col == to_col and m.final.row == to_row), None)
-        if raider_match is not None:
-            return self._execute_cast_move(raider_match, "raider")
-
         queen_match = next((m for m in destinations["raise_queen"]
                             if m.final.col == to_col and m.final.row == to_row), None)
+
+        if piece == "queen":
+            if queen_match is None:
+                raise IllegalMoveError(
+                    "the queen can't be raised there with these cards - it needs "
+                    "two board cards and one deck card")
+            return self._execute_cast_move(queen_match, "queen")
+        if piece == "raider":
+            if raider_match is None:
+                raise IllegalMoveError("no such raise destination for this combo")
+            return self._execute_cast_move(raider_match, "raider")
+
+        # no piece named: a raider where one can go, else the queen
+        if raider_match is not None:
+            return self._execute_cast_move(raider_match, "raider")
         if queen_match is not None:
             return self._execute_cast_move(queen_match, "queen")
-
         raise IllegalMoveError("no such raise destination for this combo")
 
     def apply_cast_move(self, category, index):

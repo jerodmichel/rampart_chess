@@ -87,7 +87,8 @@ public class RampartEnginePlugin extends Plugin {
     public void castComboMove(PluginCall call) {
         resolveJson(call, bridge().callAttr("cast_combo_move",
                 call.getString("gameId"), call.getString("cardsJson"), call.getString("kind"),
-                call.getInt("toCol"), call.getInt("toRow")));
+                call.getInt("toCol"), call.getInt("toRow"),
+                call.getString("piece")));  // raises: "raider" | "queen" | null
     }
 
     @PluginMethod

@@ -15,14 +15,14 @@ import {
     computeCellSize, boardSize, drawBoardMobile, colRowFromPointMobile, cellRect,
     triggerLightningMobile, isLightningActiveMobile,
 } from './render-mobile.js';
-import { renderMobilePanels, setDeckCardTapHandler } from './mobile-panels.js';
+import { renderMobilePanels, setDeckCardTapHandler, setGraveTapHandler } from './mobile-panels.js';
 import {
     CARD_VAL, CARD_SQUARES, ROWS, COLS,
     DECK_SUIT_INDEX, boardCardSuitIndex, boardCardRankIndex,
     BOARD_X, RWIDTH, RHEIGHT,
 } from './constants.js';
 import {
-    drawScreen, colRowFromPoint, buttonAt, deckCardAt, isPlayableSquare,
+    drawScreen, colRowFromPoint, buttonAt, deckCardAt, graveSlotAt, isPlayableSquare,
     DESIGN_WIDTH, DESIGN_HEIGHT, THEME_PRESETS, setTheme, PIECE_SET_NAMES, setPieceSet,
     triggerLightning, isLightningActive, startHourglass, stopHourglass, isHourglassActive,
     setFlipped, isFlipped, onImageLoaded, setCardStyle, setDeckStyle, bannerAnimationState,
@@ -1024,6 +1024,13 @@ let moveLabelsForLength = -1;
 let clickedCards = []; // {source:'deck', color, rank} | {source:'board', col, row, rank}
 let committedButton = null; // 'strike' | 'raise' | null
 let castDestinations = []; // [{col, row, category, index}] once committed
+// A raise whose cards could raise either a raider or the queen: like the
+// desktop client, the player first picks the piece in their own graveyard
+// (the cemetery), then the square. raiseOptions holds both destination
+// lists until then; raisePiece/raiseGraveIdx are the choice.
+let raiseOptions = null; // { raider: [{col,row,category}], queen: [...] }
+let raisePiece = null;   // 'raider' | 'queen'
+let raiseGraveIdx = null;
 let transientMessage = null; // e.g. "No eligible raider to strike."
 
 // "Necromancer": a player raises on two of their own consecutive turns.
@@ -1292,11 +1299,18 @@ function isBoardCardSquare(col, row) {
     return Boolean(piece && piece.piece === 'raider' && piece.color === humanColor());
 }
 
+function clearRaiseChoice() {
+    raiseOptions = null;
+    raisePiece = null;
+    raiseGraveIdx = null;
+}
+
 function toggleClickedCard(card) {
     transientMessage = null;
     if (committedButton) {
         committedButton = null;
         castDestinations = [];
+        clearRaiseChoice();
     }
     const idx = clickedCards.findIndex((c) => c.source === card.source &&
         c.color === card.color && c.rank === card.rank &&
@@ -1313,6 +1327,7 @@ function cancelCasting() {
     clickedCards = [];
     committedButton = null;
     castDestinations = [];
+    clearRaiseChoice();
     pendingQueenMove = null;
     queenSpawnDestinations = [];
     transientMessage = null;
@@ -1336,17 +1351,23 @@ async function commitCastButton(button) {
     if (button === 'raise' && boardCardCount < 1) return; // has_board_card
     if (!handSum21(clickedCards)) return;
 
+    clearRaiseChoice();
     setBusy(true);
     try {
         const cardSpecs = clickedCards.map(toCardSpec);
         const destinations = await api.castComboDestinations(gameId, cardSpecs, button);
-        const squares = [];
-        for (const category of ['strike', 'raise_raider', 'raise_queen']) {
-            for (const mv of destinations[category] || []) {
-                squares.push({ col: mv.to[0], row: mv.to[1], category });
-            }
-        }
-        if (squares.length === 0) {
+        const toSquares = (category) => (destinations[category] || [])
+            .map((mv) => ({ col: mv.to[0], row: mv.to[1], category }));
+        const squares = [...toSquares('strike'), ...toSquares('raise_raider'), ...toSquares('raise_queen')];
+        if (button === 'raise' && toSquares('raise_queen').length > 0) {
+            // these cards can raise the queen (two board cards + one deck
+            // card, the server's rule) - choose the piece first, like the
+            // desktop client's cemetery click
+            committedButton = button;
+            raiseOptions = { raider: toSquares('raise_raider'), queen: toSquares('raise_queen') };
+            castDestinations = [];
+            transientMessage = null;
+        } else if (squares.length === 0) {
             committedButton = null;
             castDestinations = [];
             transientMessage = button === 'strike'
@@ -1455,6 +1476,10 @@ function computeStatusInfo(s) {
     if (committedButton === 'strike') {
         return { kind: 'casting', text: 'Choose a raider to send to the grave.' };
     }
+    if (committedButton === 'raise' && raiseOptions && !raisePiece) {
+        // the desktop client's own wording (game.py 'choosegrv')
+        return { kind: 'casting', text: 'Choose a piece from the cemetery to raise.' };
+    }
     if (committedButton === 'raise') {
         const hasQueen = castDestinations.some((d) => d.category === 'raise_queen');
         return {
@@ -1524,6 +1549,10 @@ function currentColRowFromPoint(x, y) {
 function currentButtonAt(x, y) {
     return isMobileBoardActive() ? null : buttonAt(x, y);
 }
+function currentGraveSlotAt(x, y) {
+    return isMobileBoardActive() ? null : graveSlotAt(x, y);
+}
+
 function currentDeckCardAt(x, y) {
     return isMobileBoardActive() ? null : deckCardAt(x, y);
 }
@@ -1588,6 +1617,7 @@ function drawCanvas() {
         hoverButton: browsing ? null : hoverButton,
         hoverDeckCard: browsing ? null : hoverDeckCard,
         clickedCards: browsing ? [] : clickedCards,
+        graveChoice: browsing ? null : currentGraveChoice(),
         aiThinking: !browsing && aiThinking,
         promptText: statusInfo.text,
         promptInfo: statusInfo,
@@ -1604,7 +1634,7 @@ function drawCanvas() {
     // this call site doesn't need two different shapes.
     if (isMobileBoardActive()) {
         drawBoardMobile(ctx, s, ui, mobileCell);
-        renderMobilePanels(s, browsing ? [] : clickedCards);
+        renderMobilePanels(s, browsing ? [] : clickedCards, ui.graveChoice);
         positionMobileCastOverlay();
         mobilePromptTextEl.textContent = ui.promptText;
         // Same idea as desktop's own committed-button styling (render.js's
@@ -2169,6 +2199,7 @@ async function afterStateUpdate(notation, casterColor, captured) {
     clickedCards = [];
     committedButton = null;
     castDestinations = [];
+    clearRaiseChoice();
     transientMessage = null;
     viewState = null;
     viewIndex = null;
@@ -2307,6 +2338,43 @@ async function handleCastButtonTap(button) {
 // each .mobileDeckCard's own click listener (mobile-panels.js, via
 // setDeckCardTapHandler below) - currentDeckCardAt() is deliberately a
 // no-op in mobile mode since the deck isn't drawn on the canvas there.
+// Which of the player's own cemetery slots can be chosen for this raise,
+// and which one is chosen - for the desktop canvas and the phone panels.
+function currentGraveChoice() {
+    if (!raiseOptions || !state) return null;
+    const color = humanColor();
+    const grave = color === 'white' ? state.white_grave : state.black_grave;
+    const selectable = [];
+    grave.forEach((name, idx) => {
+        if ((name === 'queen' && raiseOptions.queen.length) || (name === 'raider' && raiseOptions.raider.length)) {
+            selectable.push(idx);
+        }
+    });
+    return { color, selectable, chosenIdx: raiseGraveIdx };
+}
+
+// Tap a piece in your own cemetery while choosing what to raise: the queen
+// or a raider (tap it again to un-choose), then only that piece's squares
+// are offered - the desktop client's clicked_grv step.
+function handleGraveTap(color, idx) {
+    if (!raiseOptions || !state || isBrowsingHistory()) return;
+    if (busy || isGameOver(state) || state.next_player !== humanColor() || color !== humanColor()) return;
+    const grave = color === 'white' ? state.white_grave : state.black_grave;
+    const name = grave[idx];
+    if (name !== 'queen' && name !== 'raider') return;
+    if (!raiseOptions[name].length) return;
+    if (raiseGraveIdx === idx) {
+        raisePiece = null;
+        raiseGraveIdx = null;
+        castDestinations = [];
+    } else {
+        raisePiece = name;
+        raiseGraveIdx = idx;
+        castDestinations = raiseOptions[name];
+    }
+    drawCanvas();
+}
+
 function handleDeckCardTap(deckCard) {
     if (!state || isBrowsingHistory()) return;
     if (busy || isGameOver(state) || state.next_player !== humanColor()) return;
@@ -2317,6 +2385,7 @@ function handleDeckCardTap(deckCard) {
     toggleClickedCard({ source: 'deck', color: deckCard.color, rank: deckCard.rank });
 }
 setDeckCardTapHandler(handleDeckCardTap);
+setGraveTapHandler(handleGraveTap);
 
 const mobileStrikeBtn = document.getElementById('mobileStrikeBtn');
 const mobileRaiseBtn = document.getElementById('mobileRaiseBtn');
@@ -2470,6 +2539,15 @@ canvas.addEventListener('click', async (evt) => {
 
     if (busy || isGameOver(state) || state.next_player !== humanColor()) return;
 
+    // 2.2. choosing which piece to raise - a tap on your own cemetery
+    if (raiseOptions) {
+        const slot = currentGraveSlotAt(x, y);
+        if (slot) {
+            handleGraveTap(slot.color, slot.idx);
+            return;
+        }
+    }
+
     const cr = currentColRowFromPoint(x, y);
     if (!cr) return;
     const { col, row } = cr;
@@ -2528,7 +2606,8 @@ canvas.addEventListener('click', async (evt) => {
             setBusy(true);
             try {
                 const cardSpecs = clickedCards.map(toCardSpec);
-                const result = await api.castComboMove(gameId, cardSpecs, committedButton, col, row);
+                const result = await api.castComboMove(gameId, cardSpecs, committedButton, col, row,
+                    committedButton === 'raise' ? raisePiece : null);
                 state = result;
                 cancelCasting();
                 await afterStateUpdate(result.notation, humanColor());

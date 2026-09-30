@@ -205,10 +205,10 @@ def cast_combo_destinations(game_id, cards_json, kind):
     return _ok(_serialize_cast_moves(destinations))
 
 
-def cast_combo_move(game_id, cards_json, kind, to_col, to_row):
+def cast_combo_move(game_id, cards_json, kind, to_col, to_row, piece=None):
     try:
         session = _session(game_id)
-        notation = session.apply_cast_combo_move(json.loads(cards_json), kind, to_col, to_row)
+        notation = session.apply_cast_combo_move(json.loads(cards_json), kind, to_col, to_row, piece)
     except KeyError as e:
         return _err(str(e), 404)
     except IllegalMoveError as e:

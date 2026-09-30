@@ -365,7 +365,7 @@ export function drawScreen(ctx, state, ui) {
     drawDecks(ctx, state);
     drawDeckHover(ctx, ui);
     drawClickedDeckCards(ctx, ui);
-    drawGraves(ctx, state);
+    drawGraves(ctx, state, ui);
     drawEmblems(ctx);
     drawHighlights(ctx, state, ui);
     drawClickedBoardCards(ctx, ui);
@@ -1283,7 +1283,40 @@ function graveSlotPos(colorLabel, idx) {
     return { x: DESIGN_WIDTH - GWIDTH / 2 - 2, y: idx * GHEIGHT + GHEIGHT / 2 + 90 };
 }
 
-function drawGraves(ctx, state) {
+// Which cemetery slot (if any) is at design point (x, y) - for choosing the
+// piece to raise, like the desktop client's clicked_grv.
+export function graveSlotAt(x, y) {
+    for (const colorLabel of ['black', 'white']) {
+        for (let idx = 0; idx < GRAVES; idx++) {
+            const c = graveSlotPos(colorLabel, idx);
+            if (Math.abs(x - c.x) <= GWIDTH / 2 && Math.abs(y - c.y) <= GHEIGHT / 2) {
+                return { color: colorLabel, idx };
+            }
+        }
+    }
+    return null;
+}
+
+function drawGraves(ctx, state, ui) {
+    // choosing what to raise: the pieces that can be chosen get a thin
+    // cast-magenta ring, the chosen one a bold glowing one
+    const choice = ui && ui.graveChoice;
+    if (choice) {
+        for (const idx of choice.selectable) {
+            const { x, y } = graveSlotPos(choice.color, idx);
+            const chosen = idx === choice.chosenIdx;
+            ctx.save();
+            ctx.strokeStyle = CAST_DOT_COLOR;
+            ctx.lineWidth = chosen ? 3 : 1.5;
+            if (chosen) {
+                ctx.shadowColor = CAST_DOT_COLOR;
+                ctx.shadowBlur = 8;
+            }
+            roundedRectPath(ctx, x - GWIDTH / 2 + 4, y - GHEIGHT / 2 + 1, GWIDTH - 8, GHEIGHT - 2, 5);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
     for (const colorLabel of ['black', 'white']) {
         const graveArray = colorLabel === 'black' ? state.black_grave : state.white_grave;
         graveArray.forEach((name, idx) => {

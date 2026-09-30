@@ -2577,6 +2577,23 @@ body.cardStyle .mobileDeckCard {
     object-fit: contain;
 }
 
+/* Choosing which piece to raise (main.js handleGraveTap): the cemetery
+   pieces that can be chosen, and the chosen one - same cast magenta as
+   the desktop canvas. */
+.mobileGraveSlot.selectable {
+    outline: 1.5px solid rgb(159, 43, 104);
+    outline-offset: -1px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.mobileGraveSlot.chosen {
+    outline: 2.5px solid rgb(159, 43, 104);
+    outline-offset: -1px;
+    border-radius: 4px;
+    box-shadow: 0 0 8px rgb(159, 43, 104);
+    cursor: pointer;
+}
+
 /* A new chat message needs to catch your eye even while #chatPanel (an
    ordinary in-flow element) is scrolled out of view - rather than a
    separate floating element (tried first, dropped: two "is this visible"

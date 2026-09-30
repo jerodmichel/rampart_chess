@@ -194,14 +194,16 @@ export const api = {
         });
     },
 
-    castComboMove(gameId, cards, kind, toCol, toRow) {
+    // piece (raises): 'raider' | 'queen' - the graveyard piece the player
+    // chose; omitted, the server raises a raider where one can go.
+    castComboMove(gameId, cards, kind, toCol, toRow, piece = null) {
         if (localGameAiColor.has(gameId)) {
             return localCall('castComboMove',
-                { gameId, cardsJson: JSON.stringify(cards), kind, toCol, toRow }, `/games/${gameId}/cast_combo_move`);
+                { gameId, cardsJson: JSON.stringify(cards), kind, toCol, toRow, piece }, `/games/${gameId}/cast_combo_move`);
         }
         return request(`/games/${gameId}/cast_combo_move`, {
             method: 'POST',
-            body: JSON.stringify({ cards, kind, to_col: toCol, to_row: toRow }),
+            body: JSON.stringify({ cards, kind, to_col: toCol, to_row: toRow, piece }),
         });
     },
 
