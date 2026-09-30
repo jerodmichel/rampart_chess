@@ -190,7 +190,12 @@ class RampartBitboard:
     def _get_house_eligibility_mask(self, player):
         """Helper for Raider house rules logic."""
         if player == 'white':
-            jack_idx, queen_idx, king_idx = 2, 3, 4 
+            # Black's houses: King 2 (3f), Queen 3 (4f), Jack 4 (5f) - this
+            # was 2, 3, 4 (Jack/King swapped), which let White's AI try the
+            # King's house first; the server rejected it and the AI stalled
+            # (found in AI-vs-AI tests, 9/30). Matches BLACK_KING_HOUSE and
+            # BLACK_JACK_HOUSE above.
+            jack_idx, queen_idx, king_idx = 4, 3, 2
         else:
             jack_idx, queen_idx, king_idx = 55, 56, 57 
     

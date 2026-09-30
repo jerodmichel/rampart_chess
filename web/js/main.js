@@ -368,7 +368,11 @@ cardStyleToggle.addEventListener('change', () => {
     drawCanvas();
 });
 
-const strikeSound = new Audio('assets/sounds/thunder_strike.wav');
+// Strike: a sharper crack (Pixabay, u_q2hb2391vb; owner, 9/30), trimmed of
+// its 0.58s silent lead-in (source kept as new_strike.mp3) so it lands with
+// the 0.5s lightning. The old strike thunder now opens each game instead.
+const strikeSound = new Audio('assets/sounds/thunder_strike_new.mp3');
+const gameStartSound = new Audio('assets/sounds/thunder_strike.wav');
 const raiseSound = new Audio('assets/sounds/thunder_raise.mp3');
 // Matches game.py's play_sound(captured) - the plain move/capture click,
 // independent of (and gated by the same effectsEnabled toggle as) the
@@ -1517,19 +1521,43 @@ function currentDeckCardAt(x, y) {
 
 // ---- rendering ------------------------------------------------------------
 
+// Mate by capture is, by the rulebook, a capture of the king - so once the
+// game has ended that way, the final position shows the losing king taken
+// off its square and lying in its graveyard (owner, 9/30). Display only:
+// the server/engine state is untouched, and browsing earlier moves shows
+// the king where it stood.
+function withFallenKing(s, browsing) {
+    const r = s.result;
+    if (browsing || !r || r.reason !== 'mate_by_capture' || !r.winner) return s;
+    const loser = r.winner === 'white' ? 'black' : 'white';
+    const key = `${loser}_grave`;
+    const grave = [...(s[key] || [])];
+    if (!grave.includes('king')) { // (never twice)
+        const free = grave.findIndex((name) => !name);
+        if (free >= 0) grave[free] = 'king';
+        else grave.push('king');
+    }
+    return {
+        ...s,
+        pieces: s.pieces.filter((p) => !(p.piece === 'king' && p.color === loser)),
+        [key]: grave,
+    };
+}
+
 function drawCanvas() {
-    const s = activeState();
+    const s0 = activeState();
     // Empty board -> the taller watermark box (style.css #boardCanvas.noGame).
     // Re-sync straight away when it flips, so the board is drawn into the
     // right-sized backing store on this same call.
-    if (canvas.classList.contains('noGame') === Boolean(s)) {
-        canvas.classList.toggle('noGame', !s);
+    if (canvas.classList.contains('noGame') === Boolean(s0)) {
+        canvas.classList.toggle('noGame', !s0);
         syncActiveCanvasResolution();
     }
-    updateFullscreenHint(Boolean(s));
-    if (!s) return;
+    updateFullscreenHint(Boolean(s0));
+    if (!s0) return;
     updateNamesClocksOrder();
     const browsing = isBrowsingHistory();
+    const s = withFallenKing(s0, browsing);
     const statusInfo = computeStatusInfo(s);
     const ui = {
         selected: browsing ? null : selected,
@@ -2176,6 +2204,16 @@ function loadGame(newState) {
     // a PREVIOUS game never leaks into this one.
     userFlippedManually = false;
     setFlipped(humanColor() === 'black');
+    // Thunder as the board is set up for a fresh game, like the desktop
+    // client's startup thunder (owner, 9/30) - only for a game you're
+    // playing in that has no moves yet, so reopening a game in progress or
+    // watching someone else's stays quiet.
+    if (effectsEnabled && state.history.length === 0 && !isGameOver(state) && humanColor()) {
+        try {
+            gameStartSound.currentTime = 0;
+            gameStartSound.play().catch(() => {});
+        } catch (_) { /* ignore */ }
+    }
 }
 
 async function startNewGame() {

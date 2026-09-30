@@ -14,9 +14,9 @@ export function aiOpponentName(difficulty) {
 }
 
 export const AI_OPPONENT_AVATARS = {
-    Easy: 'assets/misc/biff.jpeg',
-    Medium: 'assets/misc/cletus.jpeg',
-    Hard: 'assets/misc/billy_ray.jpeg',
+    Easy: 'assets/misc/avatars/biff.png',
+    Medium: 'assets/misc/avatars/cletus.png',
+    Hard: 'assets/misc/avatars/billy_ray.png',
 };
 export function aiOpponentAvatar(difficulty) {
     return AI_OPPONENT_AVATARS[difficulty] || null;
@@ -37,12 +37,18 @@ export const GRAVES = 9;
 export const GWIDTH = CWIDTH;
 export const GHEIGHT = Math.floor((CEM_HEIGHT - 150) / GRAVES);
 
-// The pygame client's "design resolution" (main.py: WIDTH+200 x
-// HEIGHT+40+RAMPART_HEIGHT) - 100px deck/grave margins each side of the
-// board, 40px + the rampart band below it for the prompt/buttons.
+// The pygame client's 40px prompt/button strip below the board is gone on
+// every device: Strike/Raise sit on the bottom-left dead squares and the
+// prompt is a banner over the top-right ones (render.js). Phones kept the
+// strip until 9/27 (owner: now the same as desktop, nothing enlarged -
+// fullscreen is for play). The old strip code paths still key off this.
+export const LEGACY_STRIP = false;
+
+// Design resolution: 100px deck/grave margins each side of the board, the
+// board's own height plus the rampart band, plus the strip on phones.
 export const BOARD_X = 100; // board's left edge within the design canvas
 export const DESIGN_WIDTH = WIDTH + 200;
-export const DESIGN_HEIGHT = HEIGHT + 40 + RAMPART_HEIGHT;
+export const DESIGN_HEIGHT = HEIGHT + RAMPART_HEIGHT + (LEGACY_STRIP ? 40 : 0);
 
 export const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 

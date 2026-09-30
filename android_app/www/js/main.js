@@ -25,7 +25,7 @@ import {
     drawScreen, colRowFromPoint, buttonAt, deckCardAt, isPlayableSquare,
     DESIGN_WIDTH, DESIGN_HEIGHT, THEME_PRESETS, setTheme, PIECE_SET_NAMES, setPieceSet,
     triggerLightning, isLightningActive, startHourglass, stopHourglass, isHourglassActive,
-    setFlipped, isFlipped, onImageLoaded, setCardStyle, setDeckStyle,
+    setFlipped, isFlipped, onImageLoaded, setCardStyle, setDeckStyle, bannerAnimationState,
 } from './render.js';
 
 // Every api.js request fetches a live token right before sending, rather
@@ -255,40 +255,45 @@ new Image().src = 'assets/misc/queen_alchemy.png'; // preload so the swap is ins
 updateWatermark();
 setInterval(updateWatermark, 10 * 1000);
 
-// Standing "try full screen" nudge for phones (#fullscreenHint; CSS only ever
-// displays it on touch devices). It sits over the blank top-right squares of
-// the normal board - top row, display columns 5-9, which are blank whichever
-// way the board is flipped (a 180-degree turn maps blank squares onto blank
-// squares) - and is shown whenever a game is loaded and fullscreen is not
-// active. Deliberately no "already used it" memory: it is always there on the
-// normal board, and only absent while actually in fullscreen.
+// Phones' big square fullscreen button (#phoneFullscreenBtn, in the Play row;
+// CSS only ever displays it on touch devices): shown while a game is being
+// played or viewed and fullscreen is not active.
+const phoneFullscreenBtn = document.getElementById('phoneFullscreenBtn');
 function updateFullscreenHint(gameLoaded) {
-    const hint = document.getElementById('fullscreenHint');
-    if (!hint) return;
     const inFullscreen = Boolean(document.fullscreenElement) || isFakeFullscreenActive();
     const show = gameLoaded && !inFullscreen;
-    hint.hidden = !show;
-    if (!show) return;
-    const scale = canvas.getBoundingClientRect().width / DESIGN_WIDTH;
-    const cellH = RHEIGHT * scale;
-    // 2px in from the covered squares' edges on every side, so the label
-    // never touches the grid lines around them.
-    const INSET = 2;
-    hint.style.left = `${canvas.offsetLeft + (BOARD_X + 5 * RWIDTH) * scale + INSET}px`;
-    hint.style.top = `${canvas.offsetTop + INSET}px`;
-    hint.style.width = `${5 * RWIDTH * scale - INSET * 2}px`;
-    hint.style.height = `${cellH - INSET * 2}px`;
-    hint.style.fontSize = `${Math.max(8, cellH * 0.32)}px`;
+    if (phoneFullscreenBtn.hidden !== !show) {
+        phoneFullscreenBtn.hidden = !show;
+        updatePlayRowShape();
+    }
 }
-document.getElementById('fullscreenHint').addEventListener('click', () => {
+
+// Phones: do the two Play buttons fit side by side (plus the short "Full
+// screen" rectangle, when it's showing)? If not, stack them and let the
+// button become a square beside the pair. Decided by measuring rather than
+// by watching the row wrap, so the button's own width change can't make
+// the layout flip back and forth.
+const playModesEl = document.getElementById('playModes');
+const PHONE_FS_SHORT_W = 130; // "⛶ Full screen" on one line, plus the gap
+function updatePlayRowShape() {
+    const phone = window.matchMedia('(pointer: coarse) and (hover: none)').matches;
+    if (!phone || isWideLayout()) {
+        playModesEl.classList.remove('stacked');
+        return;
+    }
+    const triggers = [...playModesEl.querySelectorAll('.playModeTrigger')];
+    const style = getComputedStyle(playModesEl);
+    const room = playModesEl.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const need = triggers.reduce((w, t) => w + t.offsetWidth, 0) + 10
+        + (phoneFullscreenBtn.hidden ? 0 : PHONE_FS_SHORT_W);
+    playModesEl.classList.toggle('stacked', need > room);
+}
+window.addEventListener('resize', updatePlayRowShape);
+document.fonts.ready.then(updatePlayRowShape);
+phoneFullscreenBtn.addEventListener('click', () => {
     enterMobileFullscreen(boardWrap).catch(() => {});
 });
 onLayoutModeChange(() => updateFullscreenHint(Boolean(activeState())));
-// The player-names bar (and anything else above the canvas) appears AFTER the
-// first draw and shifts the canvas down without resizing it, which the canvas
-// ResizeObserver above never sees - so re-place the hint whenever #boardWrap
-// itself changes size.
-new ResizeObserver(() => updateFullscreenHint(Boolean(activeState()))).observe(document.getElementById('boardWrap'));
 
 const statusLine = document.getElementById('statusLine');
 const statusLineTextEl = document.getElementById('statusLineText');
@@ -363,7 +368,11 @@ cardStyleToggle.addEventListener('change', () => {
     drawCanvas();
 });
 
-const strikeSound = new Audio('assets/sounds/thunder_strike.wav');
+// Strike: a sharper crack (Pixabay, u_q2hb2391vb; owner, 9/30), trimmed of
+// its 0.58s silent lead-in (source kept as new_strike.mp3) so it lands with
+// the 0.5s lightning. The old strike thunder now opens each game instead.
+const strikeSound = new Audio('assets/sounds/thunder_strike_new.mp3');
+const gameStartSound = new Audio('assets/sounds/thunder_strike.wav');
 const raiseSound = new Audio('assets/sounds/thunder_raise.mp3');
 // Matches game.py's play_sound(captured) - the plain move/capture click,
 // independent of (and gated by the same effectsEnabled toggle as) the
@@ -422,6 +431,20 @@ let currentProfile = null; // {uid, username} once signed in AND registered
 // interrupted before the username was claimed on a previous visit.
 let pendingUsernameClaim = false;
 
+// Phones: the sign-in fields live in a drop-down under the header's Log In
+// button (style.css #authPanel.phoneOpen). Desktop ignores all of this.
+const phoneLogInBtn = document.getElementById('phoneLogInBtn');
+function setPhoneAuthOpen(open) {
+    authPanel.classList.toggle('phoneOpen', open);
+    phoneLogInBtn.setAttribute('aria-expanded', String(open));
+    phoneLogInBtn.classList.toggle('active', open);
+}
+phoneLogInBtn.addEventListener('click', () => {
+    const open = !authPanel.classList.contains('phoneOpen');
+    setPhoneAuthOpen(open);
+    if (open) authEmail.focus();
+});
+
 function renderAuthUI(message) {
     const signedIn = currentProfile !== null || pendingUsernameClaim;
     // Once fully signed in (a real username claimed), the whole sign-in
@@ -429,6 +452,8 @@ function renderAuthUI(message) {
     // (header.js) covers "who's signed in" and Sign Out now. Still shown
     // during pendingUsernameClaim, since that step still needs authUsername.
     authPanel.hidden = currentProfile !== null;
+    phoneLogInBtn.hidden = currentProfile !== null;
+    if (currentProfile !== null) setPhoneAuthOpen(false);
     authEmail.hidden = signedIn;
     authPassword.hidden = signedIn;
     signUpBtn.hidden = signedIn;
@@ -909,12 +934,29 @@ PIECE_SET_NAMES.forEach(({ key, label }) => {
     opt.textContent = label;
     pieceSetSelect.appendChild(opt);
 });
+// Board style and piece style survive a refresh, like the two checkboxes
+// above: a per-browser display preference in localStorage. The theme is
+// stored by name, so it still resolves if THEME_PRESETS is ever reordered.
+try {
+    const savedTheme = THEME_PRESETS.findIndex((t) => t.name === localStorage.getItem('rampart.theme'));
+    if (savedTheme >= 0) {
+        setTheme(savedTheme);
+        themeSelect.value = String(savedTheme);
+    }
+    const savedPieceSet = localStorage.getItem('rampart.pieceSet');
+    if (PIECE_SET_NAMES.some((s) => s.key === savedPieceSet)) {
+        setPieceSet(savedPieceSet);
+        pieceSetSelect.value = savedPieceSet;
+    }
+} catch (_) { /* localStorage unavailable */ }
 themeSelect.addEventListener('change', () => {
     setTheme(Number(themeSelect.value));
+    try { localStorage.setItem('rampart.theme', THEME_PRESETS[Number(themeSelect.value)].name); } catch (_) { /* ignore */ }
     drawCanvas();
 });
 pieceSetSelect.addEventListener('change', () => {
     setPieceSet(pieceSetSelect.value);
+    try { localStorage.setItem('rampart.pieceSet', pieceSetSelect.value); } catch (_) { /* ignore */ }
     drawCanvas();
 });
 flipBoardBtn.addEventListener('click', () => {
@@ -976,6 +1018,44 @@ let clickedCards = []; // {source:'deck', color, rank} | {source:'board', col, r
 let committedButton = null; // 'strike' | 'raise' | null
 let castDestinations = []; // [{col, row, category, index}] once committed
 let transientMessage = null; // e.g. "No eligible raider to strike."
+
+// "Necromancer": a player raises on two of their own consecutive turns.
+// Shown in the banner for NECROMANCER_MS, at most once per game per player,
+// and only for moves arriving live - a page load or history browsing never
+// replays it. move_log alternates, White at even indices.
+const NECROMANCER_MS = 4000;
+let necromancer = null; // { color, until }
+let necroGameId = null;
+let necroSeenLength = 0;
+let necroShown = new Set();
+
+function checkNecromancer() {
+    if (!state || !gameId) {
+        necroGameId = null;
+        necromancer = null;
+        return;
+    }
+    const history = state.history || [];
+    if (gameId !== necroGameId) {
+        // a game just loaded: its past moves are history, not news
+        necroGameId = gameId;
+        necroSeenLength = history.length;
+        necroShown = new Set();
+        necromancer = null;
+        return;
+    }
+    for (let i = necroSeenLength; i < history.length; i++) {
+        const color = i % 2 === 0 ? 'white' : 'black';
+        if (i >= 2 && !necroShown.has(color)
+            && castKindFromNotation(history[i]) === 'raise'
+            && castKindFromNotation(history[i - 2]) === 'raise') {
+            necroShown.add(color);
+            necromancer = { color, until: Date.now() + NECROMANCER_MS };
+            setTimeout(() => drawCanvas(), NECROMANCER_MS + 50);
+        }
+    }
+    necroSeenLength = history.length;
+}
 
 function squaresEqual(a, b) {
     if (!a && !b) return true;
@@ -1276,9 +1356,14 @@ async function commitCastButton(button) {
     }
 }
 
-function computeStatus(s) {
+// The prompt text plus what kind of message it is, for the desktop banner
+// (render.js drawBanner): 'turn' | 'think' | 'casting' | 'check' | 'herald'
+// | 'result' | 'plain', a big-moment title for results, and whose king to
+// show for turn/think. Phones' strip and fullscreen prompt only use .text
+// (computeStatus below), so their wording is untouched.
+function computeStatusInfo(s) {
     if (isBrowsingHistory()) {
-        return `Viewing move ${viewIndex} of ${state.history.length}.`;
+        return { kind: 'plain', text: `Viewing move ${viewIndex} of ${state.history.length}.` };
     }
     if (s.result) {
         const { winner, reason } = s.result;
@@ -1295,62 +1380,95 @@ function computeStatus(s) {
             // fragment - not an intentional style match.
             case 'checkmate':
             case 'mate_by_capture':
-                return `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`;
-            case 'resignation': return `${cap(winner === 'white' ? 'black' : 'white')} resigned - ${cap(winner)} wins!`;
-            case 'draw_agreement': return 'Draw by agreement.';
-            case 'timeout': return `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!`;
+                if (reason === 'mate_by_capture') {
+                    // desktop banner only: its own sentence, and blood
+                    // dripping from the title (render.js drawBloodTitle)
+                    return {
+                        kind: 'result',
+                        title: 'Regicide',
+                        effect: 'blood',
+                        text: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`,
+                        bannerText: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')} by capture.`,
+                    };
+                }
+                return {
+                    kind: 'result',
+                    title: 'Checkmate',
+                    text: `${cap(winner)} mated ${cap(winner === 'white' ? 'black' : 'white')}.`,
+                };
+            case 'resignation': return { kind: 'result', title: 'Resignation', text: `${cap(winner === 'white' ? 'black' : 'white')} resigned - ${cap(winner)} wins!` };
+            case 'draw_agreement': return { kind: 'result', title: 'Draw', text: 'Draw by agreement.' };
+            case 'timeout': return { kind: 'result', title: 'Out of Time', text: `${cap(winner === 'white' ? 'black' : 'white')} ran out of time - ${cap(winner)} wins!` };
             // Matches game.py's set_repetition_prompt/is_draw_by_
             // insufficient_material wording exactly.
-            case 'repetition': return 'Draw by repetition';
-            case 'insufficient_material': return 'Draw by insufficient material';
+            case 'repetition': return { kind: 'result', title: 'Draw', text: 'Draw by repetition' };
+            case 'insufficient_material': return { kind: 'result', title: 'Draw', text: 'Draw by insufficient material' };
             // Matches game.py's set_mated_prompt('stale-mated', ...)
             // wording exactly - stalemated_color is missing only for a
             // persisted game recorded before the server tracked it.
             case 'stalemate':
             default:
-                return s.result.stalemated_color ? `${cap(s.result.stalemated_color)} stalemated` : 'Stalemate.';
+                return { kind: 'result', title: 'Stalemate', text: s.result.stalemated_color ? `${cap(s.result.stalemated_color)} stalemated` : 'Stalemate.' };
         }
     }
+    // Necromancer takes the banner for its few seconds (even over a check
+    // it may have given - the check message returns right after).
+    if (necromancer && Date.now() < necromancer.until) {
+        return {
+            kind: 'result',
+            title: 'Necromancer',
+            effect: 'electric',
+            text: `${cap(necromancer.color)} raises the dead twice in a row.`,
+        };
+    }
     if (s.in_check) {
-        return `${cap(s.in_check)}'s king is in check -- `;
+        // The trailing " -- " is game.py's; the banner shows a clean sentence.
+        return { kind: 'check', text: `${cap(s.in_check)}'s king is in check -- `, bannerText: `${cap(s.in_check)}'s king is in check.` };
     }
     // Below result/in_check (a known, correctly-synced fact always wins)
     // but above everything else, since a stalled poll makes every one of
     // those messages potentially stale too.
     if (reconnecting) {
-        return 'Reconnecting...';
+        return { kind: 'herald', text: 'Reconnecting...' };
     }
     if (s.draw_offered_by && s.draw_offered_by !== humanColor()) {
-        return `${cap(s.draw_offered_by)} has offered a draw.`;
+        return { kind: 'herald', text: `${cap(s.draw_offered_by)} has offered a draw.` };
     }
     if (aiThinking) {
-        return `${cap(s.next_player)} (AI) is thinking...`;
+        return { kind: 'think', player: s.next_player, text: `${cap(s.next_player)} (AI) is thinking...` };
     }
     if (transientMessage) {
-        return transientMessage;
+        return { kind: 'herald', text: transientMessage };
     }
     if (pendingQueenMove) {
-        return 'Choose a tile where you want to place the queen.';
+        return { kind: 'casting', text: 'Choose a tile where you want to place the queen.' };
     }
     if (committedButton === 'strike') {
-        return 'Choose a raider to send to the grave.';
+        return { kind: 'casting', text: 'Choose a raider to send to the grave.' };
     }
     if (committedButton === 'raise') {
         const hasQueen = castDestinations.some((d) => d.category === 'raise_queen');
-        return hasQueen
-            ? 'Choose a tile where you want to place the queen.'
-            : 'Choose a tile where you want to place a raider.';
+        return {
+            kind: 'casting',
+            text: hasQueen
+                ? 'Choose a tile where you want to place the queen.'
+                : 'Choose a tile where you want to place a raider.',
+        };
     }
     if (s.next_player === humanColor() && jackHouseOccupiedBy(s, s.next_player)) {
         if (clickedCards.length === 0) {
-            return 'To begin casting, click on a card in your deck.';
+            return { kind: 'casting', text: 'To begin casting, click on a card in your deck.' };
         }
         if (handSum21(clickedCards)) {
-            return 'Click one of the "strike" or "raise" buttons.';
+            return { kind: 'casting', text: 'Click one of the "strike" or "raise" buttons.' };
         }
-        return 'Choose cards from your deck and from the board that sum to 21.';
+        return { kind: 'casting', text: 'Choose cards from your deck and from the board that sum to 21.' };
     }
-    return `${cap(s.next_player)} to move.`;
+    return { kind: 'turn', player: s.next_player, text: `${cap(s.next_player)} to move.` };
+}
+
+function computeStatus(s) {
+    return computeStatusInfo(s).text;
 }
 
 // ---- canvas <-> page coordinate conversion (canvas is CSS-scaled) --------
@@ -1403,12 +1521,44 @@ function currentDeckCardAt(x, y) {
 
 // ---- rendering ------------------------------------------------------------
 
+// Mate by capture is, by the rulebook, a capture of the king - so once the
+// game has ended that way, the final position shows the losing king taken
+// off its square and lying in its graveyard (owner, 9/30). Display only:
+// the server/engine state is untouched, and browsing earlier moves shows
+// the king where it stood.
+function withFallenKing(s, browsing) {
+    const r = s.result;
+    if (browsing || !r || r.reason !== 'mate_by_capture' || !r.winner) return s;
+    const loser = r.winner === 'white' ? 'black' : 'white';
+    const key = `${loser}_grave`;
+    const grave = [...(s[key] || [])];
+    if (!grave.includes('king')) { // (never twice)
+        const free = grave.findIndex((name) => !name);
+        if (free >= 0) grave[free] = 'king';
+        else grave.push('king');
+    }
+    return {
+        ...s,
+        pieces: s.pieces.filter((p) => !(p.piece === 'king' && p.color === loser)),
+        [key]: grave,
+    };
+}
+
 function drawCanvas() {
-    const s = activeState();
-    updateFullscreenHint(Boolean(s));
-    if (!s) return;
+    const s0 = activeState();
+    // Empty board -> the taller watermark box (style.css #boardCanvas.noGame).
+    // Re-sync straight away when it flips, so the board is drawn into the
+    // right-sized backing store on this same call.
+    if (canvas.classList.contains('noGame') === Boolean(s0)) {
+        canvas.classList.toggle('noGame', !s0);
+        syncActiveCanvasResolution();
+    }
+    updateFullscreenHint(Boolean(s0));
+    if (!s0) return;
     updateNamesClocksOrder();
     const browsing = isBrowsingHistory();
+    const s = withFallenKing(s0, browsing);
+    const statusInfo = computeStatusInfo(s);
     const ui = {
         selected: browsing ? null : selected,
         legalDestinations: browsing ? [] : legalDestinations,
@@ -1426,7 +1576,8 @@ function drawCanvas() {
         hoverDeckCard: browsing ? null : hoverDeckCard,
         clickedCards: browsing ? [] : clickedCards,
         aiThinking: !browsing && aiThinking,
-        promptText: computeStatus(s),
+        promptText: statusInfo.text,
+        promptInfo: statusInfo,
         // matches game.py's in-check prompt, rendered in red instead of
         // the default white - only while it's actually the live reason
         // for the prompt (not overridden by a higher-priority message
@@ -1450,6 +1601,10 @@ function drawCanvas() {
         mobileRaiseBtn.classList.toggle('active', ui.committedButton === 'raise');
     } else {
         drawScreen(ctx, s, ui);
+        // a new banner message fades in, and check/AI-thinking/results keep
+        // a pulse or shimmer going - both need the redraw loop below
+        const banner = bannerAnimationState();
+        if (banner.fullRate || banner.ambient) ensureAnimationLoop();
     }
     // The capture-ring/move-dot/clicked-card highlights (render.js) now
     // breathe with a wall-clock pulse - keep the rAF loop below alive
@@ -1481,8 +1636,11 @@ let lastPulseFrameTime = 0;
 function animationTick(now) {
     const pulsingHighlights = !isBrowsingHistory()
         && (selected || legalDestinations.length || castDestinations.length || clickedCards.length);
-    const activeEffect = isLightningActive() || isLightningActiveMobile() || isHourglassActive();
-    if (activeEffect || pulsingHighlights) {
+    // the desktop prompt banner: fades at full rate, pulses/shimmers at the
+    // capped rate like the highlight pulse
+    const banner = isMobileBoardActive() ? { fullRate: false, ambient: false } : bannerAnimationState(now);
+    const activeEffect = isLightningActive() || isLightningActiveMobile() || isHourglassActive() || banner.fullRate;
+    if (activeEffect || pulsingHighlights || banner.ambient) {
         if (activeEffect || now - lastPulseFrameTime >= PULSE_FRAME_INTERVAL_MS) {
             drawCanvas();
             lastPulseFrameTime = now;
@@ -1594,6 +1752,7 @@ function updateMovesPanel() {
         moveLabels = null;
         moveLabelsForLength = -1;
     }
+    openMovesForWide(); // wide desktop layout: the list is always on show
 }
 
 function renderMovesList() {
@@ -1945,6 +2104,7 @@ async function refreshPlayerLabels() {
 
 function renderAll() {
     clockSyncedAt = Date.now(); // state.*_time_ms above is only ever fresh right here
+    checkNecromancer();
     drawCanvas();
     updateHistoryButtons();
     updateGameActionButtons();
@@ -2044,6 +2204,16 @@ function loadGame(newState) {
     // a PREVIOUS game never leaks into this one.
     userFlippedManually = false;
     setFlipped(humanColor() === 'black');
+    // Thunder as the board is set up for a fresh game, like the desktop
+    // client's startup thunder (owner, 9/30) - only for a game you're
+    // playing in that has no moves yet, so reopening a game in progress or
+    // watching someone else's stays quiet.
+    if (effectsEnabled && state.history.length === 0 && !isGameOver(state) && humanColor()) {
+        try {
+            gameStartSound.currentTime = 0;
+            gameStartSound.play().catch(() => {});
+        } catch (_) { /* ignore */ }
+    }
 }
 
 async function startNewGame() {
@@ -2637,6 +2807,121 @@ document.addEventListener('visibilitychange', () => {
     pollActiveGame();
     pollChat();
 });
+
+// ---- wide desktop layout (panels on both sides of the board) ------------
+//
+// On a wide desktop window the page otherwise leaves big empty margins while
+// the controls sit below the board, off the bottom of the screen. From
+// WIDE_QUERY up, the SAME elements (so every listener keeps working) are
+// moved into the two side rails (#wideLeft/#wideRight, index.html):
+//   left  - Play buttons, Chat (human games) / Live Games, Display + Flip
+//   right - Moves + history arrows, then Abort / Resign / Draw buttons
+// and moved back to their original spots, via comment-node anchors, when the
+// window narrows again. Styling lives in style.css under body.wideLayout;
+// below the breakpoint nothing here touches the page at all.
+const WIDE_QUERY = window.matchMedia('(min-width: 1500px) and (hover: hover) and (pointer: fine)');
+const wideStage = document.getElementById('stage');
+const wideLeft = document.getElementById('wideLeft');
+const wideRight = document.getElementById('wideRight');
+const wideMovesCard = document.getElementById('wideMovesCard');
+const wideMovesPlaceholder = document.getElementById('wideMovesPlaceholder');
+const wideActionsCard = document.getElementById('wideActionsCard');
+// [element, where it goes in wide mode] in the order they're placed.
+const WIDE_MOVES = [
+    [document.getElementById('playModes'), (el) => wideLeft.appendChild(el)],
+    [chatPanel, (el) => wideLeft.appendChild(el)],
+    [document.getElementById('liveGamesPanel'), (el) => wideLeft.appendChild(el)],
+    [document.getElementById('displayPanel'), (el) => wideLeft.appendChild(el)],
+    [movesPanel, (el) => wideMovesCard.insertBefore(el, wideMovesPlaceholder)],
+    [document.getElementById('historyControls'), (el) => wideMovesCard.appendChild(el)],
+    [quickActions, (el) => wideActionsCard.appendChild(el)],
+    [gameActions, (el) => wideActionsCard.appendChild(el)],
+];
+const wideAnchors = WIDE_MOVES.map(([el]) => {
+    const anchor = document.createComment(`wide-layout home of #${el.id}`);
+    el.parentNode.insertBefore(anchor, el);
+    return anchor;
+});
+
+// Room kept above the canvas for the names row + clocks row even while they
+// are hidden, so the board never changes size when a game starts.
+const WIDE_NAME_ROWS_RESERVE = 96;
+const WIDE_BOTTOM_MARGIN = 16;
+
+function isWideLayout() {
+    return document.body.classList.contains('wideLayout');
+}
+
+// The Moves list normally only fetches while its dropdown is open; in wide
+// mode it's always on show, so open it whenever it's visible.
+function openMovesForWide() {
+    if (!isWideLayout() || movesPanel.hidden || movesOpen) return;
+    movesOpen = true;
+    movesListEl.hidden = false;
+    movesToggleBtn.setAttribute('aria-expanded', 'true');
+    movesToggleArrow.textContent = '▴';
+    refreshMovesIfOpen();
+}
+
+// Board width: its normal 1000px at most, never bigger - smaller only if the
+// window is too short (or too narrow beside the rails) to show all of it.
+// Sized against the taller empty-board box (1000/860) so the width stays put
+// when a game starts. Then the rails are lined up with the canvas's own top
+// and bottom edges.
+function sizeWideLayout() {
+    if (!isWideLayout()) return;
+    const stageStyle = getComputedStyle(wideStage);
+    const railW = wideLeft.getBoundingClientRect().width;
+    const gap = parseFloat(stageStyle.columnGap) || 0;
+    const padX = parseFloat(stageStyle.paddingLeft) + parseFloat(stageStyle.paddingRight);
+    const availW = document.documentElement.clientWidth - 2 * railW - 2 * gap - padX;
+    const wrapTop = boardWrap.getBoundingClientRect().top + window.scrollY;
+    const availH = window.innerHeight - wrapTop - WIDE_NAME_ROWS_RESERVE - WIDE_BOTTOM_MARGIN;
+    const width = Math.max(560, Math.min(1000, availW, availH * 1000 / 860));
+    boardWrap.style.width = `${Math.floor(width)}px`;
+    alignWideRails();
+}
+
+function alignWideRails() {
+    if (!isWideLayout()) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    const stageTop = wideStage.getBoundingClientRect().top + parseFloat(getComputedStyle(wideStage).paddingTop);
+    for (const rail of [wideLeft, wideRight]) {
+        rail.style.marginTop = `${Math.max(0, canvasRect.top - stageTop)}px`;
+        rail.style.height = `${canvasRect.height}px`;
+    }
+}
+
+function applyWideLayout() {
+    const on = WIDE_QUERY.matches;
+    if (on === isWideLayout()) return;
+    document.body.classList.toggle('wideLayout', on);
+    wideLeft.hidden = !on;
+    wideRight.hidden = !on;
+    if (on) {
+        for (const [el, place] of WIDE_MOVES) place(el);
+        openMovesForWide();
+        sizeWideLayout();
+    } else {
+        WIDE_MOVES.forEach(([el], i) => wideAnchors[i].after(el));
+        boardWrap.style.width = '';
+        for (const rail of [wideLeft, wideRight]) {
+            rail.style.marginTop = '';
+            rail.style.height = '';
+        }
+    }
+}
+
+WIDE_QUERY.addEventListener('change', applyWideLayout);
+window.addEventListener('resize', sizeWideLayout);
+// The names/clocks rows appearing, the status line wrapping, or the canvas
+// switching between its empty (860) and in-game (820) box all move or resize
+// the canvas without a window resize.
+new ResizeObserver(() => alignWideRails()).observe(canvas);
+for (const id of ['playerNames', 'clocks', 'statusLine']) {
+    new ResizeObserver(() => sizeWideLayout()).observe(document.getElementById(id));
+}
+applyWideLayout();
 
 // ---- opening a game linked from the Profile page's ledger ----------------
 

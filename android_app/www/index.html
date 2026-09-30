@@ -5,8 +5,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>RampartChess</title>
-<link rel="icon" href="favicon.ico" />
-<link rel="stylesheet" href="style.css?v=80" />
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="style.css?v=108" />
 </head>
 <body>
 <header>
@@ -26,6 +27,11 @@
     </div>
     <a id="homeLink" href="index.html"><img id="siteLogo" src="assets/misc/logo_crown.png" alt=""><h1>RampartChess</h1></a>
   </div>
+  <!-- Phones only (style.css): while signed out, the header is one row with
+       this button, and #authPanel drops down below it when tapped (owner,
+       9/27 - the inline email/password fields made the phone header two
+       rows tall and cut off "Password"). main.js toggles .phoneOpen. -->
+  <button id="phoneLogInBtn" type="button" aria-expanded="false" aria-controls="authPanel">Log In</button>
   <div id="authPanel">
     <span id="authStatus"></span>
     <input id="authEmail" type="email" placeholder="Email" size="16">
@@ -70,6 +76,10 @@
 </div>
 
 <div id="playModes">
+  <!-- The two Play buttons as one unit, so on phones they can sit side by
+       side or stack (main.js updatePlayRowShape) beside #phoneFullscreenBtn.
+       Elsewhere this wrapper is display:contents - no layout of its own. -->
+  <div id="playModeButtons">
   <section class="playModeBand">
     <button type="button" class="playModeTrigger" id="aiMenuBtn" aria-expanded="false">Play vs Computer &#9662;</button>
     <div class="playModePanel" id="aiMenuPanel" hidden>
@@ -115,21 +125,31 @@
     <p id="humanSignedOutNote">Log in to challenge another player.</p>
     </div>
   </section>
+  </div>
+  <!-- Phones only (style.css), while a game is being played or viewed: a big
+       square way into fullscreen, beside the stacked Play buttons (owner,
+       9/27 - replaces the old hint laid over the board's top-right squares,
+       which is where the prompt banner now sits). main.js toggles [hidden]. -->
+  <button type="button" id="phoneFullscreenBtn" hidden>
+    <span class="fsIcon" aria-hidden="true">&#x26F6;</span>
+    <span class="fsLabel">Full screen</span>
+  </button>
 </div>
 
 <div id="statusLine"><span id="statusLineText">Start a new game.</span><span id="statusLineChatFlash" class="chatFlashIcon" hidden>&#128172;</span></div>
 
+<!-- Wide desktop windows only (main.js applyWideLayout, >= 1500px with a
+     mouse): the play/social/settings panels move into #wideLeft and the
+     moves/history/game-action panels into #wideRight, on either side of the
+     board. Below that width both stay hidden and #stage is a plain block, so
+     the page is exactly the ordinary stacked layout. -->
+<div id="stage">
+<aside id="wideLeft" class="wideRail" hidden></aside>
 <main id="boardWrap">
   <!-- Touch-only (see style.css's pointer/hover query) - tapping this
        fullscreens #boardWrap and attempts a landscape orientation lock,
        like YouTube's fullscreen button. Hidden again once fullscreen. -->
   <button id="mobileFullscreenBtn" title="Fullscreen">&#x26F6;</button>
-  <!-- Phones only: a standing nudge toward fullscreen, laid over the blank
-       top-right squares of the normal (non-fullscreen) board - the round
-       button above is easy to miss. main.js positions/sizes it from the
-       canvas and shows it whenever a game is loaded and fullscreen is not
-       active. Tapping it does what the round button does. -->
-  <button type="button" id="fullscreenHint" hidden>&#x26F6; Tap for full screen</button>
   <!-- Shown only while #boardWrap IS the fullscreen element and the device
        is still portrait (see the #boardWrap:fullscreen CSS rule) - i.e.
        only on platforms without orientation-lock support (iOS Safari),
@@ -181,7 +201,7 @@
         <img id="mobileEmblemBottomLeft" class="mobileEmblem" alt="">
       </div>
     </div>
-    <canvas id="boardCanvas"></canvas>
+    <canvas id="boardCanvas" class="noGame"></canvas>
     <div id="mobileSideRight" class="mobileGravePanel">
       <div id="mobileDeckWhite" class="mobileDeckList"></div>
       <!-- Emblem comes BEFORE the grave slots here (top of this column),
@@ -251,8 +271,16 @@
     <div id="liveGamesList"></div>
   </div>
 </main>
+<aside id="wideRight" class="wideRail" hidden>
+  <section id="wideMovesCard" class="wideCard">
+    <h3 class="wideCardTitle">Moves</h3>
+    <p id="wideMovesPlaceholder">Moves will appear here once a game starts.</p>
+  </section>
+  <section id="wideActionsCard" class="wideCard"></section>
+</aside>
+</div>
 
 <script type="module" src="js/header.js"></script>
-<script type="module" src="js/main.js?v=69"></script>
+<script type="module" src="js/main.js?v=81"></script>
 </body>
 </html>

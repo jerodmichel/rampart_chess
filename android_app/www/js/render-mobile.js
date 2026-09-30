@@ -73,7 +73,7 @@ export function isPlayableSquare(col, row) {
 
 // Pixel rect (relative to the canvas) of a single cell, for main.js's mobile
 // Strike/Raise/prompt overlays. Deliberately NOT flip-aware, unlike colX/
-// rowY above - matches desktop, where STRIKE_RECT/RAISE_RECT/PROMPT_POS
+// rowY above - matches desktop, where STRIKE_RECT/RAISE_RECT/BANNER_RECT
 // (render.js) are fixed canvas positions that never move on flip either.
 // Using the flip-aware helpers here would make those controls swap corners
 // every time the board flips, instead of staying put like their desktop

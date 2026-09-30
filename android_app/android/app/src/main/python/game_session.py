@@ -1049,9 +1049,13 @@ class GameSession:
         labels = []
         for i, notation in enumerate(history):
             next_player, label = GameSession._apply_notation_with_display(board, notation, next_player)
+            is_last = i == len(history) - 1
             mover_now_facing = GameSession._player_for(board, next_player)
-            if board.king_in_check(mover_now_facing):
-                is_last = i == len(history) - 1
+            if is_last and result and result.get("reason") == "mate_by_capture":
+                # the king is captured on its non-card square, not checked -
+                # so this ends the game with no check to detect; still "#"
+                label += "#"
+            elif board.king_in_check(mover_now_facing):
                 mated = is_last and bool(result) and result.get("reason") in ("checkmate", "mate_by_capture")
                 label += "#" if mated else "+"
             labels.append(label)

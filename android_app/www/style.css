@@ -4,6 +4,41 @@
     font-weight: 600;
 }
 
+/* Desktop prompt banner's headers and big moments (render.js). SIL OFL 1.1,
+   license alongside in assets/fonts/CinzelDecorative-OFL.txt. */
+@font-face {
+    font-family: 'Cinzel Decorative Web';
+    src: url('assets/fonts/CinzelDecorative-Bold.ttf') format('truetype');
+    font-weight: 700;
+}
+
+/* The Necromancer banner title (render.js drawElectricTitle). October Crow
+   by Chad Savage - free for any use; its Read Me is alongside in
+   assets/fonts/OctoberCrow-ReadMe.txt. */
+@font-face {
+    font-family: 'October Crow Web';
+    src: url('assets/fonts/OctoberCrow.ttf') format('truetype');
+    font-weight: 400;
+}
+
+/* The Regicide banner title (render.js drawBloodTitle). Ghastly Panic by
+   Chad Savage - free for any use; its Read Me is alongside in
+   assets/fonts/GhastlyPanic-ReadMe.txt. */
+@font-face {
+    font-family: 'Ghastly Panic Web';
+    src: url('assets/fonts/GhastlyPanic.ttf') format('truetype');
+    font-weight: 400;
+}
+
+/* The Out of Time banner title (render.js drawSteelTitle). Dystopian
+   Canticle by Scapholene, SIL OFL 1.1 - license alongside in
+   assets/fonts/DystopianCanticle-OFL.txt. */
+@font-face {
+    font-family: 'Dystopian Canticle Web';
+    src: url('assets/fonts/DystopianCanticle-Regular.otf') format('opentype');
+    font-weight: 400;
+}
+
 :root {
     color-scheme: dark;
     --bg: #141410;
@@ -11,6 +46,19 @@
     --panel-border: #3c3d33;
     --text: #eee;
     --muted: #a0a196;
+    /* Plain text links, site-wide (owner, 9/27): light electric blue. */
+    --link: #6fd0ff;
+    --link-hover: #a8e6ff;
+}
+
+/* Ordinary text links in page content. Links that are really styled
+   controls (menus, name links, chips) all carry a class or have their own
+   rule, so they're untouched. */
+:where(main) a:not([class]) {
+    color: var(--link);
+}
+:where(main) a:not([class]):hover {
+    color: var(--link-hover);
 }
 
 * { box-sizing: border-box; }
@@ -321,7 +369,7 @@ header h1 {
 #forgotPasswordBtn {
     background: transparent;
     border: none;
-    color: var(--muted);
+    color: var(--link);
     text-decoration: underline;
     padding: 0;
     font-size: 0.85em;
@@ -329,7 +377,7 @@ header h1 {
 
 #forgotPasswordBtn:hover:not(:disabled) {
     background: transparent;
-    color: var(--text);
+    color: var(--link-hover);
 }
 
 /* A plain #id{display:...} rule beats [hidden]'s built-in display:none
@@ -485,7 +533,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     height: auto;
     cursor: pointer;
     margin-top: 8px;
-    aspect-ratio: 1000 / 860;
+    aspect-ratio: 1000 / 820; /* DESIGN_WIDTH / DESIGN_HEIGHT (constants.js) */
     /* Only ever visible with no game loaded - drawScreen() (render.js)
        opaquely fills the whole canvas the instant a game exists, painting
        right over this; it's only ever showing through on the actual
@@ -511,6 +559,14 @@ button:disabled { opacity: 0.5; cursor: default; }
        cutting into her face/hair at the top. */
     background-size: cover;
     background-position: center top;
+}
+/* Desktop's board box is 1000/820 since the strip under it was removed, but
+   the empty board (no game loaded - main.js drawCanvas() sets .noGame) keeps
+   the old 1000/860 box, so the crown and the alchemy queen show exactly as
+   they did before: same size, same cutoff at her mouth, nothing trimmed off
+   the top. Phones too, since 9/27 (same board as desktop). */
+#boardCanvas.noGame {
+    aspect-ratio: 1000 / 860;
 }
 
 /* Three tracks - left (display settings/flip board), center (Abort/
@@ -651,12 +707,16 @@ button:disabled { opacity: 0.5; cursor: default; }
    to read comfortably here; leave phone's sizing above untouched. */
 @media (hover: hover) and (pointer: fine) {
     .playerAvatarWrap img, .playerAvatarWrap canvas {
-        width: 32px;   /* radius 12px -> 16px */
-        height: 32px;
+        width: 44px;   /* 32px -> 44px (owner, 9/27) */
+        height: 44px;
     }
 
     .playerNameText {
-        font-size: 1.1em;
+        font-size: 1.2em;
+    }
+
+    .playerTrophyRow {
+        padding-left: 50px; /* under the name text: 44px avatar + 6px gap */
     }
 }
 
@@ -765,10 +825,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 /* Sits directly under #chatPanel, same visual family (border/background/
    margin) so it reads as a continuation of it - collapsed, it's just
    #movesToggleBtn, sized to roughly match #chatInputRow's own height/
-   width; open, #movesList drops down from it as an overlay (same
-   absolute-positioned-dropdown pattern #navMenuDropdown/
-   #displaySettingsDropdown already use) rather than pushing
-   #liveGamesPanel down the page. */
+   width; open, #movesList expands inside the panel, in normal page flow,
+   pushing #liveGamesPanel down. (It used to drop down as an absolute
+   overlay, but near the bottom of the page the document never grew to
+   include it, so the last moves couldn't be scrolled into view - 9/26.) */
 #movesPanel {
     position: relative;
     margin: 10px 15px 0;
@@ -797,22 +857,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 #movesList {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    margin-top: 4px;
-    max-height: 220px;
+    max-height: 320px;
     overflow-y: auto;
     grid-template-columns: auto 1fr 1fr;
     align-content: start;
     gap: 3px 8px;
     padding: 8px 12px;
     font-size: 0.9em;
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    z-index: 20;
+    border-top: 1px solid var(--panel-border);
 }
 
 /* `display` must live here, not on the unconditional rule above - see
@@ -1108,6 +1160,22 @@ button:disabled { opacity: 0.5; cursor: default; }
     line-height: 1.4;
 }
 
+/* Stands in for #rulebookFrame where the browser can't show a PDF inline.
+   `hidden` must keep winning, so display only when not hidden. */
+#rulebookButton:not([hidden]) {
+    display: block;
+    margin: 16px auto 0;
+    max-width: 360px;
+    padding: 14px 18px;
+    text-align: center;
+    font-size: 1.05em;
+    color: var(--text);
+    text-decoration: none;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+}
+
 #rulebookFrame {
     width: 100%;
     height: 80vh;
@@ -1336,7 +1404,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 
 #signedOutMessage a {
-    color: var(--text);
+    color: var(--link);
 }
 
 #profileHeader {
@@ -1585,34 +1653,60 @@ a.ledgerOpponent:hover {
 .ledgerDraw { background: #4a4a3a; color: #ddd; }
 .ledgerOngoing { background: #33342a; color: var(--muted); }
 
-/* On a touch device, a row's fixed-min-width columns (opponent + color +
-   result + time-control + date) don't all fit the viewport - rather than
-   let flex-shrink cram them down past legibility (the page itself can't
-   scroll horizontally at all, see html's overflow-x: hidden), keep every
-   column at its natural width and let them overflow. The scrollbar lives
-   on #gamesLedger itself (one shared scroll position for the whole list,
-   recent rows and filed year/month sections alike), not per-row - a
-   scrollbar on every single row would drift independently and be far
-   fiddlier to use than one shared one. #gamesLedger has no explicit
-   height, so this never clips it vertically - only overflow-x actually
-   triggers (see MDN's overflow-x note: setting only one axis auto still
-   computes the other axis to auto too, but auto never shows a scrollbar
-   on an axis with nothing to clip). Left off the desktop (mouse/trackpad)
-   case entirely since nothing there reported this - .ledgerRow already
-   fits comfortably at typical desktop widths. */
+/* Phones: each game is two tidy lines instead of one squeezed row
+   (owner, 9/27) -
+       vs samarkand_city                 [ Win ]
+       Black · 1 day/move              9/21/2026
+   so the result badges and dates always line up at the right edge, and a
+   long name ends in "..." rather than wrapping and pushing the columns
+   around. .ledgerGameLink becomes display:contents so its four spans can
+   sit in the row's own grid; they're still inside the link, so tapping
+   them still opens the game. Desktop keeps the single-row layout above. */
 @media (pointer: coarse) and (hover: none) {
-    #gamesLedger {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+    .ledgerRow {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas:
+            "opp  opp  result"
+            "color time date";
+        align-items: center;
+        gap: 4px 8px;
+        padding: 9px 4px;
     }
 
     .ledgerOpponent {
-        flex: 0 0 auto;
-        min-width: 90px;
+        grid-area: opp;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .ledgerGameLink {
-        flex-shrink: 0;
+        display: contents;
+    }
+
+    .ledgerResult {
+        grid-area: result;
+        justify-self: end;
+    }
+
+    .ledgerColor {
+        grid-area: color;
+        min-width: 0;
+    }
+
+    .ledgerTimeControl {
+        grid-area: time;
+        min-width: 0;
+    }
+    .ledgerTimeControl:not(:empty)::before {
+        content: '· ';
+    }
+
+    .ledgerDate {
+        grid-area: date;
+        justify-self: end;
     }
 }
 
@@ -1838,9 +1932,10 @@ a.ledgerOpponent:hover {
     #boardWrap.fakeFullscreen #mobilePrompt {
         transform: translate(-7px, 7px);
     }
-    /* Strike/Raise keep their original rounded shape - lightened a step
-       past var(--panel) (the same lighter olive used for ordinary
-       dropdowns), and always kept lighter than #mobilePrompt below. */
+    /* Strike/Raise keep their original rounded shape - a neutral gray a
+       couple of steps lighter than the #mobilePrompt console below (owner,
+       9/28: the old olive rgb(88,91,73) read as green), and always kept
+       lighter than it. */
     #boardWrap:fullscreen #mobileStrikeBtn,
     #boardWrap.fakeFullscreen #mobileStrikeBtn,
     #boardWrap:fullscreen #mobileRaiseBtn,
@@ -1849,8 +1944,8 @@ a.ledgerOpponent:hover {
         text-align: center;
         white-space: nowrap;
         border-radius: 4px;
-        background: rgb(88, 91, 73);
-        border: 1px solid rgb(110, 113, 95);
+        background: rgb(74, 74, 74);
+        border: 1px solid rgb(100, 100, 100);
         /* Same font/weight/color as desktop's own canvas-drawn Strike/
            Raise buttons (render.js's drawCastButtons: '600 20px "Cinzel
            Web", Georgia, serif', pure white) - main.js sets an actual px
@@ -1863,7 +1958,7 @@ a.ledgerOpponent:hover {
     /* Console-panel look: sharp corners, and left-justified text with a
        little padding after the left edge instead of centered. Lightened a
        step from its original near-black, but stays deliberately darker
-       than the Strike/Raise buttons above (rgb(88,91,73)) regardless of
+       than the Strike/Raise buttons above (rgb(74,74,74)) regardless of
        any further tweak to either - that contrast is the point of the
        "console" look. */
     #boardWrap:fullscreen #mobilePrompt,
@@ -2326,16 +2421,10 @@ a.ledgerOpponent:hover {
            across all 13 cards - guaranteed to fit exactly, on any device,
            rather than a fixed guessed pixel height that happened to work
            for one screen size and overflowed on another. aspect-ratio then
-           derives each card's WIDTH from that computed height - matched to
-           card_back.png's own real 680x336 (2.02:1) ratio specifically,
-           since that's CARD_BACK_PRESETS[0], the default theme's (Green)
-           card back, not an in-between guess. The other card-back art
-           (dead_card0.png, 881x561, ~1.57:1 - shown on the Brown/Gray
-           themes) will letterbox a bit more via object-fit:contain since
-           it doesn't match this ratio as closely, but that trades off
-           correctness for the theme most people will actually see by
-           default against a theme most won't, rather than fitting neither
-           particularly well. */
+           derives each card's WIDTH from that computed height at 680:336
+           (2.02:1) - the exact shape every theme's 'wide' card back
+           (assets/misc/card_backs/*_wide.png, render.js CARD_BACK_PRESETS)
+           is cut to, so a used card's back fills it without stretching. */
         #boardWrap:fullscreen .mobileDeckCard,
         #boardWrap.fakeFullscreen .mobileDeckCard {
             flex: 1;
@@ -2633,34 +2722,75 @@ body.cardStyle .mobileDeckCard {
 .modReportButtons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .modReportSubmit { background: rgb(159, 43, 104); border-color: rgb(159, 43, 104); color: #fff; }
 
-/* Fullscreen nudge (see #fullscreenHint in index.html): phones only, laid
-   over the blank top-right squares of the normal board. main.js sets its
-   left/top/width/height/font-size from the canvas and toggles [hidden]
-   (game loaded + not fullscreen). */
-#fullscreenHint {
+/* Phones: the two Play buttons stacked on the left and, while a game is
+   being played or viewed, a big square fullscreen button to their right
+   (#phoneFullscreenBtn - main.js toggles [hidden]). The small round
+   fullscreen button that used to float over the page is retired in favour
+   of it (owner, 9/27). Desktop never shows either. */
+#playModeButtons {
+    display: contents;
+}
+#phoneFullscreenBtn {
     display: none;
 }
 @media (pointer: coarse) and (hover: none) {
-    #fullscreenHint:not([hidden]) {
+    #playModes {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 12px;
+    }
+    /* the Play buttons at their natural widths - side by side when they
+       fit, one above the other when not (main.js adds .stacked) */
+    #playModeButtons {
         display: flex;
-        position: absolute;
-        z-index: 5;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 10px;
+        min-width: 0;
+    }
+    #playModes.stacked #playModeButtons {
+        flex-direction: column;
+    }
+    /* Old dark panel colour. Short "⛶ Full screen" rectangle beside a single
+       row of Play buttons; a ~72px square beside a stacked pair. */
+    #phoneFullscreenBtn:not([hidden]) {
+        grid-column: 2;
+        display: flex;
         align-items: center;
         justify-content: center;
-        padding: 0 4px;
-        overflow: hidden;
-        background: rgba(20, 20, 16, 0.82);
-        border: 1px solid var(--panel-border);
+        gap: 6px;
+        padding: 6px 12px;
         border-radius: 6px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
         color: var(--text);
-        font: inherit;
-        line-height: 1.1;
-        text-align: center;
+        white-space: nowrap;
         cursor: pointer;
     }
-    #boardWrap:fullscreen #fullscreenHint,
-    #boardWrap.fakeFullscreen #fullscreenHint {
-        display: none;
+    #playModes.stacked #phoneFullscreenBtn:not([hidden]) {
+        align-self: stretch;
+        flex-direction: column;
+        gap: 3px;
+        width: 72px;
+        min-height: 72px;
+        padding: 4px;
+        white-space: normal;
+    }
+    #phoneFullscreenBtn .fsIcon {
+        font-size: 18px;
+        line-height: 1;
+    }
+    #playModes.stacked #phoneFullscreenBtn .fsIcon {
+        font-size: 26px;
+    }
+    #phoneFullscreenBtn .fsLabel {
+        font-size: 13px;
+        line-height: 1.1;
+        text-align: center;
+    }
+    #mobileFullscreenBtn {
+        display: none !important;
     }
 }
 
@@ -2751,7 +2881,7 @@ body.cardStyle .mobileDeckCard {
     text-align: center;
 }
 
-#playersSignedOutNote a { color: var(--accent); }
+#playersSignedOutNote a { color: var(--link); }
 
 /* avatar with a presence dot in its corner */
 .playerAvatar {
@@ -2889,11 +3019,12 @@ body.cardStyle .mobileDeckCard {
     white-space: nowrap;
 }
 
+/* Light electric blue, matching the site's links (owner, 9/27). */
 .challengeBtn,
 .primaryBtn {
-    background: var(--accent, #8fb56a);
+    background: var(--link, #6fd0ff);
     color: #15160f;
-    border: 1px solid var(--accent, #8fb56a);
+    border: 1px solid var(--link, #6fd0ff);
     font-weight: bold;
 }
 
@@ -3121,7 +3252,7 @@ body.cardStyle .mobileDeckCard {
 }
 
 #challengeDialogStatus.ok { color: var(--online, #6cc070); }
-#challengeDialogStatus.ok a { color: var(--text); }
+#challengeDialogStatus.ok a { color: var(--link); }
 #challengeDialogStatus.error { color: #e5837a; }
 
 #challengeDialogButtons {
@@ -3246,3 +3377,358 @@ body.cardStyle .mobileDeckCard {
 .tutVideo { max-width: 100%; aspect-ratio: 16 / 9; }
 .tutClipId { font-family: monospace; font-weight: bold; color: #8fb56a; }
 .tutClipDesc { font-size: 0.9em; max-width: 440px; }
+
+
+/* ---- wide desktop layout ------------------------------------------------
+   Only when main.js applyWideLayout() has set body.wideLayout (>= 1500px
+   window, mouse + hover): the side panels sit in two rails either side of
+   the board (#wideLeft / #wideRight), lined up with the canvas's own top
+   and bottom edges (main.js alignWideRails sets their margin-top/height;
+   sizeWideLayout sets #boardWrap's width - never above 1000px). Nothing in
+   this block applies below the breakpoint. */
+body.wideLayout {
+    --wideRailW: clamp(260px, 17vw, 310px);
+    --wideGap: 24px;
+}
+
+body.wideLayout #stage {
+    display: grid;
+    grid-template-columns: var(--wideRailW) auto var(--wideRailW);
+    justify-content: center;
+    align-items: start;
+    column-gap: var(--wideGap);
+    padding: 0 20px;
+}
+
+body.wideLayout #boardWrap {
+    max-width: none;
+    margin: 0 0 16px;
+}
+
+body.wideLayout #belowBoard {
+    display: none; /* everything in it now lives in the rails */
+}
+
+.wideRail:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+}
+
+/* The shared card look: every panel in the rails. */
+body.wideLayout .wideCard,
+body.wideLayout #playModes,
+body.wideLayout #chatPanel,
+body.wideLayout #liveGamesPanel,
+body.wideLayout #displayPanel {
+    margin: 0;
+    padding: 14px 16px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* Card headings: Cinzel, spaced capitals, with a silver hairline fading
+   out to the right. */
+.wideCardTitle,
+body.wideLayout #liveGamesPanel h2,
+body.wideLayout #playModes::before,
+body.wideLayout #chatPanel::before {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 12px;
+    font-family: 'Cinzel Web', Georgia, serif;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.wideCardTitle::after,
+body.wideLayout #liveGamesPanel h2::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, #8a9098, transparent);
+    opacity: 0.5;
+}
+body.wideLayout #playModes::before { content: 'Play'; }
+body.wideLayout #chatPanel::before { content: 'Chat'; margin-bottom: 4px; }
+
+/* -- left rail -- */
+
+body.wideLayout #playModes {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 10px;
+    max-width: none;
+}
+
+body.wideLayout .playModeBand {
+    width: 100%;
+}
+
+/* Same dark button look as everywhere else, just full width here. */
+body.wideLayout .playModeTrigger {
+    width: 100%;
+    padding: 9px 12px;
+}
+
+/* The options open in place inside the card instead of as a popover. */
+body.wideLayout .playModePanel {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin-top: 8px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.18);
+    box-shadow: none;
+    border-radius: 5px;
+}
+
+body.wideLayout #newGamePanel {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 10px;
+}
+body.wideLayout #newGamePanel label {
+    display: contents; /* label text + select become the two grid columns */
+}
+body.wideLayout #newGamePanel select,
+body.wideLayout #challengeSend input,
+body.wideLayout #challengeSend select {
+    width: 100%;
+    min-width: 0;
+}
+body.wideLayout #newGameBtn {
+    grid-column: 1 / -1;
+    padding: 7px;
+}
+body.wideLayout #challengeSend {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+/* Chat in a game against a person, Live Games otherwise - whichever is
+   showing takes the rail's spare height and scrolls inside itself. */
+body.wideLayout #chatPanel:not([hidden]) ~ #liveGamesPanel {
+    display: none;
+}
+body.wideLayout #chatPanel:not([hidden]),
+body.wideLayout #liveGamesPanel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+body.wideLayout #chatMessages,
+body.wideLayout #liveGamesList {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+}
+body.wideLayout #chatReportBtn {
+    align-self: flex-end;
+    font-size: 0.8em;
+}
+
+body.wideLayout #displayPanel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 0.9em;
+}
+body.wideLayout #displaySettingsBtn,
+body.wideLayout #flipBoardBtn {
+    width: 100%;
+    padding: 8px 6px;
+}
+
+/* -- right rail -- */
+
+body.wideLayout #wideMovesCard {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+body.wideLayout #movesPanel:not([hidden]) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+body.wideLayout #movesToggleBtn {
+    display: none; /* always open here */
+}
+body.wideLayout #movesList:not([hidden]) {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    border-top: none;
+    font-size: 0.95em;
+}
+
+#wideMovesPlaceholder {
+    flex: 1;
+    margin: 0;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.9em;
+}
+body.wideLayout #movesPanel:not([hidden]) + #wideMovesPlaceholder {
+    display: none;
+}
+
+body.wideLayout #historyControls {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 10px;
+}
+body.wideLayout #historyControls button {
+    min-width: 0;
+    padding: 7px 0;
+}
+
+/* Abort / Resign / Offer Draw (and Accept / Decline). Hidden altogether
+   while there's nothing to show (no game, or browsing history). */
+body.wideLayout #wideActionsCard:not(:has(#quickActions > button:not([hidden]), #gameActions:not([hidden]))) {
+    display: none;
+}
+body.wideLayout #quickActions,
+body.wideLayout #gameActions:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+body.wideLayout #quickActions:not(:has(button:not([hidden]))) {
+    display: none;
+}
+body.wideLayout #gameActions:not([hidden]) {
+    margin-top: 8px;
+}
+body.wideLayout #quickActions:not(:has(button:not([hidden]))) + #gameActions {
+    margin-top: 0;
+}
+body.wideLayout #quickActions button,
+body.wideLayout #gameActions button {
+    flex: 1 1 40%;
+    padding: 8px 10px;
+}
+
+/* They carry justify-self from #belowBoard's grid (center/start/end), which
+   current browsers also honour in block layout - that would shrink-wrap
+   them here instead of spanning the card. */
+body.wideLayout #quickActions,
+body.wideLayout #gameActions,
+body.wideLayout #displayPanel,
+body.wideLayout #historyControls {
+    justify-self: stretch;
+}
+
+/* The status line empties (and shrinks) once a game starts; keeping its
+   height fixed here stops the board resizing/shifting at that moment. */
+body.wideLayout #statusLine {
+    box-sizing: border-box;
+    min-height: 34px;
+}
+
+/* ---- phone header while signed out (owner, 9/27) ------------------------
+   One row - hamburger, title, Log In - instead of two, with the sign-in
+   fields in a drop-down panel under the header (#authPanel.phoneOpen,
+   main.js). It also opens by itself for the username step after sign-up.
+   Signed in, the header is unchanged. Desktop never shows #phoneLogInBtn. */
+#phoneLogInBtn {
+    display: none;
+}
+@media (pointer: coarse) and (hover: none) {
+    header:has(#authPanel:not([hidden])) {
+        position: relative;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "nav title login";
+        column-gap: 10px;
+    }
+    header:has(#authPanel:not([hidden])) #headerLeft {
+        justify-content: center;
+        min-width: 0;
+    }
+    header:has(#authPanel:not([hidden])) h1 {
+        /* shrinks with the screen so it never runs under Log In: ~23px on
+           a 412px phone, ~17px on a 360px one */
+        font-size: clamp(14px, calc((100vw - 216px) / 8.6), 23px);
+        margin-top: 3px;
+        white-space: nowrap;
+    }
+    header:has(#authPanel:not([hidden])) #siteLogo {
+        height: 28px;
+    }
+    #phoneLogInBtn:not([hidden]) {
+        display: block;
+        grid-area: login;
+        align-self: center;
+        padding: 7px 12px;
+        font-size: 0.9em;
+    }
+    #phoneLogInBtn.active {
+        background: #40412f;
+    }
+
+    /* the drop-down itself */
+    #authPanel:not([hidden]) {
+        display: none;
+    }
+    #authPanel.phoneOpen:not([hidden]),
+    #authPanel:not([hidden]):has(#authUsername:not([hidden])) {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        position: absolute;
+        /* span the whole header row: an absolutely placed grid child is
+           sized against its grid area, not the header */
+        grid-area: 1 / 1 / 2 / -1;
+        justify-self: stretch; /* the base phone rule's "end" would shrink-wrap it */
+        top: calc(100% + 14px);
+        right: 0;
+        left: 0;
+        z-index: 40;
+        padding: 14px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    }
+    #authPanel #authStatus,
+    #authPanel #authEmail,
+    #authPanel #authPassword,
+    #authPanel #authUsername,
+    #authPanel #claimUsernameBtn,
+    #authPanel #forgotPasswordBtn {
+        grid-column: 1 / -1;
+    }
+    #authPanel #authStatus:empty {
+        display: none;
+    }
+    #authPanel input {
+        width: auto;
+        min-width: 0;
+        padding: 9px 10px;
+        font-size: 1em;
+    }
+    #authPanel button {
+        padding: 9px 6px;
+        font-size: 0.95em;
+    }
+    #authPanel #forgotPasswordBtn {
+        padding: 4px;
+        font-size: 0.9em;
+        text-align: center;
+    }
+}

@@ -817,7 +817,21 @@ class BitboardGameState:
                         enemy_graveyard['queen'] += 1
                         
                     break
-                
+
+            # mate by capture (rulebook, "Preparing for Checkmate"): a raider
+            # landing on the enemy King's house while that king stands on a
+            # non-card square captures the king. The engine had no such rule,
+            # so it neither defended against it nor went for it (seen in a
+            # real game vs Easy, 9/30). Removing the king here lets the
+            # existing is_terminal()/evaluate_board() "king missing" path
+            # score it as the win/loss it is. The server's real rules already
+            # handle this separately (game_session.apply_normal_move).
+            if move.piece_type == 'raider':
+                enemy_king_house = new_bb.BLACK_KING_HOUSE if move.color == 'white' \
+                    else new_bb.WHITE_KING_HOUSE
+                if (to_mask & enemy_king_house) and (enemy_pieces['king'] & ~new_bb.CARD_MASK):
+                    enemy_pieces['king'] = 0
+
             # 2. handle queen spawn
             if move.move_type == "enter_queen_house" and move.spawn_sq is not None:
                 
