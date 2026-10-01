@@ -1040,15 +1040,27 @@ let raisePiece = null;   // 'raider' | 'queen'
 let raiseGraveIdx = null;
 let transientMessage = null; // e.g. "No eligible raider to strike."
 
-// "Necromancer": a player raises on two of their own consecutive turns.
-// Shown in the banner for NECROMANCER_MS, at most once per game per player,
-// and only for moves arriving live - a page load or history browsing never
-// replays it. move_log alternates, White at even indices.
+// "Necromancer": the first time EITHER player raises on two of their own
+// consecutive turns - once per game, full stop (owner, 9/30; it will carry
+// a game consequence later). Found from the game's full move history, so
+// it's the same moment for both players and survives a reload; shown in
+// the banner for NECROMANCER_MS only when that move arrives live - opening
+// or reloading a game never replays it. move_log alternates, White at even
+// indices.
 const NECROMANCER_MS = 4000;
 let necromancer = null; // { color, until }
 let necroGameId = null;
 let necroSeenLength = 0;
-let necroShown = new Set();
+
+// Index of the move that earns Necromancer, or -1 if no one has yet.
+function necromancerPly(history) {
+    for (let i = 2; i < history.length; i++) {
+        if (castKindFromNotation(history[i]) === 'raise' && castKindFromNotation(history[i - 2]) === 'raise') {
+            return i;
+        }
+    }
+    return -1;
+}
 
 function checkNecromancer() {
     if (!state || !gameId) {
@@ -1061,19 +1073,14 @@ function checkNecromancer() {
         // a game just loaded: its past moves are history, not news
         necroGameId = gameId;
         necroSeenLength = history.length;
-        necroShown = new Set();
         necromancer = null;
         return;
     }
-    for (let i = necroSeenLength; i < history.length; i++) {
-        const color = i % 2 === 0 ? 'white' : 'black';
-        if (i >= 2 && !necroShown.has(color)
-            && castKindFromNotation(history[i]) === 'raise'
-            && castKindFromNotation(history[i - 2]) === 'raise') {
-            necroShown.add(color);
-            necromancer = { color, until: Date.now() + NECROMANCER_MS };
-            setTimeout(() => drawCanvas(), NECROMANCER_MS + 50);
-        }
+    const ply = necromancerPly(history);
+    if (ply >= necroSeenLength) { // earned by a move that just arrived
+        const color = ply % 2 === 0 ? 'white' : 'black';
+        necromancer = { color, until: Date.now() + NECROMANCER_MS };
+        setTimeout(() => drawCanvas(), NECROMANCER_MS + 50);
     }
     necroSeenLength = history.length;
 }
