@@ -1528,6 +1528,8 @@ function drawPieces(ctx, state) {
 }
 
 const MOVE_DOT_COLOR = 'rgb(20, 90, 200)';
+const LIGHT_DOT_COLOR = 'rgb(160, 215, 255)';        // for dark blue squares
+const LIGHT_DOT_FILL = 'rgba(160, 215, 255, 0.85)';
 const CAST_DOT_COLOR = 'rgb(159, 43, 104)'; // same accent used for the
                                              // committed button / hovered_dom
 
@@ -1605,10 +1607,13 @@ function drawHighlights(ctx, state, ui) {
     if (ui.legalDestinations) {
         for (const [col, row] of ui.legalDestinations) {
             const captures = state.pieces.some((p) => p.col === col && p.row === row);
+            // Blue board's blue card squares: the usual blue dot vanished
+            // there, so a light, bright sky blue instead (owner, 9/30)
+            const onBlue = THEME.name === 'Blue' && CARD_SQUARES.has(`${col},${row}`);
             if (captures) {
-                drawCaptureRing(ctx, col, row, MOVE_DOT_COLOR);
+                drawCaptureRing(ctx, col, row, onBlue ? LIGHT_DOT_COLOR : MOVE_DOT_COLOR);
             } else {
-                drawDot(ctx, col, row, 'rgba(20, 90, 200, 0.55)');
+                drawDot(ctx, col, row, onBlue ? LIGHT_DOT_FILL : 'rgba(20, 90, 200, 0.55)');
             }
         }
     }

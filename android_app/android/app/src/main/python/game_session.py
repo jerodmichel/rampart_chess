@@ -820,6 +820,15 @@ class GameSession:
         deck_suit = 1 if self.ai_color == "white" else 0
 
         used_cards = [self.board.cards[deck_suit][rank_idx] for rank_idx in engine_move.deck_cards]
+        # The engine only reports the deck cards (plus ONE of the board
+        # squares, as from_sq) - so AI casts were recorded without their
+        # board cards ("--X@7c(A)"), which _replay_notation can't re-check
+        # and so a resumed game couldn't be rebuilt after a restart (found
+        # 9/30). Recover them: from_sq's card, plus - when the combo needs
+        # two - another of the AI's own raider-on-card squares that makes
+        # 21. Board cards are never used up, so any square that fits gives
+        # the identical move.
+        used_cards = used_cards + self._ai_board_cards(engine_move, used_cards)
         cast_type_int = 0 if engine_move.move_type == "strike" else 1
         cast_move = Cast_move(used_cards, target_sq, cast_type_int)
 
@@ -830,6 +839,36 @@ class GameSession:
         else:
             piece_type = "raider"
         return self._execute_cast_move(cast_move, piece_type)
+
+    def _ai_board_cards(self, engine_move, deck_cards):
+        """The board cards behind an AI cast (see request_ai_move): the
+        card on engine_move.from_sq, plus a second own raider-on-card
+        square when the combo is two board cards + one deck card (strikes,
+        queen raises, and raises with a single deck card). Returns [] if
+        nothing fits - then the cast is recorded the old, deck-only way
+        rather than blocking the AI's (already engine-validated) move."""
+        color = self.ai_color
+        clicker = self.board.clicker
+
+        def own_card_squares():
+            for col in range(10):
+                for row in range(1, 5):
+                    sq = self.board.squares[col][row]
+                    if sq.is_card() and sq.has_piece() and sq.piece.name == "raider" \
+                            and sq.piece.color == color:
+                        yield sq
+
+        f_col, f_row = engine_move.from_sq % 10, engine_move.from_sq // 10
+        first = self.board.squares[f_col][f_row]
+        squares = list(own_card_squares())
+        if first not in squares:
+            return []
+        if len(deck_cards) >= 2:   # 1 board card + 2 deck cards (a raise)
+            return [first.card] if clicker.has_sum_21(deck_cards + [first.card]) else []
+        for sq in squares:         # 2 board cards + 1 deck card
+            if sq is not first and clicker.has_sum_21(deck_cards + [first.card, sq.card]):
+                return [first.card, sq.card]
+        return []
 
     # -- serialization ------------------------------------------------------
 

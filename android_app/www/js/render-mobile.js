@@ -228,10 +228,12 @@ function drawHighlights(ctx, state, ui, theme, cell) {
     if (ui.legalDestinations) {
         for (const [col, row] of ui.legalDestinations) {
             const captures = state.pieces.some((p) => p.col === col && p.row === row);
+            // same as desktop: light sky blue on the Blue board's blue squares
+            const onBlue = theme.name === 'Blue' && CARD_SQUARES.has(`${col},${row}`);
             if (captures) {
-                drawCaptureRing(ctx, col, row, cell, CAPTURE_RING_COLOR);
+                drawCaptureRing(ctx, col, row, cell, onBlue ? 'rgb(160, 215, 255)' : CAPTURE_RING_COLOR);
             } else {
-                drawDot(ctx, col, row, cell, MOVE_DOT_COLOR);
+                drawDot(ctx, col, row, cell, onBlue ? 'rgba(160, 215, 255, 0.85)' : MOVE_DOT_COLOR);
             }
         }
     }

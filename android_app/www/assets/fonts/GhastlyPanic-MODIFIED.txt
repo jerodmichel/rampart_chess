@@ -1,0 +1,13 @@
+Rampart's copy of Ghastly Panic (GhastlyPanic.ttf) is lightly modified.
+
+Only the letters E and e were changed: their middle arm was moved down
+toward the centre of the letter (a vertical warp of the stem between the
+top and bottom bars; the arm's hand-drawn shape is unchanged). In the
+original the middle arm sits right under the top bar, which made the E in
+the "Regicide" banner title hard to read. Every other glyph is untouched.
+
+Done 2026-09-30, as the font's licence allows ("Use it however you want,
+for whatever you want" - see GhastlyPanic-ReadMe.txt). The unmodified font
+is kept alongside as GhastlyPanic-original.ttf.
+
+Ghastly Panic is by Chad Savage, sinisterfonts.com.

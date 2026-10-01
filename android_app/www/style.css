@@ -26,7 +26,7 @@
    assets/fonts/GhastlyPanic-ReadMe.txt. */
 @font-face {
     font-family: 'Ghastly Panic Web';
-    src: url('assets/fonts/GhastlyPanic.ttf') format('truetype');
+    src: url('assets/fonts/GhastlyPanic.ttf?v=2') format('truetype');
     font-weight: 400;
 }
 
