@@ -380,6 +380,13 @@ const raiseSound = new Audio('assets/sounds/thunder_raise.mp3');
 // thunders. Deliberately the only "event" sound - Necromancer already has
 // its raise thunder; a serious strategy game shouldn't pile on effects.
 const gameEndSound = new Audio('assets/sounds/draw_resign_checkmate.mp3');
+// ...except mate by capture - the king is literally captured - which gets
+// a death scream instead (Universfield on Pixabay; owner, 9/30).
+const regicideSound = new Audio('assets/sounds/death_scream.mp3');
+// The raise that earns "Necromancer" chants instead of thundering (Yodguard
+// on Pixabay; owner, 9/30) - 3.6s, inside the 4s banner. All three event
+// sounds are level-matched to the bell (sources kept as *_src.mp3).
+const necromancerSound = new Audio('assets/sounds/necromancer.mp3');
 let gameEndSoundedFor = null; // the game whose ending has already been sounded (or that loaded already over)
 // Matches game.py's play_sound(captured) - the plain move/capture click,
 // independent of (and gated by the same effectsEnabled toggle as) the
@@ -1347,9 +1354,18 @@ function toCardSpec(card) {
 
 async function commitCastButton(button) {
     const boardCardCount = clickedCards.filter((c) => c.source === 'board').length;
-    if (button === 'strike' && boardCardCount < 2) return; // has_2_raider_cards
-    if (button === 'raise' && boardCardCount < 1) return; // has_board_card
     if (!handSum21(clickedCards)) return;
+    // A real 21 that just doesn't fit the button: say why instead of the
+    // click doing nothing - the strike one is the desktop client's own
+    // ('strike-needs-2-board'); the raise one is new (owner, 9/30).
+    if (button === 'strike' && boardCardCount < 2) { // has_2_raider_cards
+        showCastHint('Striking requires two board cards.');
+        return;
+    }
+    if (button === 'raise' && boardCardCount < 1) { // has_board_card
+        showCastHint('Raising requires at least one board card.');
+        return;
+    }
 
     clearRaiseChoice();
     setBusy(true);
@@ -1384,6 +1400,16 @@ async function commitCastButton(button) {
     } finally {
         setBusy(false);
     }
+}
+
+function showCastHint(text) {
+    transientMessage = text;
+    drawCanvas();
+}
+
+// Rows 0-2 are Black's half of the board, 3-5 White's.
+function inOwnHalf(color, row) {
+    return color === 'white' ? row >= 3 : row <= 2;
 }
 
 // The prompt text plus what kind of message it is, for the desktop banner
@@ -2151,9 +2177,10 @@ function checkGameEndSound() {
     if (!state || !gameId || !isGameOver(state) || gameEndSoundedFor === gameId) return;
     gameEndSoundedFor = gameId;
     if (effectsEnabled) {
+        const audio = state.result.reason === 'mate_by_capture' ? regicideSound : gameEndSound;
         try {
-            gameEndSound.currentTime = 0;
-            gameEndSound.play().catch(() => {});
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
         } catch (_) { /* ignore */ }
     }
 }
@@ -2181,10 +2208,23 @@ function renderAll() {
 async function afterStateUpdate(notation, casterColor, captured) {
     if (notation !== undefined) lastMoveSquares = parseLastMoveSquares(notation);
     const castKind = castKindFromNotation(notation);
+    // Does this move earn the Necromancer banner? Checked here, before the
+    // cast sound, so that raise can chant instead of thunder (renderAll's
+    // own later checkNecromancer call then finds nothing new).
+    const necromancerBefore = necromancer;
+    checkNecromancer();
+    const earnedNecromancer = necromancer !== necromancerBefore && necromancer !== null;
     if (castKind && casterColor && effectsEnabled) {
         triggerLightning(casterColor);
         triggerLightningMobile(casterColor, mobileCell);
-        playCastSound(castKind);
+        if (earnedNecromancer) {
+            try {
+                necromancerSound.currentTime = 0;
+                necromancerSound.play().catch(() => {});
+            } catch (_) { /* ignore */ }
+        } else {
+            playCastSound(castKind);
+        }
         ensureAnimationLoop();
     }
     // Matches game.py's play_sound(captured) - fires for the underlying
@@ -2616,6 +2656,12 @@ canvas.addEventListener('click', async (evt) => {
             } finally {
                 setBusy(false);
             }
+        } else if (committedButton === 'raise' && castDestinations.length && !inOwnHalf(humanColor(), row)) {
+            // a tap on the far side of the board while raising
+            showCastHint('You can only raise in your own territory.');
+        } else if (committedButton === 'strike' && inOwnHalf(humanColor(), row)) {
+            // a tap on your own side while striking
+            showCastHint('You can only strike raiders in enemy territory.');
         }
         return;
     }
