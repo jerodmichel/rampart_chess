@@ -35,10 +35,26 @@ export { DESIGN_WIDTH, DESIGN_HEIGHT };
 // ported as-is (light bg, dark bg, light trace, dark trace).
 export const THEME_PRESETS = [
     { name: 'Green', bgLight: 'rgb(234, 235, 200)', bgDark: 'rgb(119, 154, 88)', traceLight: 'rgb(244, 247, 116)', traceDark: 'rgb(172, 195, 51)' },
-    { name: 'Brown', bgLight: 'rgb(241, 222, 188)', bgDark: 'rgb(165, 117, 80)', traceLight: 'rgb(245, 234, 100)', traceDark: 'rgb(209, 185, 59)' },
-    { name: 'Blue', bgLight: 'rgb(229, 228, 200)', bgDark: 'rgb(60, 95, 135)', traceLight: 'rgb(123, 187, 227)', traceDark: 'rgb(43, 119, 191)' },
-    { name: 'Gray', bgLight: 'rgb(222, 219, 210)', bgDark: 'rgb(86, 85, 84)', traceLight: 'rgb(99, 126, 143)', traceDark: 'rgb(82, 102, 128)' },
+    { name: 'Brown', bgLight: 'rgb(241, 222, 188)', bgDark: 'rgb(165, 117, 80)', traceLight: 'rgb(245, 234, 100)', traceDark: 'rgb(209, 185, 59)', swapSquares: true, bgPlain: 'rgb(196, 158, 122)' },
+    { name: 'Blue', bgLight: 'rgb(229, 228, 200)', bgDark: 'rgb(60, 95, 135)', traceLight: 'rgb(123, 187, 227)', traceDark: 'rgb(43, 119, 191)', swapSquares: true, bgPlain: 'rgb(96, 130, 160)' },
+    { name: 'Gray', bgLight: 'rgb(222, 219, 210)', bgDark: 'rgb(86, 85, 84)', traceLight: 'rgb(99, 126, 143)', traceDark: 'rgb(82, 102, 128)', swapSquares: true, bgPlain: 'rgb(138, 137, 135)' },
 ];
+
+// Card squares normally take the dark color and plain squares the light
+// one. Brown, Blue and Gray swap that (owner, 10/1): the red card indices
+// didn't contrast on their dark colors, so the cards go cream there.
+export function cardSquareColor(theme) {
+    return theme.swapSquares ? theme.bgLight : theme.bgDark;
+}
+// bgPlain: a lighter shade than bgDark for those swapped plain squares
+// (owner, 10/1), still darker than the cream cards.
+export function plainSquareColor(theme) {
+    return theme.swapSquares ? (theme.bgPlain || theme.bgDark) : theme.bgLight;
+}
+// Whether this square is drawn in the theme's dark color.
+export function isDarkSquare(theme, col, row) {
+    return CARD_SQUARES.has(`${col},${row}`) !== Boolean(theme.swapSquares);
+}
 
 let THEME = THEME_PRESETS[0];
 
@@ -506,9 +522,10 @@ function drawBanner(ctx, info, ui) {
 
     ctx.save();
     roundedRectPath(ctx, r.x, r.y, r.w, r.h, 4);
-    ctx.fillStyle = 'rgb(52, 52, 52)';
+    // a step lighter on the swapped boards, a little on Green (owner, 10/1)
+    ctx.fillStyle = THEME.swapSquares ? 'rgb(68, 68, 68)' : 'rgb(62, 62, 62)';
     ctx.fill();
-    ctx.strokeStyle = 'rgb(80, 80, 80)';
+    ctx.strokeStyle = THEME.swapSquares ? 'rgb(96, 96, 96)' : 'rgb(90, 90, 90)';
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.clip();
@@ -969,7 +986,7 @@ function drawBoardSquares(ctx) {
             }
             const x = boardColX(col);
             const y = rowY(row);
-            ctx.fillStyle = isCard ? THEME.bgDark : THEME.bgLight;
+            ctx.fillStyle = isCard ? cardSquareColor(THEME) : plainSquareColor(THEME);
             ctx.fillRect(x, y, RWIDTH - 2, RHEIGHT - 2);
             drawSquareBevel(ctx, x, y, RWIDTH - 2, RHEIGHT - 2);
         }
@@ -984,7 +1001,7 @@ function drawBoardSquares(ctx) {
     ctx.clip();
     for (const c of cards) castCardShadow(ctx, c.x, c.y, w, h, Math.max(2, Math.min(w, h) * 0.07), 2, 3, 7, 0.38);
     ctx.restore();
-    for (const c of cards) drawCardSquare(ctx, c.x, c.y, w, h, THEME.bgDark, c.card);
+    for (const c of cards) drawCardSquare(ctx, c.x, c.y, w, h, cardSquareColor(THEME), c.card);
 }
 
 // A soft shadow shaped like the card, offset down-right. Only the shadow is
@@ -1069,7 +1086,7 @@ function drawRowLetters(ctx) {
     for (let row = 0; row < ROWS; row++) {
         // matches game.py's row-letter color rule exactly - not the same
         // condition as CARD_SQUARES (that one depends on col too).
-        const useDark = row === 5 || row % 2 === 0;
+        const useDark = (row === 5 || row % 2 === 0) !== Boolean(THEME.swapSquares);
         ctx.fillStyle = useDark ? THEME.bgDark : THEME.bgLight;
         const label = ROW_LETTERS[row];
         const y = rowY(row) + RHEIGHT - 25;
@@ -1095,7 +1112,7 @@ function drawColumnNumbers(ctx) {
         // the original (logical) bottom-row square, not whichever edge it
         // visually lands on when flipped.
         const isCardSquare = CARD_SQUARES.has(`${col},${ROWS - 1}`);
-        ctx.fillStyle = isCardSquare ? THEME.bgLight : THEME.bgDark;
+        ctx.fillStyle = isCardSquare !== Boolean(THEME.swapSquares) ? THEME.bgLight : THEME.bgDark;
         const label = String(col + 1);
         const x = boardColX(col) + RWIDTH - 25;
         const y = rowY(ROWS - 1) + RHEIGHT - 25;
@@ -1594,7 +1611,8 @@ function drawHighlights(ctx, state, ui) {
             // Plain squares: a bolder, darker frame (owner, 9/30) - the
             // theme's trace color at 4px vanished on the cream squares and
             // under the bevel. Card squares keep the original yellow frame.
-            if (CARD_SQUARES.has(`${col},${row}`)) {
+            // Keyed on light/dark, so it follows the swapped themes.
+            if (isDarkSquare(THEME, col, row)) {
                 strokeSquareFrame(ctx, col, row, THEME.traceLight);
             } else {
                 strokeSquareFrame(ctx, col, row, darkenRgb(THEME.traceDark, 0.2), 6);
@@ -1609,7 +1627,7 @@ function drawHighlights(ctx, state, ui) {
             const captures = state.pieces.some((p) => p.col === col && p.row === row);
             // Blue board's blue card squares: the usual blue dot vanished
             // there, so a light, bright sky blue instead (owner, 9/30)
-            const onBlue = THEME.name === 'Blue' && CARD_SQUARES.has(`${col},${row}`);
+            const onBlue = THEME.name === 'Blue' && isDarkSquare(THEME, col, row);
             if (captures) {
                 drawCaptureRing(ctx, col, row, onBlue ? LIGHT_DOT_COLOR : MOVE_DOT_COLOR);
             } else {
@@ -1636,11 +1654,17 @@ function drawHighlights(ctx, state, ui) {
         // A shade darker and a pixel thicker on the plain squares (owner,
         // 9/28) - the bevel's edges run right where this ring does and had
         // swallowed it. Card squares keep the original ring.
+        // On the swapped boards (owner, 10/1) both grays vanished: a dark
+        // ring on the cream cards, a near-white one on the plain squares.
         const { col, row } = ui.hoverSquare;
         const plain = !CARD_SQUARES.has(`${col},${row}`);
-        ctx.strokeStyle = plain ? 'rgb(150, 150, 150)' : 'rgb(180, 180, 180)';
-        ctx.lineWidth = plain ? 4 : 3;
-        const inset = plain ? 2 : 1;
+        if (THEME.swapSquares) {
+            ctx.strokeStyle = plain ? 'rgb(245, 245, 240)' : 'rgb(70, 70, 70)';
+        } else {
+            ctx.strokeStyle = plain ? 'rgb(150, 150, 150)' : 'rgb(180, 180, 180)';
+        }
+        ctx.lineWidth = plain || THEME.swapSquares ? 4 : 3;
+        const inset = plain || THEME.swapSquares ? 2 : 1;
         ctx.strokeRect(boardColX(col) + inset, rowY(row) + inset, RWIDTH - 2 - 2 * inset, RHEIGHT - 2 - 2 * inset);
     }
 }
@@ -1683,9 +1707,18 @@ function drawButtonHover(ctx, ui) {
 // Green and Brown get a deeper silver (owner, 9/27) - the standard one read
 // too pale against their lighter boards. Darkened again to a gunmetal
 // (owner, 9/28), with a bright band near the top to keep it reading metallic.
+// Gray joined them (owner, 10/1) once its plain squares were lightened.
 function castButtonFill(ctx, rect) {
-    const deep = THEME.name === 'Green' || THEME.name === 'Brown';
+    const deep = THEME.name === 'Green' || THEME.name === 'Brown' || THEME.name === 'Gray';
     const g = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.h);
+    if (THEME.name === 'Green') {
+        // the gunmetal lifted a little for Green (owner, 10/1)
+        g.addColorStop(0, 'rgb(126, 129, 135)');
+        g.addColorStop(0.18, 'rgb(154, 157, 163)');
+        g.addColorStop(0.5, 'rgb(96, 99, 105)');
+        g.addColorStop(1, 'rgb(72, 74, 79)');
+        return { fill: g, edge: 'rgb(146, 149, 155)' };
+    }
     if (deep) {
         g.addColorStop(0, 'rgb(112, 115, 121)');
         g.addColorStop(0.18, 'rgb(140, 143, 149)');

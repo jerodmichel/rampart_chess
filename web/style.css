@@ -1970,6 +1970,31 @@ a.ledgerOpponent:hover {
         background: rgb(52, 52, 52);
         border: 1px solid rgb(80, 80, 80);
     }
+    /* A step lighter on Brown/Blue/Gray (owner, 10/1) - main.js sets
+       body[data-board-theme]; still darker than Strike/Raise's 74. */
+    body[data-board-theme="Brown"] #boardWrap:fullscreen #mobilePrompt,
+    body[data-board-theme="Brown"] #boardWrap.fakeFullscreen #mobilePrompt,
+    body[data-board-theme="Blue"] #boardWrap:fullscreen #mobilePrompt,
+    body[data-board-theme="Blue"] #boardWrap.fakeFullscreen #mobilePrompt,
+    body[data-board-theme="Gray"] #boardWrap:fullscreen #mobilePrompt,
+    body[data-board-theme="Gray"] #boardWrap.fakeFullscreen #mobilePrompt {
+        background: rgb(68, 68, 68);
+        border-color: rgb(96, 96, 96);
+    }
+    /* Green: console and Strike/Raise each a little lighter (owner, 10/1),
+       buttons still lighter than the console. */
+    body[data-board-theme="Green"] #boardWrap:fullscreen #mobilePrompt,
+    body[data-board-theme="Green"] #boardWrap.fakeFullscreen #mobilePrompt {
+        background: rgb(62, 62, 62);
+        border-color: rgb(90, 90, 90);
+    }
+    body[data-board-theme="Green"] #boardWrap:fullscreen #mobileStrikeBtn:not(.active),
+    body[data-board-theme="Green"] #boardWrap.fakeFullscreen #mobileStrikeBtn:not(.active),
+    body[data-board-theme="Green"] #boardWrap:fullscreen #mobileRaiseBtn:not(.active),
+    body[data-board-theme="Green"] #boardWrap.fakeFullscreen #mobileRaiseBtn:not(.active) {
+        background: rgb(84, 84, 84);
+        border-color: rgb(110, 110, 110);
+    }
     /* Shows which one is the currently-committed cast action (main.js
        toggles this from ui.committedButton) - same idea as desktop's own
        pressed/active button styling, so tapping Strike/Raise gives visible

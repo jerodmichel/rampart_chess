@@ -951,10 +951,16 @@ PIECE_SET_NAMES.forEach(({ key, label }) => {
 // Board style and piece style survive a refresh, like the two checkboxes
 // above: a per-browser display preference in localStorage. The theme is
 // stored by name, so it still resolves if THEME_PRESETS is ever reordered.
+// Lets style.css theme the DOM bits (the phone fullscreen console).
+function markBoardTheme(index) {
+    document.body.dataset.boardTheme = (THEME_PRESETS[index] || THEME_PRESETS[0]).name;
+}
+markBoardTheme(0);
 try {
     const savedTheme = THEME_PRESETS.findIndex((t) => t.name === localStorage.getItem('rampart.theme'));
     if (savedTheme >= 0) {
         setTheme(savedTheme);
+        markBoardTheme(savedTheme);
         themeSelect.value = String(savedTheme);
     }
     const savedPieceSet = localStorage.getItem('rampart.pieceSet');
@@ -965,6 +971,7 @@ try {
 } catch (_) { /* localStorage unavailable */ }
 themeSelect.addEventListener('change', () => {
     setTheme(Number(themeSelect.value));
+    markBoardTheme(Number(themeSelect.value));
     try { localStorage.setItem('rampart.theme', THEME_PRESETS[Number(themeSelect.value)].name); } catch (_) { /* ignore */ }
     drawCanvas();
 });
