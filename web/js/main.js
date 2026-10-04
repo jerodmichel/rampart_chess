@@ -130,6 +130,7 @@ function syncCanvasResolution() {
 // canvas.style.width/height directly (in real CSS px, not %) rather than
 // deferring to style.css, unlike syncCanvasResolution() above.
 let mobileCell = 0;
+const FULLSCREEN_CLOCK_LINE = 18;
 
 function syncMobileCanvasResolution() {
     // Reset any downward offset a previous call may have applied (see
@@ -154,8 +155,14 @@ function syncMobileCanvasResolution() {
     // ballooned it. Adding scrollTop back gives the unscrolled distance.
     const spaceAboveCanvas = canvas.getBoundingClientRect().top +
         (document.getElementById('boardWrap')?.scrollTop || 0);
+    // The fullscreen names row's second line (the small .slotClock - 16px
+    // + 2px gap, see style.css) is deliberately left out: the board gets
+    // the same height as the live vs-AI view, which had only the name line
+    // above it, and the player scrolls down that little bit instead.
+    const inFullscreen = Boolean(document.fullscreenElement) || isFakeFullscreenActive();
+    const clockLine = inFullscreen && !playerNamesBar.hidden ? FULLSCREEN_CLOCK_LINE : 0;
     const availableWidth = window.innerWidth;
-    const availableHeight = Math.max(100, window.innerHeight - spaceAboveCanvas);
+    const availableHeight = Math.max(100, window.innerHeight - spaceAboveCanvas + clockLine);
     const cell = computeCellSize(availableWidth, availableHeight);
     const { width, height } = boardSize(cell);
     const dpr = window.devicePixelRatio || 1;
@@ -237,9 +244,21 @@ mobileFullscreenBtn.addEventListener('click', () => {
 mobileExitFullscreenBtn.addEventListener('click', () => {
     exitMobileFullscreen().catch(() => {});
 });
+// Always redraw here, even if the canvas size didn't change - the phone
+// overlay (console, Strike/Raise) is only positioned during a mobile draw.
 onLayoutModeChange(() => {
-    if (syncActiveCanvasResolution()) drawCanvas();
+    syncActiveCanvasResolution();
+    drawCanvas();
 });
+// The overlay is placed from the canvas's POSITION, which the side panels
+// shift as they fill in after entering fullscreen - the canvas ResizeObserver
+// above only sees SIZE changes, so the console sat stale until the next tap.
+const overlayPositionObserver = new ResizeObserver(() => {
+    if (isMobileBoardActive()) positionMobileCastOverlay();
+});
+for (const id of ['mobileBoardRow', 'mobileSideLeft', 'mobileSideRight']) {
+    overlayPositionObserver.observe(document.getElementById(id));
+}
 
 // The empty board (no game loaded) shows a watermark that alternates between
 // the crown and the alchemy queen. Chosen from the wall clock, not at random,
@@ -321,6 +340,14 @@ const whiteClockEl = document.getElementById('whiteClock');
 const blackClockEl = document.getElementById('blackClock');
 const whitePlayerSlot = document.getElementById('whitePlayerSlot');
 const blackPlayerSlot = document.getElementById('blackPlayerSlot');
+// Small per-name copies of the clocks - only shown in fullscreen, where
+// style.css hides the separate #clocks bar so the board gets the same
+// height as an AI game (names row only). Re-appended to the slots after
+// every refreshPlayerLabels(), since buildPlayerEntry() clears them.
+const whiteSlotClockEl = document.createElement('span');
+const blackSlotClockEl = document.createElement('span');
+whiteSlotClockEl.className = blackSlotClockEl.className = 'slotClock';
+whiteSlotClockEl.hidden = blackSlotClockEl.hidden = true;
 const chatPanel = document.getElementById('chatPanel');
 const chatMessagesEl = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
@@ -1966,9 +1993,11 @@ function updateNamesClocksOrder() {
 function updateClocks() {
     if (!state || !state.time_control) {
         clocksBar.hidden = true;
+        whiteSlotClockEl.hidden = blackSlotClockEl.hidden = true;
         return;
     }
     clocksBar.hidden = false;
+    whiteSlotClockEl.hidden = blackSlotClockEl.hidden = false;
     // Frozen (no live interpolation) while over, while browsing a past
     // position, or before white's first move has actually started the
     // clock (see clock_running in game_session.py) - state itself is still
@@ -1986,6 +2015,10 @@ function updateClocks() {
     blackClockEl.textContent = `Black: ${formatClock(blackMs)}`;
     whiteClockEl.classList.toggle('clockActive', !frozen && state.next_player === 'white');
     blackClockEl.classList.toggle('clockActive', !frozen && state.next_player === 'black');
+    whiteSlotClockEl.textContent = formatClock(whiteMs);
+    blackSlotClockEl.textContent = formatClock(blackMs);
+    whiteSlotClockEl.classList.toggle('clockActive', !frozen && state.next_player === 'white');
+    blackSlotClockEl.classList.toggle('clockActive', !frozen && state.next_player === 'black');
 }
 
 // ---- player name/avatar/rating labels ("respective sides of the board") -
@@ -2110,6 +2143,8 @@ async function refreshPlayerLabels() {
         buildPlayerEntry(blackPlayerSlot, state.black_username, state.ai_color === 'black', state.ai_difficulty),
     ]);
     if (gameId !== forGameId) return; // switched games while these lookups were in flight
+    whitePlayerSlot.appendChild(whiteSlotClockEl);
+    blackPlayerSlot.appendChild(blackSlotClockEl);
     playerNamesBar.hidden = !whiteHasContent && !blackHasContent;
 }
 

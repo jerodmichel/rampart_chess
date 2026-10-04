@@ -778,6 +778,10 @@ button:disabled { opacity: 0.5; cursor: default; }
     height: 24px;
 }
 
+.slotClock {
+    display: none;
+}
+
 .playerTrophyIcon {
     width: 16px;
     height: 16px;
@@ -2438,6 +2442,74 @@ a.ledgerOpponent:hover {
             display: flex;
             align-items: stretch;
             width: 100%;
+        }
+        /* Fixed-height names row - main.js sizes the board from the space
+           left BELOW it, so any height change here shrank or grew the
+           board, differently in every game. 46px is what this row came to
+           in an AI game when the trophy row still sat under the name
+           (4px padding + 24px avatar row + 2px gap + 16px trophies) - the
+           board size the owner called "perfect". Line 1 is avatar + name,
+           line 2 is the small clock (main.js's .slotClock), sitting where
+           the trophies used to; trophies and the separate #clocks bar are
+           hidden here. An untimed game just leaves line 2 empty, so the
+           board is the same size in every game. */
+        #boardWrap:fullscreen #playerNames,
+        #boardWrap.fakeFullscreen #playerNames {
+            box-sizing: border-box;
+            height: 46px;
+            flex-shrink: 0;
+            padding: 4px 15px 0;
+            align-items: flex-start;
+            overflow: hidden;
+        }
+        #boardWrap:fullscreen .playerSlot,
+        #boardWrap.fakeFullscreen .playerSlot {
+            min-width: 0;
+            max-width: 50%;
+        }
+        #boardWrap:fullscreen .playerNameLink,
+        #boardWrap.fakeFullscreen .playerNameLink {
+            min-width: 0;
+            max-width: 100%;
+        }
+        #boardWrap:fullscreen .playerNameText,
+        #boardWrap.fakeFullscreen .playerNameText {
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #boardWrap:fullscreen .playerTrophyRow,
+        #boardWrap.fakeFullscreen .playerTrophyRow {
+            display: none;
+        }
+        #boardWrap:fullscreen .slotClock:not([hidden]),
+        #boardWrap.fakeFullscreen .slotClock:not([hidden]) {
+            display: block;
+            height: 16px;
+            line-height: 16px;
+            padding-left: 30px; /* under the name text, past the 24px avatar + gap */
+            white-space: nowrap;
+            font-family: monospace;
+            font-size: 0.85em;
+            color: var(--muted);
+        }
+        #boardWrap:fullscreen .slotClock.clockActive,
+        #boardWrap.fakeFullscreen .slotClock.clockActive {
+            color: var(--text);
+            font-weight: bold;
+        }
+        #boardWrap:fullscreen #clocks,
+        #boardWrap.fakeFullscreen #clocks {
+            display: none;
+            box-sizing: border-box;
+            height: 26px;
+            flex-shrink: 0;
+            padding: 2px 15px 4px;
+            align-items: center;
+            font-size: 1.05em;
+            white-space: nowrap;
+            overflow: hidden;
         }
         /* Deck and graveyard sit side by side (not stacked) now that the
            deck cards are narrow - deck innermost (next to the board),
