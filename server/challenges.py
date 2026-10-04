@@ -149,7 +149,10 @@ def decline(challenge_id: str, uid: str) -> None:
 
 
 def mark_accepted(challenge_id: str, game_id: str) -> None:
-    db.reference(f"challenges/{challenge_id}").update({"status": "accepted", "game_id": game_id})
+    # accepted_at: the challenger's "Join Game" row is hidden 24h after this
+    # (web/js/main.js's refreshChallenges).
+    db.reference(f"challenges/{challenge_id}").update(
+        {"status": "accepted", "game_id": game_id, "accepted_at": {".sv": "timestamp"}})
 
 
 def dismiss(challenge_id: str, uid: str) -> None:

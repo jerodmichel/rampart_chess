@@ -7,6 +7,8 @@ survives across Cloud Run instances/restarts)."""
 
 import logging
 import os
+import threading
+import time
 from typing import Optional
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
@@ -397,8 +399,39 @@ def list_outgoing_challenges(uid: str = Depends(get_current_uid)):
     return challenges.list_outgoing(uid)
 
 
+# -- notification "seen" times --------------------------------------------
+#
+# The bell's number counts notifications newer than the last time the user
+# opened the bell ("all"); challenges also count as seen once the Play vs
+# Human panel has shown them ("challenges"). Stored per user on the server
+# so seeing something on one device clears it on every device. Kept out of
+# users/{uid} so it never leaks into public profile/players responses.
+
+class NotificationsSeenRequest(BaseModel):
+    scope: str = "all"  # 'all' | 'challenges'
+
+
+@app.get("/notifications/seen")
+def get_notifications_seen(uid: str = Depends(get_current_uid)):
+    seen = db.reference(f"notif_seen/{uid}").get() or {}
+    return {"all": seen.get("all", 0), "challenges": seen.get("challenges", 0)}
+
+
+@app.post("/notifications/seen")
+@limiter.limit("30/minute")
+def mark_notifications_seen(request: Request, req: NotificationsSeenRequest,
+                            uid: str = Depends(get_current_uid)):
+    if req.scope not in ("all", "challenges"):
+        raise HTTPException(status_code=400, detail='scope must be "all" or "challenges"')
+    ref = db.reference(f"notif_seen/{uid}")
+    ref.update({req.scope: {".sv": "timestamp"}})
+    seen = ref.get() or {}
+    return {"all": seen.get("all", 0), "challenges": seen.get("challenges", 0)}
+
+
 @app.post("/challenges/{challenge_id}/accept")
-def accept_challenge(challenge_id: str, uid: str = Depends(get_current_uid)):
+def accept_challenge(challenge_id: str, background_tasks: BackgroundTasks,
+                     uid: str = Depends(get_current_uid)):
     record = challenges.accept(challenge_id, uid)
     challenger_is_white = record["challenger_color"] == "white"
     white_uid = record["from_uid"] if challenger_is_white else record["to_uid"]
@@ -412,6 +445,9 @@ def accept_challenge(challenge_id: str, uid: str = Depends(get_current_uid)):
     GAMES[session.id] = session
     challenges.mark_accepted(challenge_id, session.id)
     game_records.save_game_record(session, white_username, black_username)
+    background_tasks.add_task(
+        notifications.notify_challenge_accepted, record["from_uid"], record["to_username"],
+        record.get("time_control"), session.id)
     return session.to_dict()
 
 
@@ -525,11 +561,60 @@ def _rehydrate_unfinished_games() -> None:
     logger.info("startup: rehydrated %d unfinished game(s)", loaded)
 
 
+# -- day-per-move low-time email -------------------------------------------
+#
+# Clocks are otherwise only evaluated lazily on a read, so nothing would
+# notice a player running low while nobody has the game open - this loop
+# does. One email per turn: the warned ply is kept on the session and also
+# persisted to game_records/{id}/low_time_warned_ply so a deploy/restart
+# (which rehydrates the game) doesn't send it again.
+
+LOW_TIME_WARNING_MS = 90 * 60 * 1000
+LOW_TIME_CHECK_INTERVAL_S = 5 * 60
+
+
+def _check_low_time_warnings() -> None:
+    for session in list(GAMES.values()):
+        try:
+            if (session.ai_color is not None or not session.white_uid or not session.black_uid
+                    or session.time_control is None
+                    or GameSession.TIME_CONTROLS[session.time_control]["kind"] != "per_move"
+                    or session.clock_running_since_ms is None or session.is_game_over()):
+                continue
+            white_ms, black_ms = session._live_remaining_ms()
+            mover = session.next_player
+            remaining = white_ms if mover == "white" else black_ms
+            if not 0 < remaining <= LOW_TIME_WARNING_MS:
+                continue
+            ply = len(session.move_log)
+            if getattr(session, "_low_time_warned_ply", None) == ply:
+                continue
+            ref = db.reference(f"game_records/{session.id}/low_time_warned_ply")
+            already_warned = ref.get() == ply
+            session._low_time_warned_ply = ply
+            if already_warned:
+                continue
+            ref.set(ply)
+            mover_uid = session.white_uid if mover == "white" else session.black_uid
+            opponent_uid = session.black_uid if mover == "white" else session.white_uid
+            notifications.notify_low_time(
+                mover_uid, accounts.get_profile(opponent_uid)["username"], session.id)
+        except Exception:
+            logger.exception("low-time check failed for game %s", session.id)
+
+
+def _low_time_warning_loop() -> None:
+    while True:
+        time.sleep(LOW_TIME_CHECK_INTERVAL_S)
+        _check_low_time_warnings()
+
+
 @app.on_event("startup")
 def _on_startup():
     if os.environ.get("RAMPART_SKIP_STARTUP_REHYDRATE"):
         return
     _rehydrate_unfinished_games()
+    threading.Thread(target=_low_time_warning_loop, daemon=True).start()
 
 
 # -- Players page ----------------------------------------------------------
@@ -577,6 +662,7 @@ def list_live_games():
             "white_username": accounts.get_profile(session.white_uid)["username"],
             "black_username": accounts.get_profile(session.black_uid)["username"],
             "time_control": session.time_control,
+            "next_player": session.next_player,  # lets a participant see "Your Move"
         })
     return out
 

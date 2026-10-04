@@ -11,6 +11,7 @@ import { setupDropdown, keepOnScreen } from './nav.js';
 import { flagNode } from './extinctStates.js';
 import { highestPerCategory } from './badges.js';
 import { attachTapLabel } from './taplabel.js';
+import { fetchChallenges, buildChallengeRows, CHALLENGES_CHANGED_EVENT, NOTIFICATIONS_SEEN_EVENT } from './challenges-ui.js';
 
 setTokenProvider(getIdToken); // harmless if the page's own script already did this
 
@@ -36,13 +37,37 @@ if (accountHeader) {
         window.location.href = 'index.html';
     });
 
+    // The number counts notifications newer than when they were last seen
+    // (server-stored, so it syncs across devices): opening this dropdown
+    // sees everything; challenges also count as seen once the Play vs Human
+    // panel has shown them. The rows stay listed until dealt with.
+    let lastData = null;
+    let lastError = '';
+
+    function unseenCount({ incomingFriends, challenges, unreadThreads, seen }) {
+        const seenChallenges = Math.max(seen.all, seen.challenges);
+        return incomingFriends.filter((r) => (r.created_at || 0) > seen.all).length +
+            challenges.incoming.filter((c) => (c.created_at || 0) > seenChallenges).length +
+            challenges.outgoing.filter((c) => (
+                c.status === 'accepted' && (c.accepted_at || c.created_at || 0) > seenChallenges
+            )).length +
+            unreadThreads.filter((t) => (t.last_timestamp || 0) > seen.all).length;
+    }
+
+    function updateBadge() {
+        const total = lastData ? unseenCount(lastData) : 0;
+        notifBadge.hidden = total === 0;
+        notifBadge.textContent = String(total);
+    }
+
     async function renderNotifications() {
         let incomingFriends = [];
-        let incomingChallenges = [];
+        let challenges;
         let unreadThreads = [];
+        let seen;
         try {
-            [incomingFriends, incomingChallenges] = await Promise.all([
-                api.incomingFriendRequests(), api.incomingChallenges(),
+            [incomingFriends, challenges, seen] = await Promise.all([
+                api.incomingFriendRequests(), fetchChallenges(), api.notificationsSeen(),
             ]);
         } catch (e) {
             return; // background poll - transient failure just retries next tick
@@ -53,41 +78,54 @@ if (accountHeader) {
             unreadThreads = (await api.inbox()).filter((t) => t.unread);
         } catch (e) { /* no message alerts this tick */ }
 
-        const total = incomingFriends.length + incomingChallenges.length + unreadThreads.length;
-        notifBadge.hidden = total === 0;
-        notifBadge.textContent = String(total);
+        lastData = { incomingFriends, challenges, unreadThreads, seen };
+        updateBadge();
 
-        notifDropdown.innerHTML = '';
-        if (total === 0) {
-            const empty = document.createElement('p');
-            empty.textContent = 'No new notifications.';
-            notifDropdown.appendChild(empty);
+        // Same rows and buttons as the Play vs Human panel (challenges-ui.js).
+        // (No re-render here - the action's own change event re-renders.)
+        const challengeRows = buildChallengeRows(challenges, (message) => { lastError = message; });
+        const children = [];
+        if (lastError) {
+            const err = document.createElement('p');
+            err.textContent = lastError;
+            children.push(err);
         }
         for (const r of incomingFriends) {
             const row = document.createElement('a');
             row.className = 'notifRow';
             row.href = 'messages.html';
             row.textContent = `${r.from_username} sent you a friend request`;
-            notifDropdown.appendChild(row);
+            children.push(row);
         }
-        for (const c of incomingChallenges) {
-            const row = document.createElement('a');
-            row.className = 'notifRow';
-            row.href = 'index.html';
-            const yourColor = c.challenger_color === 'white' ? 'black' : 'white';
-            row.textContent = `${c.from_username} challenged you to a game (you'd play ${yourColor})`;
-            notifDropdown.appendChild(row);
-        }
+        children.push(...challengeRows.incoming, ...challengeRows.outgoing);
         for (const t of unreadThreads) {
             const row = document.createElement('a');
             row.className = 'notifRow';
             // messages.html?user=X opens that conversation directly.
             row.href = `messages.html?user=${encodeURIComponent(t.other_username)}`;
             row.textContent = `New message from ${t.other_username}`;
-            notifDropdown.appendChild(row);
+            children.push(row);
         }
+        if (children.length === 0) {
+            const empty = document.createElement('p');
+            empty.textContent = 'No new notifications.';
+            children.push(empty);
+        }
+        notifDropdown.replaceChildren(...children);
         if (!notifDropdown.hidden) keepOnScreen(notifDropdown);
     }
+
+    // Opening the dropdown sees everything in it.
+    notifBtn.addEventListener('click', async () => {
+        lastError = ''; // an old error goes once the dropdown is reopened
+        if (notifDropdown.hidden || !lastData) return;
+        try {
+            lastData.seen = await api.markNotificationsSeen('all');
+            updateBadge();
+        } catch (e) { /* stays counted; retried next open */ }
+    });
+    window.addEventListener(CHALLENGES_CHANGED_EVENT, () => renderNotifications());
+    window.addEventListener(NOTIFICATIONS_SEEN_EVENT, () => renderNotifications());
 
     async function loadAvatar(uid) {
         const url = await getAvatarUrl(uid);

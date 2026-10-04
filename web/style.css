@@ -203,6 +203,20 @@ header h1 {
     font-size: 0.9em;
 }
 
+/* Challenge rows in the bell - same lines/buttons as the Play vs Human
+   panel (challenges-ui.js), wrapped to fit the narrower dropdown. */
+#notifDropdown .challengeRow {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 8px;
+    color: var(--text);
+    font-size: 0.9em;
+}
+
+#notifDropdown .challengeRow span {
+    flex-basis: 100%;
+}
+
 .notifRow:hover {
     background: #40412f;
 }
@@ -437,6 +451,31 @@ button:disabled { opacity: 0.5; cursor: default; }
     font-size: 0.95em;
     padding: 6px 14px;
     white-space: nowrap;
+}
+
+/* Pending incoming challenge count - same look as the header's #notifBadge. */
+#humanMenuBtn {
+    position: relative;
+}
+
+#humanMenuBadge {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 8px;
+    background: #b5442e;
+    color: #fff;
+    font-family: Georgia, serif;
+    font-size: 11px;
+    line-height: 16px;
+    text-align: center;
+}
+
+#humanMenuBadge:not([hidden]) {
+    display: inline-block;
 }
 
 .playModeTrigger[aria-expanded="true"] {

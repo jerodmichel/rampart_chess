@@ -10,6 +10,7 @@ import {
 } from './firebase.js';
 import { drawIdenticon } from './identicon.js';
 import { initNavMenu, setupDropdown, keepOnScreen } from './nav.js';
+import { fetchChallenges, buildChallengeRows, setChallengeGameOpener, CHALLENGES_CHANGED_EVENT, NOTIFICATIONS_SEEN_EVENT } from './challenges-ui.js';
 import { enterMobileFullscreen, exitMobileFullscreen, onLayoutModeChange, isMobileBoardActive, isFakeFullscreenActive } from './mobile.js';
 import {
     computeCellSize, boardSize, drawBoardMobile, colRowFromPointMobile, cellRect,
@@ -236,9 +237,21 @@ mobileFullscreenBtn.addEventListener('click', () => {
 mobileExitFullscreenBtn.addEventListener('click', () => {
     exitMobileFullscreen().catch(() => {});
 });
+// Always redraw here, even if the canvas size didn't change - the phone
+// overlay (console, Strike/Raise) is only positioned during a mobile draw.
 onLayoutModeChange(() => {
-    if (syncActiveCanvasResolution()) drawCanvas();
+    syncActiveCanvasResolution();
+    drawCanvas();
 });
+// The overlay is placed from the canvas's POSITION, which the side panels
+// shift as they fill in after entering fullscreen - the canvas ResizeObserver
+// above only sees SIZE changes, so the console sat stale until the next tap.
+const overlayPositionObserver = new ResizeObserver(() => {
+    if (isMobileBoardActive()) positionMobileCastOverlay();
+});
+for (const id of ['mobileBoardRow', 'mobileSideLeft', 'mobileSideRight']) {
+    overlayPositionObserver.observe(document.getElementById(id));
+}
 
 // The empty board (no game loaded) shows a watermark that alternates between
 // the crown and the alchemy queen. Chosen from the wall clock, not at random,
@@ -372,7 +385,7 @@ cardStyleToggle.addEventListener('change', () => {
 // its 0.58s silent lead-in (source kept as new_strike.mp3) so it lands with
 // the 0.5s lightning. The old strike thunder now opens each game instead.
 const strikeSound = new Audio('assets/sounds/thunder_strike_new.mp3');
-const gameStartSound = new Audio('assets/sounds/thunder_strike.wav');
+const gameStartSound = new Audio('assets/sounds/thunder_strike.mp3');
 const raiseSound = new Audio('assets/sounds/thunder_raise.mp3');
 // A tolling bell as any game ends - checkmate, mate by capture, resignation,
 // a draw, time or stalemate (owner, 9/30) - DRAGON-STUDIO on Pixabay, the second toll with
@@ -476,6 +489,7 @@ function renderAuthUI(message) {
     authUsername.hidden = !pendingUsernameClaim;
     claimUsernameBtn.hidden = !pendingUsernameClaim;
     challengePanel.hidden = currentProfile === null;
+    if (currentProfile === null) updateHumanMenuBadge(0);
 
     // Soft nudge only - nothing server-side is gated on this (see
     // firebase.js's verifyEmailWithCode comment), just a reminder banner.
@@ -714,142 +728,62 @@ challengeUsernameInput.addEventListener('keydown', (evt) => {
 const incomingChallengesList = document.getElementById('incomingChallenges');
 const outgoingChallengesList = document.getElementById('outgoingChallenges');
 
-function renderChallenges(incoming, outgoing, gameStates = new Map()) {
-    incomingChallengesList.innerHTML = '';
-    for (const c of incoming) {
-        const row = document.createElement('div');
-        row.className = 'challengeRow';
-        const yourColor = c.challenger_color === 'white' ? 'black' : 'white';
-        const label = document.createElement('span');
-        label.textContent = `${c.from_username} challenges you - you'd play ${yourColor}`;
-        const acceptBtn = document.createElement('button');
-        acceptBtn.textContent = 'Accept';
-        acceptBtn.addEventListener('click', () => acceptChallenge(c.challenge_id));
-        const declineBtn = document.createElement('button');
-        declineBtn.textContent = 'Decline';
-        declineBtn.addEventListener('click', () => declineChallengeById(c.challenge_id));
-        const dismissBtn = document.createElement('button');
-        dismissBtn.textContent = '✕';
-        dismissBtn.title = 'Remove this challenge';
-        dismissBtn.addEventListener('click', () => dismissChallengeById(c.challenge_id));
-        row.append(label, acceptBtn, declineBtn, dismissBtn);
-        incomingChallengesList.appendChild(row);
-    }
-
-    outgoingChallengesList.innerHTML = '';
-    for (const c of outgoing) {
-        const row = document.createElement('div');
-        row.className = 'challengeRow';
-        const label = document.createElement('span');
-        label.textContent = `You challenged ${c.to_username} (${c.status})`;
-        row.appendChild(label);
-        if (c.status === 'accepted' && c.game_id) {
-            const gameState = gameStates.get(c.game_id);
-            const isOver = Boolean(gameState && gameState.result);
-            const joinBtn = document.createElement('button');
-            // Once the game has actually ended there's nothing left to
-            // "join" - still let them open it (it already just displays
-            // whatever state comes back, finished or not), but the label
-            // shouldn't imply you're resuming a live game.
-            joinBtn.textContent = isOver ? 'View Game' : 'Join Game';
-            joinBtn.addEventListener('click', () => joinAcceptedGame(c.challenge_id, c.game_id));
-            row.appendChild(joinBtn);
-        }
-        const dismissBtn = document.createElement('button');
-        dismissBtn.textContent = '✕';
-        dismissBtn.title = 'Remove this challenge';
-        dismissBtn.addEventListener('click', () => dismissChallengeById(c.challenge_id));
-        row.appendChild(dismissBtn);
-        outgoingChallengesList.appendChild(row);
-    }
+// Red count bubble on the Play vs Human button: incoming challenges waiting
+// for an answer (outgoing ones aren't counted - nothing to accept there).
+const humanMenuBadge = document.getElementById('humanMenuBadge');
+function updateHumanMenuBadge(count) {
+    humanMenuBadge.hidden = count === 0;
+    humanMenuBadge.textContent = String(count);
 }
+
+// The rows themselves (and their buttons) come from challenges-ui.js, shared
+// with the header bell. Here Accept/Join Game load the game onto the board.
+setChallengeGameOpener(async (game) => {
+    setBusy(true);
+    try {
+        loadGame(game);
+        await afterStateUpdate();
+    } finally {
+        setBusy(false);
+    }
+});
+
+const humanMenuPanel = document.getElementById('humanMenuPanel');
+// Newest challenge timestamp already reported as seen from this panel, so
+// the server is only told when something new has actually been shown.
+let challengesSeenUpTo = 0;
 
 async function refreshChallenges() {
     if (!currentProfile) return;
+    let data;
     try {
-        const [incoming, outgoing] = await Promise.all([
-            api.incomingChallenges(), api.outgoingChallenges(),
-        ]);
-
-        // For every accepted outgoing challenge, check its game's actual
-        // status - dead (server restart orphaned it, self-heal by
-        // dismissing, same as joinAcceptedGame's 404 handling) or finished
-        // (still viewable, but "Join Game" shouldn't be offered as if
-        // there's a live game to resume).
-        const accepted = outgoing.filter((c) => c.status === 'accepted' && c.game_id);
-        const gameStates = new Map(); // game_id -> state, or null once confirmed dead
-        await Promise.all(accepted.map(async (c) => {
-            try {
-                gameStates.set(c.game_id, await api.getGame(c.game_id));
-            } catch (e) {
-                if (e.message.includes('failed (404)')) {
-                    gameStates.set(c.game_id, null);
-                    await api.dismissChallenge(c.challenge_id).catch(() => {});
-                }
-                // any other error (network hiccup) - leave unset, treated
-                // as still-joinable this tick rather than risk a false dismiss
-            }
-        }));
-        const stillRelevant = outgoing.filter((c) => (
-            c.status !== 'accepted' || !c.game_id || gameStates.get(c.game_id) !== null
-        ));
-
-        renderChallenges(incoming, stillRelevant, gameStates);
-    } catch (e) { /* background poll - a transient failure just retries next tick */ }
-}
-
-async function acceptChallenge(challengeId) {
-    setBusy(true);
-    try {
-        loadGame(await api.acceptChallenge(challengeId));
-        await afterStateUpdate();
-        await refreshChallenges();
+        data = await fetchChallenges();
     } catch (e) {
-        setStatus(`Error: ${e.message}`);
-    } finally {
-        setBusy(false);
+        return; // background poll - a transient failure just retries next tick
     }
-}
+    const rows = buildChallengeRows(data, setStatus);
+    incomingChallengesList.replaceChildren(...rows.incoming);
+    outgoingChallengesList.replaceChildren(...rows.outgoing);
+    updateHumanMenuBadge(data.incoming.length);
 
-async function declineChallengeById(challengeId) {
-    try {
-        await api.declineChallenge(challengeId);
-        await refreshChallenges();
-    } catch (e) {
-        setStatus(`Error: ${e.message}`);
-    }
-}
-
-async function dismissChallengeById(challengeId) {
-    try {
-        await api.dismissChallenge(challengeId);
-        await refreshChallenges();
-    } catch (e) {
-        setStatus(`Error: ${e.message}`);
-    }
-}
-
-async function joinAcceptedGame(challengeId, joinGameId) {
-    setBusy(true);
-    try {
-        loadGame(await api.getGame(joinGameId));
-        await afterStateUpdate();
-    } catch (e) {
-        // server/'s game storage is in-memory only, so a server restart
-        // during testing orphans every live game - self-heal by removing
-        // the now-pointless challenge record rather than leaving a Join
-        // Game button that 404s forever.
-        if (e.message.includes('failed (404)')) {
-            setStatus('That game no longer exists - removing it from your challenges.');
-            await api.dismissChallenge(challengeId).catch(() => {});
-            await refreshChallenges();
-        } else {
-            setStatus(`Error: ${e.message}`);
+    // Challenges shown in the open panel count as seen for the header bell.
+    if (!humanMenuPanel.hidden) {
+        const newest = Math.max(0,
+            ...data.incoming.map((c) => c.created_at || 0),
+            ...data.outgoing.filter((c) => c.status === 'accepted').map((c) => c.accepted_at || c.created_at || 0));
+        if (newest > challengesSeenUpTo) {
+            challengesSeenUpTo = newest;
+            api.markNotificationsSeen('challenges')
+                .then(() => window.dispatchEvent(new Event(NOTIFICATIONS_SEEN_EVENT)))
+                .catch(() => {});
         }
-    } finally {
-        setBusy(false);
     }
 }
+window.addEventListener(CHALLENGES_CHANGED_EVENT, () => refreshChallenges());
+// Deferred: the menu's own toggle (further down) runs after this listener.
+document.getElementById('humanMenuBtn').addEventListener('click', () => {
+    setTimeout(() => { if (!humanMenuPanel.hidden) refreshChallenges(); });
+});
 
 sendChallengeBtn.addEventListener('click', async () => {
     if (!challengeUsernameInput.value) return;
@@ -891,7 +825,13 @@ function renderLiveGames(games) {
         timeControl.className = 'ledgerTimeControl';
         timeControl.textContent = g.time_control || '';
         const watchBtn = document.createElement('button');
-        watchBtn.textContent = 'Watch';
+        // Your own game opens playable (humanColor() matches your uid), so
+        // don't call it watching.
+        const myColor = currentProfile === null ? null
+            : g.white_username === currentProfile.username ? 'white'
+            : g.black_username === currentProfile.username ? 'black' : null;
+        watchBtn.textContent = myColor === null ? 'Watch'
+            : myColor === g.next_player ? 'Your Move' : 'Go to Game';
         watchBtn.addEventListener('click', () => spectateGame(g.id));
         row.append(label, timeControl, watchBtn);
         liveGamesList.appendChild(row);

@@ -232,3 +232,41 @@ def notify_challenge(to_uid: str, from_username: str, time_control: str) -> None
     )
     body_html = _email_layout(heading, _button_html(url, "Accept the Challenge"))
     notify_user(to_uid, subject, body_text, body_html)
+
+
+def _game_url(game_id: str) -> str:
+    # index.html?game=<id> opens that game directly (same deep link the
+    # Players page's Watch button uses) - playable for a participant.
+    return f"{_SITE_BASE_URL}/index.html?game={quote(game_id)}"
+
+
+def notify_challenge_accepted(to_uid: str, opponent_username: str, time_control: str, game_id: str) -> None:
+    label = _TIME_CONTROL_LABELS.get(time_control, time_control)
+    url = _game_url(game_id)
+    subject = f"{opponent_username} accepted your challenge on RampartChess!"
+    body_text = (
+        f"{opponent_username} accepted your {label} challenge.\n\n"
+        f"Go to the game here: {url}"
+    )
+    heading = (
+        f"<strong>{html_lib.escape(opponent_username)}</strong> accepted your "
+        f"{html_lib.escape(label)} challenge."
+    )
+    body_html = _email_layout(heading, _button_html(url, "Go to Game"))
+    notify_user(to_uid, subject, body_text, body_html)
+
+
+def notify_low_time(to_uid: str, opponent_username: str, game_id: str) -> None:
+    url = _game_url(game_id)
+    subject = f"90 minutes left to move vs {opponent_username}"
+    body_text = (
+        f"You have 90 minutes or less left to make your move against {opponent_username} "
+        f"in your day-per-move game on RampartChess.\n\n"
+        f"Make your move here: {url}"
+    )
+    heading = (
+        f"You have 90 minutes or less left to make your move against "
+        f"<strong>{html_lib.escape(opponent_username)}</strong>."
+    )
+    body_html = _email_layout(heading, _button_html(url, "Make Your Move"))
+    notify_user(to_uid, subject, body_text, body_html)

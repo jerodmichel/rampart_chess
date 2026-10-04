@@ -148,6 +148,7 @@ def delete_account(uid: str, confirm_username: str) -> dict:
     reports.anonymize_for_deleted_user(uid)
     db.reference(f"badges/{uid}").delete()
     db.reference(f"rating_history/{uid}").delete()
+    db.reference(f"notif_seen/{uid}").delete()
     _delete_avatar(uid)
 
     # Profile + username index last: they're what the confirmation check
