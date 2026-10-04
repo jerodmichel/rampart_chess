@@ -1785,11 +1785,10 @@ function updateChatPanel() {
     chatPanel.hidden = !show;
 }
 
-// Unlike chat, the Moves list is useful for a vs-AI game too (reviewing
-// your own game against the AI is just as valid as reviewing a human-vs-
-// human one) - shown for any game the viewer is actually playing.
+// Unlike chat, the Moves list is read-only, so it's shown for any loaded
+// game - your own (vs-AI or human) or one you're spectating.
 function updateMovesPanel() {
-    const show = Boolean(state) && Boolean(humanColor());
+    const show = Boolean(state);
     movesPanel.hidden = !show;
     if (!show) {
         movesOpen = false;
