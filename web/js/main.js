@@ -131,6 +131,7 @@ function syncCanvasResolution() {
 // deferring to style.css, unlike syncCanvasResolution() above.
 let mobileCell = 0;
 const FULLSCREEN_CLOCK_LINE = 18;
+const MOBILE_SIDE_MIN = 40 + 6 + 40;
 
 function syncMobileCanvasResolution() {
     // Reset any downward offset a previous call may have applied (see
@@ -161,7 +162,13 @@ function syncMobileCanvasResolution() {
     // above it, and the player scrolls down that little bit instead.
     const inFullscreen = Boolean(document.fullscreenElement) || isFakeFullscreenActive();
     const clockLine = inFullscreen && !playerNamesBar.hidden ? FULLSCREEN_CLOCK_LINE : 0;
-    const availableWidth = window.innerWidth;
+    // The deck/graveyard columns either side only get whatever width the
+    // board leaves, so on narrower 16:9 phones and tablets the board used
+    // to squeeze them (thin cards, emblem clipped). Reserving a minimum for
+    // each - a 40px deck column + 6px gap + 40px graveyard/emblem column -
+    // stops the board short of that. No effect where there's room anyway.
+    const sideReserve = inFullscreen ? 2 * MOBILE_SIDE_MIN : 0;
+    const availableWidth = window.innerWidth - sideReserve;
     const availableHeight = Math.max(100, window.innerHeight - spaceAboveCanvas + clockLine);
     const cell = computeCellSize(availableWidth, availableHeight);
     const { width, height } = boardSize(cell);

@@ -433,6 +433,16 @@ export const api = {
         return request(`/challenges/${challengeId}/dismiss`, { method: 'POST' });
     },
 
+    // Last time the bell was opened ("all") / challenges were shown in the
+    // Play vs Human panel ("challenges") - server ms timestamps.
+    notificationsSeen() {
+        return request('/notifications/seen');
+    },
+
+    markNotificationsSeen(scope = 'all') {
+        return request('/notifications/seen', { method: 'POST', body: JSON.stringify({ scope }) });
+    },
+
     // -- ending a game --------------------------------------------------
 
     resign(gameId) {

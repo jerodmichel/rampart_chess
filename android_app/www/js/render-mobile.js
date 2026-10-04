@@ -16,7 +16,7 @@
 // board itself.
 
 import { COLS, ROWS, CARD_SQUARES, CARD_TABLE } from './constants.js';
-import { getActiveTheme, darkenRgb, pieceImage, rampartImage, drawImageWhenReady, isFlipped, isCardStyle, fullscreenPieceScale } from './render.js';
+import { getActiveTheme, cardSquareColor, plainSquareColor, isDarkSquare, darkenRgb, pieceImage, rampartImage, drawImageWhenReady, isFlipped, isCardStyle, fullscreenPieceScale } from './render.js';
 import { drawCardSquare } from './cardface.js';
 
 // Same proportion as the old mobile/ prototype's CELL=64/RAMPART_BAND=14
@@ -117,17 +117,17 @@ function drawBoardSquares(ctx, theme, cell) {
             const key = `${col},${row}`;
             const isCard = CARD_SQUARES.has(key);
             if (isCard && isCardStyle()) {
-                // No grid gaps on mobile, so the card sits on a light square
+                // No grid gaps on mobile, so the card sits on a plain square
                 // with a hairline margin - that's what its rounded corners
                 // reveal.
-                ctx.fillStyle = theme.bgLight;
+                ctx.fillStyle = plainSquareColor(theme);
                 ctx.fillRect(colX(col, cell), rowY(row, cell), cell, cell);
                 const m = Math.max(0.75, cell * 0.02);
                 drawCardSquare(ctx, colX(col, cell) + m, rowY(row, cell) + m, cell - 2 * m, cell - 2 * m,
-                    theme.bgDark, CARD_TABLE.get(key), { indexScale: 0.2 });
+                    cardSquareColor(theme), CARD_TABLE.get(key), { indexScale: 0.2 });
                 continue;
             }
-            ctx.fillStyle = isCard ? theme.bgDark : theme.bgLight;
+            ctx.fillStyle = isCard ? cardSquareColor(theme) : plainSquareColor(theme);
             ctx.fillRect(colX(col, cell), rowY(row, cell), cell, cell);
         }
     }
@@ -215,7 +215,7 @@ function drawHighlights(ctx, state, ui, theme, cell) {
     if (ui.lastMoveSquares) {
         for (const [col, row] of ui.lastMoveSquares) {
             // same as desktop: bolder, darker frame on plain squares
-            if (CARD_SQUARES.has(`${col},${row}`)) {
+            if (isDarkSquare(theme, col, row)) {
                 strokeSquare(ctx, col, row, cell, theme.traceLight, lineWidth);
             } else {
                 strokeSquare(ctx, col, row, cell, darkenRgb(theme.traceDark, 0.2), lineWidth * 1.5);
@@ -229,7 +229,7 @@ function drawHighlights(ctx, state, ui, theme, cell) {
         for (const [col, row] of ui.legalDestinations) {
             const captures = state.pieces.some((p) => p.col === col && p.row === row);
             // same as desktop: light sky blue on the Blue board's blue squares
-            const onBlue = theme.name === 'Blue' && CARD_SQUARES.has(`${col},${row}`);
+            const onBlue = theme.name === 'Blue' && isDarkSquare(theme, col, row);
             if (captures) {
                 drawCaptureRing(ctx, col, row, cell, onBlue ? 'rgb(160, 215, 255)' : CAPTURE_RING_COLOR);
             } else {
