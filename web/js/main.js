@@ -237,21 +237,9 @@ mobileFullscreenBtn.addEventListener('click', () => {
 mobileExitFullscreenBtn.addEventListener('click', () => {
     exitMobileFullscreen().catch(() => {});
 });
-// Always redraw here, even if the canvas size didn't change - the phone
-// overlay (console, Strike/Raise) is only positioned during a mobile draw.
 onLayoutModeChange(() => {
-    syncActiveCanvasResolution();
-    drawCanvas();
+    if (syncActiveCanvasResolution()) drawCanvas();
 });
-// The overlay is placed from the canvas's POSITION, which the side panels
-// shift as they fill in after entering fullscreen - the canvas ResizeObserver
-// above only sees SIZE changes, so the console sat stale until the next tap.
-const overlayPositionObserver = new ResizeObserver(() => {
-    if (isMobileBoardActive()) positionMobileCastOverlay();
-});
-for (const id of ['mobileBoardRow', 'mobileSideLeft', 'mobileSideRight']) {
-    overlayPositionObserver.observe(document.getElementById(id));
-}
 
 // The empty board (no game loaded) shows a watermark that alternates between
 // the crown and the alchemy queen. Chosen from the wall clock, not at random,
