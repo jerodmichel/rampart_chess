@@ -855,6 +855,17 @@ button:disabled { opacity: 0.5; cursor: default; }
     color: var(--muted);
 }
 
+/* Floated so a long message wraps underneath it instead of the time
+   getting pushed onto its own line (renderChatMessages in main.js). */
+#chatMessages .chatTime {
+    float: right;
+    margin-left: 8px;
+    font-size: 0.75em;
+    line-height: 1.6;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
 #chatInputRow {
     display: flex;
     gap: 6px;

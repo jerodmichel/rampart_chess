@@ -1765,11 +1765,25 @@ function updateGameActionButtons() {
 
 let chatMessages = []; // cache of the last list fetched from the server
 
+// Kept as short as possible ("10/7 9:42p") so it fits beside the message
+// on a phone-width #chatPanel - see .chatTime in style.css.
+function formatChatTime(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    const hour = d.getHours() % 12 || 12;
+    const minute = String(d.getMinutes()).padStart(2, '0');
+    return `${d.getMonth() + 1}/${d.getDate()} ${hour}:${minute}${d.getHours() < 12 ? 'a' : 'p'}`;
+}
+
 function renderChatMessages() {
     chatMessagesEl.innerHTML = '';
     for (const msg of chatMessages) {
         const row = document.createElement('div');
         row.className = 'chatMsg';
+        const time = document.createElement('span');
+        time.className = 'chatTime';
+        time.textContent = formatChatTime(msg.timestamp);
+        row.appendChild(time);
         const author = document.createElement('span');
         author.className = 'chatAuthor';
         author.textContent = msg.uid === currentProfile?.uid ? 'You' : msg.username;
