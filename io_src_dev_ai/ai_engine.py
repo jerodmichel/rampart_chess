@@ -644,6 +644,16 @@ class BitboardGameState:
                         # 2. find empty square
                         
                         valid_spawns = list(bb.get_set_bits(spawn_mask & ~occupied))
+
+                        # Rule (owner, 10/7): a player may not enter the
+                        # queen's house to get out of check - the queen it
+                        # places does NOT count toward escaping, so only the
+                        # raider's own step is tested (same as the server's
+                        # board.valid_move check on the raider move).
+                        step_is_safe = self._leaves_own_king_safe(
+                            EngineMove(from_sq, to_sq, 'raider', self.current_player))
+                        if not step_is_safe:
+                            continue
                         
                         if valid_spawns:
                             # branch for valid spawn
@@ -651,10 +661,8 @@ class BitboardGameState:
                                 mv = EngineMove(from_sq, to_sq, 'raider', \
                                     self.current_player, \
                                     move_type="enter_queen_house", spawn_sq=spawn_sq)
-                                
-                                # check if this spawn variation is safe
                                 moves.append(mv)
-                                
+
                         else:
                             # rare case: no space to spawn queen
                             mv = EngineMove(from_sq, to_sq, 'raider', self.current_player)
@@ -683,7 +691,28 @@ class BitboardGameState:
                         
         # cast moves
         raw_casts = self.cast_gen.get_cast_moves(self.bitboard, self.current_player)
-        
+
+        # The cast generator proposes each raise on ONE heuristic "best"
+        # square, which usually doesn't block a check - so in check, the
+        # filter below threw it out and the AI never saw a raise that
+        # blocks the check (found 10/7 fuzzing: a legal escape the AI
+        # missed, and its only move in some positions). In check, also try
+        # every raise combo on each empty raise-zone square that blocks.
+        if checkers and not in_double_check:
+            spawn_zone = 0x3FFFFC0000000 if self.current_player == 'white' else 0x3FFFFC00
+            block_squares = list(bb.get_set_bits(resolution_mask & spawn_zone & ~occupied))
+            seen = {(src, tgt, m_type, tuple(cards)) for (src, tgt, m_type, cards) in raw_casts}
+            extra = []
+            for (src, tgt, m_type, cards) in raw_casts:
+                if m_type not in ('raise', 'raise_queen'):
+                    continue
+                for block_sq in block_squares:
+                    key = (src, block_sq, m_type, tuple(cards))
+                    if key not in seen:
+                        seen.add(key)
+                        extra.append((src, block_sq, m_type, cards))
+            raw_casts = list(raw_casts) + extra
+
         # wrap in engine objects
         for (src, tgt, m_type, cards) in raw_casts:
             # notation (and apply_move's own move_type-driven dispatch) should
@@ -734,6 +763,17 @@ class BitboardGameState:
                 moves.append(mv)
 
         return moves
+
+    def _leaves_own_king_safe(self, move):
+        """Full make-and-test legality check: True if, after `move`, the
+        mover's king is not attacked. Used for the enter_queen_house branch
+        of get_legal_moves (called with the raider's plain step - the queen
+        it places never counts toward escaping check, per the rules). Before
+        this, those moves were never tested at all, so the AI could answer
+        a check by entering the queen house and leave its king in check
+        (real game vs Easy, 10/7: R6b>7a/Q@9e with Q2e>4c checking 5c)."""
+        new_state, _ = self.apply_move(move)
+        return not self.attack_gen.get_checkers(new_state.bitboard, self.current_player)
 
     def apply_move(self, move: EngineMove):
         """
@@ -1153,7 +1193,7 @@ class NegamaxEngine:
                 
                 # run standard negamax
                 score, move = self.negamax(root_state, depth, -INFINITY, INFINITY, \
-                    color_multiplier, history)
+                    color_multiplier, history, is_root=True)
                 
                 # print(f"[AI] Depth {depth} done. Score: {score}. Move: {move}")
 
@@ -1191,10 +1231,17 @@ class NegamaxEngine:
         #                 best_move_found = mv
         #                 break
         
+        # Out of time before even the depth-1 pass finished (only under
+        # heavy load - seen in 10/7 stress tests): play a legal move rather
+        # than none, which left the AI's turn unplayed. legal_moves already
+        # passed every legality check above.
+        if best_move_found is None:
+            best_move_found = legal_moves[0]
+
         # flush_debug_log()
         return best_move_found
 
-    def negamax(self, state, depth, alpha, beta, color, state_history):
+    def negamax(self, state, depth, alpha, beta, color, state_history, is_root=False):
         # time Check
         # using bitwise '&' here with integer 1023 (has 10 1's in binary)
         if self.nodes_explored & 1023 == 0:
@@ -1203,7 +1250,14 @@ class NegamaxEngine:
                 
         current_hash = state.bitboard.get_state_hash()
         
-        if current_hash in state_history:
+        # Not at the root: the root is the position the AI is actually in,
+        # so it has to move from it whether or not it was seen before -
+        # aborting here made get_best_move return no move at all, and the
+        # AI froze on its turn (found 10/7: get_state_hash() doesn't encode
+        # side to move, so this also fired on mere look-alike positions).
+        # Positions further down the search are still penalized, so the AI
+        # keeps steering away from repeats (threefold draw) when it can.
+        if not is_root and current_hash in state_history:
             # apply massive penalty
             return -500, None
                 

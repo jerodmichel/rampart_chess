@@ -99,6 +99,19 @@ def _rehydrate_eligible(record: dict) -> bool:
             and record.get("result") is None)
 
 
+def _ai_rehydrate_eligible(record: dict) -> bool:
+    """A signed-in player's unfinished game against the computer (its
+    record carries ai_difficulty and exactly one uid - see new_game).
+    Kept separate from _rehydrate_eligible on purpose: those are rebuilt
+    eagerly at startup, while AI games are only rebuilt on demand, when
+    someone opens one (_live_session_or_rehydrate) - there can be many
+    abandoned ones, and nobody is waiting on their clock. Before 10/7 an
+    AI game simply became view-only after any restart/deploy."""
+    return (record.get("ai_difficulty") is not None
+            and (record.get("white_uid") is None) != (record.get("black_uid") is None)
+            and record.get("result") is None)
+
+
 def _live_session_or_rehydrate(game_id: str) -> Optional[GameSession]:
     """A live GameSession for game_id if one is already in memory, else
     one rebuilt via GameSession.rehydrate (and cached into GAMES, same
@@ -119,7 +132,7 @@ def _live_session_or_rehydrate(game_id: str) -> Optional[GameSession]:
     if session is not None:
         return session
     record = game_records.get_game_record(game_id)
-    if record is None or not _rehydrate_eligible(record):
+    if record is None or not (_rehydrate_eligible(record) or _ai_rehydrate_eligible(record)):
         return None
     try:
         session = GameSession.rehydrate(record)

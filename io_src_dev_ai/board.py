@@ -615,10 +615,14 @@ class Board:
                 if move.cast_type == 0:
                     pieces_to_check = [None]
                 else:
-                    pieces_to_check = [Raider(color), Queen(color)] \
-                        if queen_eligible else [Raider(color)]
-                if not booL or any(not self.cast_in_check(player, p, move)
-                                    for p in pieces_to_check):
+                    # same rule as _original_calc_cast_moves' raise moves
+                    pieces_to_check = []
+                    if self._raider_in_grave(color):
+                        pieces_to_check.append(Raider(color))
+                    if queen_eligible and self._is_queen_combo(move.cards):
+                        pieces_to_check.append(Queen(color))
+                if pieces_to_check and (not booL or any(not self.cast_in_check(player, p, move)
+                                    for p in pieces_to_check)):
                     valid_moves.append(move)
             player.cast_moves = valid_moves
             return
@@ -648,6 +652,12 @@ class Board:
         # 2. Find card combos using new helper (REPLACES the old if/elif blocks)
         strike_combo = None
         raise_combo = None
+        # A queen raise needs exactly 2 board cards + 1 deck card (see
+        # game_session._is_queen_combo), so it gets its own combo - a raider
+        # raise combo (1 board card + 1-2 deck cards) can't stand in for it.
+        queen_combo = None
+        queen_eligible = self._queen_isdead(color) and \
+            self._enemy_queen_house_occupied(color)
         
         # Find combo for raise (needs 1+ board cards)
         if known_combo:
@@ -655,6 +665,8 @@ class Board:
                 strike_combo = known_combo
             else:
                 raise_combo = known_combo
+                if self._is_queen_combo(known_combo):
+                    queen_combo = known_combo
                 
         else:
             if len(possible_hand) >= 2 and self.clicker.has_2_raider_cards(possible_hand):
@@ -668,6 +680,13 @@ class Board:
                 raise_combo = self._find_valid_combo(
                     possible_hand, available_deck,
                     need_board_count=1, max_total_cards=3
+                )
+
+            if queen_eligible and len(possible_hand) >= 2 and \
+                    self.clicker.has_2_raider_cards(possible_hand):
+                queen_combo = self._find_valid_combo(
+                    possible_hand, available_deck,
+                    need_board_count=2, max_total_cards=3
                 )
         
         # 3. Generate moves (same structure as before, just use strike_combo/raise_combo)
@@ -685,22 +704,25 @@ class Board:
                                 player.add_cast_move(move)
             
             # RAISE moves (if we have a valid raise combo)
-            if raise_combo:
+            # Which piece each raise combo can bring back: a raider only if
+            # one is actually in the graveyard (before 10/7 a raise was
+            # offered with all raiders on the board - it used up the cards
+            # and the turn and placed nothing, and the mate test counted it
+            # as a way out of check), the queen only with a queen combo.
+            raises = []
+            if raise_combo and self._raider_in_grave(color):
+                raises.append((raise_combo, Raider(color)))
+            if queen_combo and queen_eligible:
+                raises.append((queen_combo, Queen(color)))
+            if raises:
                 rangE = range(3, 5) if color == 'white' else range(1, 3)
                 for col in range(COLS):
                     for row in rangE:
                         sq = self.squares[col][row]
                         if sq.is_empty():
                             final = sq
-                            move = Cast_move(raise_combo, final, 1)
-                            
-                            # Determine piece to raise
-                            if self._queen_isdead(color) and self._enemy_queen_house_occupied(color):
-                                pieces_to_try = [Raider(color), Queen(color)]
-                            else:
-                                pieces_to_try = [Raider(color)]
-                            
-                            for raise_piece in pieces_to_try:
+                            for combo, raise_piece in raises:
+                                move = Cast_move(combo, final, 1)
                                 if not booL or not self.cast_in_check(player, raise_piece, move):
                                     player.add_cast_move(move)
                                 
@@ -1161,6 +1183,21 @@ class Board:
                     self.squares[col][row] = Square(col, row, new_piece, card)
                     break
                 
+    def _raider_in_grave(self, color):
+        """True if COLOR has at least one raider in its graveyard - the
+        only source a raised raider can come from (see _raise_raider)."""
+        side = 1 if color == 'white' else 0
+        return any(self.graves[side][roW].has_piece() and
+                   self.graves[side][roW].piece.name == 'raider'
+                   for roW in range(GRAVES))
+
+    @staticmethod
+    def _is_queen_combo(cards):
+        """A queen raise: exactly 2 board cards (suits 2/3) + 1 deck card -
+        same rule as game_session.GameSession._is_queen_combo."""
+        board = sum(1 for c in cards if c.suit in (2, 3))
+        return board == 2 and len(cards) - board == 1
+
     def _queen_isdead(self, color):
         auX = False
         if color == 'white':
@@ -1268,20 +1305,25 @@ class Board:
         - need_board_count: Minimum board cards required (1 for raise, 2 for strike)
         - max_total_cards: Max cards allowed (3)
         """
-        # Filter: only need to consider up to max_total_cards
-        board_cards = board_cards[:max_total_cards]
-        
+        # No pre-trimming of board_cards: max_total_cards limits the size of
+        # a combo (each case below builds at most 3 cards), not which board
+        # cards may be in it. Trimming to the first 3 found (board scan
+        # order) hid valid combos using a 4th+ raider card - and
+        # _king_mated relies on this search, so that could call a false
+        # mate/stalemate (found 10/7; io_src_dev's original search had no
+        # such limit).
+
         # CASE 1: 2 board cards + 1 deck card (for strike)
         if need_board_count >= 2 and len(board_cards) >= 2:
             for i in range(len(board_cards)):
                 for j in range(i+1, len(board_cards)):
-                    board_sum = self._card_sum([board_cards[i], board_cards[j]])
-                    needed = 21 - board_sum
-                    
-                    # Look for deck card that completes to 21
+                    # Look for deck card that completes to 21. Uses the same
+                    # ace rule as everywhere else (any ace - board or deck -
+                    # may count as 1 or 11): this used to let only a DECK
+                    # ace count as 11, missing e.g. board A + board 5 +
+                    # deck 5 (found 10/7).
                     for deck_card in deck_cards:
-                        if self._card_sum([deck_card]) == needed or \
-                           (deck_card.rank == 0 and self._card_sum([deck_card]) + 10 == needed):
+                        if self._has_sum_21_fast([board_cards[i], board_cards[j], deck_card]):
                             return [board_cards[i], board_cards[j], deck_card]
         
         # CASE 2: 1 board card + 1-2 deck cards (for raise only - a strike
@@ -1301,6 +1343,15 @@ class Board:
                     for j in range(i+1, len(deck_cards)):
                         if self._has_sum_21_fast([board_card, deck_cards[i], deck_cards[j]]):
                             return [board_card, deck_cards[i], deck_cards[j]]
+
+            # Try 2 board + 1 deck - also a legal raise (the AI's combo B;
+            # confirmed with the rules 10/7), tried last so every position
+            # that already had a raise combo keeps the same one
+            for i in range(len(board_cards)):
+                for j in range(i+1, len(board_cards)):
+                    for deck_card in deck_cards:
+                        if self._has_sum_21_fast([board_cards[i], board_cards[j], deck_card]):
+                            return [board_cards[i], board_cards[j], deck_card]
         
         return None  # No valid combination
     

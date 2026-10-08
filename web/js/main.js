@@ -1342,6 +1342,18 @@ async function commitCastButton(button) {
         showCastHint('Raising requires at least one board card.');
         return;
     }
+    // Exact card mix (rulebook 6.1.1/6.1.2) - the server enforces the same
+    // (game_session.legal_cast_destinations_for_combo). Reachable by
+    // deselecting the deck card a combo was started with.
+    const deckCardCount = clickedCards.length - boardCardCount;
+    if (button === 'strike' && (boardCardCount !== 2 || deckCardCount !== 1)) {
+        showCastHint('Striking requires two board cards and one deck card.');
+        return;
+    }
+    if (button === 'raise' && (deckCardCount < 1 || boardCardCount + deckCardCount > 3 || boardCardCount > 2)) {
+        showCastHint('Raising requires deck cards along with your board cards.');
+        return;
+    }
 
     clearRaiseChoice();
     setBusy(true);

@@ -1,0 +1,62 @@
+RAMPART RULEBOOK NOTES
+======================
+Gaps and unclear spots in the rulebook (rulebook_1-8.png), found while
+fixing rules bugs on 2026-10-07. Each item gives the rule as you confirmed
+it and a suggested place to add it.
+
+
+1. Entering the Queen's house cannot be used to get out of check
+   (Section 6.1.3, "Raising a Queen")
+
+   Missing. Confirmed rule: a player may not enter the opponent's Queen's
+   house to get out of check. The queen placed that turn does not count
+   toward escaping check.
+
+   Suggested wording: "Entering the opponent's Queen's house cannot be used
+   to get out of check; the queen placed that turn does not count toward
+   escaping check."
+
+
+2. House cards never count toward a card combination
+   (Sections 6.1.2 "Capturing Material by using the Deck" and 6.1.3
+   "Raising a Queen")
+
+   6.1.1 (raising a raider) says the card square must be one "that is not a
+   house", but 6.1.2 (striking) and 6.1.3 (raising a queen) only say "card
+   squares containing raiders of the player's color", without excluding
+   houses. Confirmed rule: house cards never count toward any combo.
+
+
+3. A raider can only be raised if one is in the graveyard
+   (Section 6.1.1, "Raising a Raider")
+
+   Implied by "take a raider from their graveyard", but not stated outright.
+   Confirmed rule: with no raider in the graveyard (all eight on the board),
+   a player cannot raise one, so the cards cannot be spent on an empty raise.
+
+
+4. Aces under raiders
+   (Section 6.1, aces "worth either 1 or 11")
+
+   The rulebook already says aces are 1 or 11. It may help to state that
+   this applies to aces on card squares (under raiders) as well as aces
+   from the deck.
+
+
+5. Two-card raise with an ace
+   (Sections 6.1 "any cast move requires exactly three cards" and 6.1.1)
+
+   Confirmed rule: a raise with only two cards (one card square + one deck
+   card) is valid if an ace is used. (Two cards can only make 21 with an ace
+   as 11 plus a 10-value card.) The rulebook currently says every cast needs
+   exactly three cards, so this exception needs adding.
+
+
+6. Typos noticed on pages 5-8
+   - "beign spawning"       -> "begin spawning"         (p.6)
+   - "from there deck"      -> "from their deck"        (p.6)
+   - "make make a sum"      -> "make a sum"             (p.6)
+   - "reglar moves"         -> "regular moves"          (p.6)
+   - "on the the heart side"-> "on the heart side"      (p.6)
+   - "elligable"            -> "eligible"               (p.8)
+   - "visa versa"           -> "vice versa"             (p.5, twice)

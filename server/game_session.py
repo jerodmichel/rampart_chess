@@ -519,8 +519,11 @@ class GameSession:
         queen_eligible = self.board._queen_isdead(color) and \
             self.board._enemy_queen_house_occupied(color)
 
+        # a raider can only be raised if one is in the graveyard
+        raider_available = self.board._raider_in_grave(color)
         raise_raider = [m for m in raise_candidates
-                         if not self.board.cast_in_check(player, Raider(color), m)]
+                         if raider_available and
+                         not self.board.cast_in_check(player, Raider(color), m)]
         raise_queen = [m for m in raise_candidates
                         if queen_eligible and self._is_queen_combo(m.cards) and
                         not self.board.cast_in_check(player, Queen(color), m)] \
@@ -591,21 +594,30 @@ class GameSession:
             raise IllegalMoveError("selected cards do not sum to 21")
 
         board_card_count = sum(1 for c in cards if c.suit in (2, 3))
+        deck_card_count = len(cards) - board_card_count
 
         player.clear_cast_moves()
         self.board.cast_cache.cache = {}
 
+        # Exact card mix (rulebook 6.1.1/6.1.2, owner 10/7): the browser
+        # only starts a combo from a deck card, but deselecting it (or a
+        # direct request) let board-only combos through, e.g. a strike on
+        # 7+7+7 under three raiders spending no deck card at all.
         if kind == "strike":
-            if board_card_count < 2:
-                raise IllegalMoveError("striking needs two board cards")
+            if (board_card_count, deck_card_count) != (2, 1):
+                raise IllegalMoveError("striking needs exactly two board cards and one deck card")
             self.board.calc_cast_moves(player, None, booL=True, known_combo=cards)
             strikes = [m for m in player.cast_moves if m.cast_type == 0]
             player.clear_cast_moves()
             self.board.cast_cache.cache = {}
             return {"strike": strikes, "raise_raider": [], "raise_queen": []}
 
-        if board_card_count < 1:
-            raise IllegalMoveError("raising needs at least one board card")
+        # 1 board + 2 deck, 2 board + 1 deck, or 1 board + 1 deck (two cards
+        # can only make 21 with an ace - allowed, owner 10/7)
+        if (board_card_count, deck_card_count) not in ((1, 2), (2, 1), (1, 1)):
+            raise IllegalMoveError(
+                "raising needs one board card and two deck cards, or two board cards "
+                "and one deck card (one board card and one deck card works only with an ace)")
 
         self.board.calc_cast_moves(player, Raider(color), booL=True, known_combo=cards)
         raw_moves = list(player.cast_moves)
@@ -625,8 +637,11 @@ class GameSession:
             self.board._enemy_queen_house_occupied(color) and \
             self._is_queen_combo(cards)
 
+        # a raider can only be raised if one is in the graveyard
+        raider_available = self.board._raider_in_grave(color)
         raise_raider = [m for m in raise_candidates
-                         if not self.board.cast_in_check(player, Raider(color), m)]
+                         if raider_available and
+                         not self.board.cast_in_check(player, Raider(color), m)]
         raise_queen = [m for m in raise_candidates
                         if queen_eligible and
                         not self.board.cast_in_check(player, Queen(color), m)] \
@@ -802,21 +817,19 @@ class GameSession:
             # at from_sq never actually moved, a brand-new raider was
             # conjured directly onto the house square, and the queen -
             # whose only case is this branch - was never touched.
+            #
+            # Routed through apply_normal_move (same as the "normal" branch
+            # above) rather than applied directly: it re-validates the move
+            # against the real board (so an engine move that leaves the AI's
+            # own king in check is refused instead of played - real game vs
+            # Easy, 10/7: R6b>7a/Q@9e while in check), and only places the
+            # queen when she's actually in the graveyard, exactly as for a
+            # human's queen-house move.
             from_col, from_row = engine_move.from_sq % 10, engine_move.from_sq // 10
             to_col, to_row = engine_move.to_sq % 10, engine_move.to_sq // 10
             spawn_col, spawn_row = engine_move.spawn_sq % 10, engine_move.spawn_sq // 10
-
-            piece = self.board.squares[from_col][from_row].piece
-            move_notation = self.board.move(piece, Move(Square(from_col, from_row), Square(to_col, to_row)))
-
-            spawn_card = self.board.squares[spawn_col][spawn_row].card
-            self.board._raise_queen(spawn_col, spawn_row, self.ai_color, spawn_card)
-
-            spawn_dst = f"{spawn_col + 1}{Square.get_alpharow(5 - spawn_row)}"
-            notation = f"{move_notation}/Q@{spawn_dst}"
-            self.move_log.append(notation)
-            self._post_move(self.ai_color)
-            return notation
+            return self.apply_normal_move(from_col, from_row, to_col, to_row,
+                                          queen_col=spawn_col, queen_row=spawn_row)
 
         # cast move: translate the engine's move back into a real Cast_move
         t_col, t_row = engine_move.to_sq % 10, engine_move.to_sq // 10
@@ -1290,9 +1303,10 @@ class GameSession:
         replay only), this replays record["history"] through
         _replay_notation, so mate/stalemate/repetition are correctly
         re-derived rather than needing to be persisted separately. Only
-        ever appropriate for a still-in-progress human-vs-human game
-        (ai_color is None, result is None) - app.py is responsible for
-        using ReplayOnlyGame instead once a game is actually over.
+        ever appropriate for a still-in-progress game (result is None) -
+        human-vs-human, or a signed-in player's game vs the AI (since
+        10/7, see app.py's _ai_rehydrate_eligible) - app.py is responsible
+        for using ReplayOnlyGame instead once a game is actually over.
 
         Clock state is deliberately NOT left to fall out of replay:
         replay runs in a tight loop with no real elapsed time between
@@ -1313,8 +1327,17 @@ class GameSession:
         that kind), but a "pool" control (30min/1hour) genuinely
         accumulates/depletes across moves, and replay has no way to
         reconstruct that on its own - only the persisted amount can."""
+        # A vs-AI record (ai_difficulty set, exactly one uid - see app.py's
+        # new_game and _ai_rehydrate_eligible) gets the AI back on the
+        # uid-less side; replaying through _replay_notation with ai_color
+        # set rebuilds state_history exactly as the live game recorded it
+        # (_post_move only records after the AI's own moves).
+        ai_color = None
+        if record.get("ai_difficulty") is not None:
+            ai_color = "black" if record.get("white_uid") else "white"
         session = cls(
-            ai_color=None,
+            ai_color=ai_color,
+            ai_difficulty=record.get("ai_difficulty") or "Medium",
             white_uid=record.get("white_uid"),
             black_uid=record.get("black_uid"),
             time_control=record.get("time_control"),
