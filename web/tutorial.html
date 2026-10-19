@@ -6,7 +6,7 @@
 <title>Learn to Play - RampartChess</title>
 <link rel="icon" href="favicon.ico" sizes="any" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="style.css?v=121" />
+<link rel="stylesheet" href="style.css?v=122" />
 </head>
 <body>
 <header>
@@ -21,6 +21,7 @@
         <a href="players.html">Players</a>
         <a href="about.html">About</a>
         <a href="rules.html">Game Rules</a>
+        <a href="tutorial.html">Learn to Play</a>
         <a href="legal.html">Terms &amp; Privacy</a>
       </div>
     </div>
@@ -49,28 +50,28 @@
   </div>
 </header>
 <main id="tutorialPage">
-  <p class="tutDraftNote">DRAFT - outline with placeholders. Each dashed box is a clip still
-    to be recorded; its id (e.g. <code>raiders-move</code>) is the scene name the recorder
-    will use, and the GIF will land at <code>assets/tutorial/&lt;id&gt;.gif</code>.</p>
-
   <h2>Learn to Play RampartChess</h2>
   <p>
     RampartChess is chess with a deck of cards. You still win by checkmating the enemy
     king - but along the way you'll slip raiders past the rampart, break into your
     opponent's houses, and cast cards that add up to 21 to bring back fallen pieces or
-    strike down enemy raiders. Each lesson below takes about a minute.
+    strike down enemy raiders.
+  </p>
+  <p>
+    Every lesson below comes with two narrated videos: one played on a real tabletop with
+    a deck of cards and a few chess pieces, and one played right here on the site. Watch
+    whichever suits you - or both.
   </p>
 
-  <div class="tutClip tutVideo" data-clip="full-tutorial">
-    <span class="tutClipId">VIDEO: full-tutorial</span>
-    <span class="tutClipDesc">The complete narrated tutorial (all lessons stitched together, ~6-8 min).</span>
+  <div class="tutSeries">
+    <a class="tutSeriesBtn" data-playlist="tabletop" href="#" target="_blank" rel="noopener">&#9654; Watch the whole Tabletop series</a>
+    <a class="tutSeriesBtn" data-playlist="online" href="#" target="_blank" rel="noopener">&#9654; Watch the whole Online series</a>
   </div>
 
   <nav class="tutToc" aria-label="Lessons">
     <ol>
+      <li><a href="#board">The board &amp; setup</a></li>
       <li><a href="#goal">The goal</a></li>
-      <li><a href="#board">The board</a></li>
-      <li><a href="#setup">Your army, deck &amp; graveyard</a></li>
       <li><a href="#raiders">Raiders &amp; the rampart</a></li>
       <li><a href="#pieces">The other pieces</a></li>
       <li><a href="#houses">Houses</a></li>
@@ -84,65 +85,58 @@
     </ol>
   </nav>
 
-  <section class="tutLesson" id="goal">
-    <h3>1. The goal</h3>
-    <p>Just like in traditional chess, your primary objective is to checkmate your opponent's king. White always moves first, followed by Black. On each turn, you are allowed to make exactly <em>one</em> move. This can be either a standard piece movement on the board, or a <em>cast move</em> using the cards from your deck.</p>
-    <div class="tutClip" data-clip="goal-checkmate">
-      <span class="tutClipId">GIF: goal-checkmate</span>
-      <span class="tutClipDesc">A short, dramatic checkmate from a late-game position.</span>
-    </div>
-  </section>
-
   <section class="tutLesson" id="board">
-    <h3>2. The board</h3>
+    <h3>1. The board &amp; setup</h3>
+    <video class="tutLoop" data-src="assets/tutorial/board-tour.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T1"></div>
+      <div class="tutVid" data-video="P1"></div>
+    </div>
     <p>The board consists of 10 columns (numbered <em>1</em>-<em>10</em>) and 6 rows (lettered <em>a</em>-<em>f</em>). The bottom half is made up of diamonds and is White's territory, while the top half is made up of hearts and belongs to Black. The gap dividing the middle of the board is called the <strong>rampart</strong>.</p>
     <p>The board features a mix of blank squares and permanent <em>card squares</em>. These card squares never move; they are a permanent part of the battlefield. The back rows (<em>a</em> and <em>f</em>) are entirely off-limits, except for the three face cards—the Jack, Queen, and King. These face cards act as the <strong>houses</strong>.</p>
-    <div class="tutClip" data-clip="board-tour">
-      <span class="tutClipId">GIF: board-tour</span>
-      <span class="tutClipDesc">Highlight in turn: diamond half, heart half, the rampart gap,
-        a few card squares, then the six house squares.</span>
-    </div>
-  </section>
-
-  <section class="tutLesson" id="setup">
-    <h3>3. Your army, deck &amp; graveyard</h3>
     <p>Each side starts with 4 raiders, a rook, a knight, a bishop, and a king on the board. White begins on the diamond side, and Black begins on the heart side.</p>
     <p>You also hold a <strong>deck</strong> of cards. White holds all the Spades, and Black holds the Clubs. Each player also has a <strong>graveyard</strong> which, initially, holds 4 more raiders and a queen. The graveyard is where captured raiders and queens go, and pieces in the graveyard can potentially be brought back into play by using cast moves later in the game.</p>
-    <div class="tutClip" data-clip="setup">
-      <span class="tutClipId">GIF: setup</span>
-      <span class="tutClipDesc">Starting position; highlight each side's pieces, then each
-        player's deck and graveyard.</span>
+  </section>
+
+  <section class="tutLesson" id="goal">
+    <h3>2. The goal</h3>
+    <video class="tutLoop" data-src="assets/tutorial/goal-checkmate.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T2"></div>
+      <div class="tutVid" data-video="P2"></div>
     </div>
+    <p>Just like in traditional chess, your primary objective is to checkmate your opponent's king. White always moves first, followed by Black. On each turn, you are allowed to make exactly <em>one</em> move. This can be either a standard piece movement on the board, or a <em>cast move</em> using the cards from your deck.</p>
   </section>
 
   <section class="tutLesson" id="raiders">
-    <h3>4. Raiders &amp; the rampart</h3>
+    <h3>3. Raiders &amp; the rampart</h3>
+    <video class="tutLoop" data-src="assets/tutorial/raiders-move.mp4" muted loop playsinline preload="none"></video>
+    <video class="tutLoop" data-src="assets/tutorial/raiders-rampart.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T3"></div>
+      <div class="tutVid" data-video="P3"></div>
+    </div>
     <p>Raiders are the pawns of RampartChess, but much more flexible. A raider may move one space in <em>any</em> direction (horizontally, vertically, or diagonally). They capture diagonally into any adjacent square.</p>
     <p>The catch is the rampart. Once a raider crosses the diamond-heart barrier into enemy territory (moving from row <em>c</em> to <em>d</em>, or vice versa), it can never return to its own side. Furthermore, raiders are the <em>only</em> pieces allowed to enter houses—and only opponent houses. Once a raider has occupied a house it must remain there for the remainder of the game, nor can it be captured.</p>
-    <div class="tutClip" data-clip="raiders-move">
-      <span class="tutClipId">GIF: raiders-move</span>
-      <span class="tutClipDesc">Select a raider, show its 8 target squares, move it; then a
-        diagonal capture.</span>
-    </div>
-    <div class="tutClip" data-clip="raiders-rampart">
-      <span class="tutClipId">GIF: raiders-rampart</span>
-      <span class="tutClipDesc">A raider crosses the rampart; on its next selection the squares
-        back across are no longer offered.</span>
-    </div>
   </section>
 
   <section class="tutLesson" id="pieces">
-    <h3>5. Other pieces</h3>
-    <p>The knight, bishop, rook, queen, and king move and capture exactly as in standard chess. No single square may ever be occupied by more than one piece, and captures are executed by displacement. Furthermore, a player is strictly prohibited from making any move—whether it be a standard move or a cast move—that places their own king in check.</p>
-    <div class="tutClip" data-clip="pieces-move">
-      <span class="tutClipId">GIF: pieces-move</span>
-      <span class="tutClipDesc">Quick montage: knight L-move, bishop diagonal, rook slide, king step, each with
-        its target squares shown.</span>
+    <h3>4. The other pieces</h3>
+    <video class="tutLoop" data-src="assets/tutorial/pieces-move.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T4"></div>
+      <div class="tutVid" data-video="P4"></div>
     </div>
+    <p>The knight, bishop, rook, queen, and king move and capture exactly as in standard chess. No single square may ever be occupied by more than one piece, and captures are executed by displacement. Furthermore, a player is strictly prohibited from making any move—whether it be a standard move or a cast move—that places their own king in check.</p>
   </section>
 
   <section class="tutLesson" id="houses">
-    <h3>6. Houses</h3>
+    <h3>5. Houses</h3>
+    <video class="tutLoop" data-src="assets/tutorial/houses-jack.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T5" data-start="0" data-end="136"></div>
+      <div class="tutVid" data-video="P5" data-start="0" data-end="326"></div>
+    </div>
     <p>Each player possesses three houses: a Jack's House, a Queen's House, and a King's House. Raiders are the only pieces permitted to enter houses, and they may only occupy opponent houses. Once a raider occupies a house, it must remain there indefinitely; it cannot move again, nor can it be captured.</p>
     <p>Securing houses unlocks sequential tactical advantages:</p>
     <ul>
@@ -150,103 +144,158 @@
       <li><strong>Queen's House</strong> - Allows a player to spawn their queen onto the board.</li>
       <li><strong>King's House</strong> - Restricts the opponent's king exclusively to card squares, making non-card squares off-limits to it.</li>
     </ul>
-    <div class="tutClip" data-clip="houses-jack">
-      <span class="tutClipId">GIF: houses-jack</span>
-      <span class="tutClipDesc">A raider steps into the enemy Jack's House; show that it's now
-        locked in place, and that the cast options unlock.</span>
-    </div>
   </section>
 
   <section class="tutLesson" id="casting">
-    <h3>7. Casting: making 21</h3>
+    <h3>6. Casting: making 21</h3>
+    <video class="tutLoop" data-src="assets/tutorial/casting-21.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T5" data-start="139" data-end="397"></div>
+      <div class="tutVid" data-video="P5" data-start="330" data-end="454"></div>
+    </div>
     <p>A cast move always requires exactly three cards that combine to equal a sum of 21. These three cards are formed by a combination of the stationary card squares currently occupied by a player's raiders, plus cards chosen directly from the player's deck. A player may select specific cards from the deck; they do not need to be drawn at random.</p>
     <p>Card values function identically to Blackjack: number cards hold their face value, all face cards are worth 10, and aces act as either 1 or 11 at the player's discretion. While the board's card squares remain permanently stationary during a cast move, any deck cards used are immediately removed and cast into the graveyard, never to be used again.</p>
-    <div class="tutClip" data-clip="casting-21">
-      <span class="tutClipId">GIF: casting-21</span>
-      <span class="tutClipDesc">Raiders on the 7 and 4 card squares light up, plus a 10 from the
-        deck: 7 + 4 + 10 = 21. The deck card flips over, and cannot be used again.</span>
-    </div>
   </section>
 
   <section class="tutLesson" id="raising">
-    <h3>8. Raising a raider</h3>
+    <h3>7. Raising a raider</h3>
+    <video class="tutLoop" data-src="assets/tutorial/raising-raider.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T5" data-start="396" data-end="557"></div>
+      <div class="tutVid" data-video="P5" data-start="453" data-end="556"></div>
+    </div>
     <p>Once a player secures the opponent's Jack's House, they unlock the ability to spawn new raiders from the graveyard. To execute a raise, a player must form a sum of 21 using either:</p>
     <ul>
       <li>One raider occupying a non-house card square, combined with exactly two cards from the deck, or,</li>
       <li>Two raiders occupying non-house card squares, combined with exactly one card from the deck.</li>
     </ul>
     <p>After successfully casting, the player may take a raider from the graveyard and place it onto any empty square within their own territory, excluding house squares.</p>
-    <div class="tutClip" data-clip="raising-raider">
-      <span class="tutClipId">GIF: raising-raider</span>
-      <span class="tutClipDesc">Cast with one raider + two deck cards; a raider rises from the
-        graveyard onto a chosen home square.</span>
-    </div>
   </section>
 
   <section class="tutLesson" id="striking">
-    <h3>9. Striking</h3>
+    <h3>8. Striking</h3>
+    <video class="tutLoop" data-src="assets/tutorial/striking.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T5" data-start="556" data-end="905"></div>
+      <div class="tutVid" data-video="P5" data-start="555" data-end="698"></div>
+    </div>
     <p>Occupying the opponent's Jack's House also allows a player to execute a strike, which captures an enemy raider via casting. To strike, a player must form a sum of 21 using exactly two of their own raiders occupying card squares on the board, combined with exactly one card from the deck.</p>
     <p>Strikes exclusively target enemy raiders, and they may only be executed in enemy territory (rows <em>d</em> and <em>e</em> for White, and rows <em>b</em> and <em>c</em> for Black). A player is never permitted to strike within their own territory, nor can they strike a raider that is occupying a house.</p>
-    <div class="tutClip" data-clip="striking">
-      <span class="tutClipId">GIF: striking</span>
-      <span class="tutClipDesc">Two raiders + one deck card make 21; an enemy raider is struck
-        from the board and goes to its graveyard.</span>
-    </div>
   </section>
 
   <section class="tutLesson" id="queen">
-    <h3>10. The Queen's House &amp; the Queen</h3>
+    <h3>9. The Queen's House &amp; the Queen</h3>
+    <video class="tutLoop" data-src="assets/tutorial/queen-house.mp4" muted loop playsinline preload="none"></video>
+    <video class="tutLoop" data-src="assets/tutorial/queen-raise.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T5" data-start="907" data-end="1216"></div>
+      <div class="tutVid" data-video="P5" data-start="697" data-end="1090"></div>
+    </div>
     <p>Once a player holds the opponent's Jack's House, advancing a raider into the opponent's Queen's House becomes legal. Entering this house triggers an immediate deployment: on that same turn, the player places their queen onto any unoccupied square within their home territory, excluding houses. Unlike casting, this initial deployment requires no cards from the deck.</p>
     <p>A player may never have more than one queen on the board simultaneously. Should the queen be captured, she returns to the graveyard and can later be raised back onto the board. Raising a fallen queen follows the same requirements as a strike: the player must combine two raiders stationed on card squares with one card from their deck to total 21.</p>
-    <div class="tutClip" data-clip="queen-house">
-      <span class="tutClipId">GIF: queen-house</span>
-      <span class="tutClipDesc">Raider enters the Queen's House, then the queen is placed on a
-        home square in the same turn.</span>
-    </div>
-    <div class="tutClip" data-clip="queen-raise">
-      <span class="tutClipId">GIF: queen-raise</span>
-      <span class="tutClipDesc">Later: a captured queen is raised back from the graveyard with a
-        2-raider + 1-card cast.</span>
-    </div>
   </section>
 
   <section class="tutLesson" id="kinghouse">
-    <h3>11. The King's House</h3>
+    <h3>10. The King's House</h3>
+    <video class="tutLoop" data-src="assets/tutorial/king-house-restrict.mp4" muted loop playsinline preload="none"></video>
+    <video class="tutLoop" data-src="assets/tutorial/mate-by-capture.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T5" data-start="1222"></div>
+      <div class="tutVid" data-video="P5" data-start="1090"></div>
+    </div>
     <p>Occupying the opponent's Queen's House unlocks access to their King's House. Moving a raider into the King's House imposes severe restrictions on the defending monarch's movements: all blank, non-card squares immediately become illegal terrain for the enemy king, confining its steps strictly to card squares.</p>
     <p>Furthermore, if the opponent's king happens to be resting on a non-card square at the moment a raider enters the King's House, the game ends immediately as <strong>mate by capture</strong>. This represents the sole condition in RampartChess where a king is physically removed from the board rather than forced into conventional checkmate.</p>
-    <div class="tutClip" data-clip="king-house-restrict">
-      <span class="tutClipId">GIF: king-house-restrict</span>
-      <span class="tutClipDesc">Raider enters the King's House; the enemy king's reachable
-        squares shrink to card squares only.</span>
-    </div>
-    <div class="tutClip" data-clip="mate-by-capture">
-      <span class="tutClipId">GIF: mate-by-capture</span>
-      <span class="tutClipDesc">Enemy king on a blank square; raider steps into the King's
-        House; the king is captured and the game ends.</span>
-    </div>
   </section>
 
   <section class="tutLesson" id="ending">
-    <h3>12. Winning &amp; Draws</h3>
-    <p>Victory is achieved primarily through standard checkmate, or instantly via mate by capture upon entering the King's House. If a player whose turn it is to move is not in check but has no legal move available—neither a board step nor a cast move—the game concludes in a draw by stalemate. Either player may also claim a draw if an identical board position occurs three times over the course of the game.</p>
-    <div class="tutClip" data-clip="ending-stalemate">
-      <span class="tutClipId">GIF: ending-stalemate</span>
-      <span class="tutClipDesc">A stalemate position: side to move is not in check and has no
-        legal moves.</span>
+    <h3>11. Winning &amp; Draws</h3>
+    <video class="tutLoop" data-src="assets/tutorial/ending-stalemate.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T6" data-start="0" data-end="641"></div>
+      <div class="tutVid" data-video="P6" data-start="0" data-end="386"></div>
     </div>
+    <p>Victory is achieved primarily through standard checkmate, or instantly via mate by capture upon entering the King's House. If a player whose turn it is to move is not in check but has no legal move available—neither a board step nor a cast move—the game concludes in a draw by stalemate. Either player may also claim a draw if an identical board position occurs three times over the course of the game.</p>
   </section>
 
   <section class="tutLesson" id="example">
-    <h3>13. Putting It Together</h3>
-    <p>A typical match follows a distinct strategic arc: advancing raiders toward key card squares, breaching the rampart, securing the Jack's House to open casting channels, deploying the queen, and finally infiltrating the King's House to suffocate the enemy monarch's escape routes. Note also that it is not required to enter any house to checkmate the opposing king; if an opportunity for checkmate occurs anywhere throughout the game, this would count as victory just the same.</p>
-    <div class="tutClip" data-clip="example-game">
-      <span class="tutClipId">GIF: example-game</span>
-      <span class="tutClipDesc">Sped-up full game (or key moments) with captions at each
-        milestone.</span>
+    <h3>12. Putting It Together</h3>
+    <video class="tutLoop" data-src="assets/tutorial/example-game.mp4" muted loop playsinline preload="none"></video>
+    <div class="tutPair">
+      <div class="tutVid" data-video="T6" data-start="645"></div>
+      <div class="tutVid" data-video="P6" data-start="393"></div>
     </div>
+    <p>A typical match follows a distinct strategic arc: advancing raiders toward key card squares, breaching the rampart, securing the Jack's House to open casting channels, deploying the queen, and finally infiltrating the King's House to suffocate the enemy monarch's escape routes. Note also that it is not required to enter any house to checkmate the opposing king; if an opportunity for checkmate occurs anywhere throughout the game, this would count as victory just the same.</p>
     <p>Ready to test these tactics? Play a match against the AI, or consult the complete official rulebook for full technical specifications.</p>
   </section>
 </main>
+
+<script>
+  // YouTube video ids - paste the id from each link (the part after "watch?v=" or "youtu.be/").
+  // T = Tabletop series, P = Online series; the number is the lesson (1-6).
+  const TUT_VIDEOS = {
+    T1: 'BTHldMzdW_0', T2: 'JcMwqBCzZHs', T3: '_wniKd87r94', T4: 'Wkifc7vy-AM', T5: '4zD1LSv9ssQ', T6: 'dOEIlo11TxQ',
+    P1: 'i_nr4_rm10Y', P2: 'oIBI3-RPywc', P3: 'hvkMiNbbvMI', P4: 'pOe_wttkrG0', P5: 'KKoKGTvt8qA', P6: 'yz0pB5-LyFA',
+  };
+  const TUT_PLAYLISTS = { tabletop: 'PLDsZTrdxmxvE', online: 'PLR2-Lt9HGnCw' };
+
+  // The looping clips only load once they come near the screen, and pause
+  // when scrolled away, so 15 videos don't all download with the page.
+  const loopObserver = new IntersectionObserver((entries) => {
+    for (const { target: v, isIntersecting } of entries) {
+      if (isIntersecting) {
+        if (!v.src) v.src = v.dataset.src;
+        v.play().catch(() => {});
+      } else if (v.src) {
+        v.pause();
+      }
+    }
+  }, { rootMargin: '200px 0px' });
+  document.querySelectorAll('.tutLoop').forEach((v) => loopObserver.observe(v));
+
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  for (const a of document.querySelectorAll('.tutSeriesBtn')) {
+    const id = TUT_PLAYLISTS[a.dataset.playlist];
+    if (id) a.href = `https://www.youtube.com/playlist?list=${id}`;
+    else a.hidden = true;
+  }
+  for (const box of document.querySelectorAll('.tutVid')) {
+    const key = box.dataset.video;
+    const id = TUT_VIDEOS[key];
+    const start = box.dataset.start ? Number(box.dataset.start) : null;
+    const end = box.dataset.end ? Number(box.dataset.end) : null;
+    const series = key[0] === 'T' ? 'Tabletop' : 'Online';
+    const range = start === null ? '' : end === null ? ` · from ${fmt(start)}` : ` · ${fmt(start)}–${fmt(end)}`;
+    const label = document.createElement('div');
+    label.className = 'tutVidLabel';
+    label.textContent = series + range;
+    const frame = document.createElement('div');
+    frame.className = 'tutVidFrame';
+    if (!id) {
+      frame.classList.add('tutVidPending');
+      frame.textContent = 'Video coming soon';
+    } else {
+      // Thumbnail + play button; the real YouTube player only loads on click,
+      // so two dozen embeds don't all load with the page.
+      const btn = document.createElement('button');
+      btn.className = 'tutVidPlay';
+      btn.setAttribute('aria-label', `Play the ${series} video`);
+      btn.style.backgroundImage = `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)`;
+      btn.addEventListener('click', () => {
+        const q = new URLSearchParams({ autoplay: '1', rel: '0' });
+        if (start) q.set('start', start);
+        if (end) q.set('end', end);
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://www.youtube-nocookie.com/embed/${id}?${q}`;
+        iframe.title = `RampartChess ${series} tutorial`;
+        iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+        iframe.allowFullscreen = true;
+        frame.replaceChildren(iframe);
+      });
+      frame.appendChild(btn);
+    }
+    box.append(label, frame);
+  }
+</script>
 
 <script type="module" src="js/header.js"></script>
 <script type="module">
