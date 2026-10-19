@@ -36,11 +36,12 @@ TIME_CONTROLS = ("30min", "1hour", "1day_per_move")
 # explicitly asked for a cap on this. Originally a flat 24 hours regardless
 # of time_control; a 1day_per_move game is itself played at a pace of days,
 # so 24 hours to even ACCEPT the challenge was unreasonably tight compared
-# to the game's own tempo - that one now gets a week. 30min/1hour keep the
-# original 24 hours (a same-day answer is reasonable for a game that fast).
+# to the game's own tempo - that one now gets a week. 30min/1hour games are
+# played in one sitting, so their invites expire after 90 minutes (owner,
+# 10/18; was 24 hours).
 CHALLENGE_EXPIRY_MS_BY_TIME_CONTROL = {
-    "30min": 24 * 60 * 60 * 1000,
-    "1hour": 24 * 60 * 60 * 1000,
+    "30min": 90 * 60 * 1000,
+    "1hour": 90 * 60 * 1000,
     "1day_per_move": 7 * 24 * 60 * 60 * 1000,
 }
 DEFAULT_CHALLENGE_EXPIRY_MS = 24 * 60 * 60 * 1000

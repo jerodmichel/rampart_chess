@@ -2290,6 +2290,14 @@ async function triggerAiMove() {
 function loadGame(newState) {
     state = newState;
     gameId = state.id;
+    // Keep the game in the address bar, so a refresh reopens it via
+    // loadGameFromUrl instead of dropping back to the home screen.
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('game') !== gameId) {
+        url.searchParams.delete('open');
+        url.searchParams.set('game', gameId);
+        history.replaceState(null, '', url);
+    }
     gameEndSoundedFor = isGameOver(state) ? state.id : null;
     selected = null;
     legalDestinations = [];

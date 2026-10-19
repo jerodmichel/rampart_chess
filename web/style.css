@@ -3752,16 +3752,17 @@ body.wideLayout #challengeSend {
 }
 
 /* Chat in a game against a person, Live Games otherwise - whichever is
-   showing takes the rail's spare height and scrolls inside itself. */
-body.wideLayout #chatPanel:not([hidden]) ~ #liveGamesPanel {
-    display: none;
-}
+   showing takes the rail's spare height and scrolls inside itself. With
+   chat showing, Live Games stays underneath it in the bottom third. */
 body.wideLayout #chatPanel:not([hidden]),
 body.wideLayout #liveGamesPanel {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
+}
+body.wideLayout #chatPanel:not([hidden]) {
+    flex: 2;
 }
 body.wideLayout #chatMessages,
 body.wideLayout #liveGamesList {
