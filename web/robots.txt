@@ -1,0 +1,2 @@
+User-agent: *
+Sitemap: https://rampartchess.com/sitemap.xml
